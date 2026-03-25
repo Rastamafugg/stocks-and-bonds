@@ -76,8 +76,11 @@ If a syscall detail appears ambiguous or undocumented, use
 - Follow `bestPractices.md` for declaration order, line numbering, naming,
   comments, and procedure structure.
 - Consult `basic09-error-handling.md` before changing error handling.
-- Write every procedure with `ON ERROR GOTO` unless the project docs document an
-  explicit exception.
+- Add `ON ERROR GOTO` when the procedure has a real runtime-error surface or
+  owns cleanup, following `docs/reference/basic09-error-handling.md`.
+- Small pure-logic procedures may omit a local handler when they perform no
+  I/O, no syscall work, no conversion that can trap, own no cleanup, and
+  operate only on already-validated in-memory values.
 - Preserve referenced line numbers used by `GOSUB`, `ON ERROR GOTO`, and
   `ON...GOTO/GOSUB`.
 - Use `RUN` to call procedures, not `CALL`.

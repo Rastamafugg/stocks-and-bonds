@@ -193,7 +193,9 @@ DIR       EXEC      READ      UPDATE    WRITE
 
 ### Error Handling
 
-* **Include an `ON ERROR GOTO` handler in every procedure.** Global error handling is not supported. Each procedure must manage its own errors.
+* **Include an `ON ERROR GOTO` handler when the procedure has a real runtime-error surface or owns cleanup.** Common triggers are file I/O, syscalls, `GET`/`PUT`/`OPEN`/`CREATE`/`DELETE`, `INPUT` or `VAL` conversion traps, and any procedure that must close paths, restore state, or release resources on failure.
+
+* **A small pure-logic procedure may omit a local handler when all of the following are true:** it performs no I/O, no syscall work, no conversion that can trap, owns no cleanup, and operates only on already-validated in-memory values. Omission should be intentional, not accidental.
 
 * **Do not treat `ERROR(ERR)` as a reliable bubbling mechanism.** In this codebase it is not a verified way to delegate an error to the caller's `ON ERROR` handler. Prefer explicit local handling, verified control-flow patterns, or status/result out-parameters.
 

@@ -1,81 +1,156 @@
-### **Basic09 Error Handling: A Guide to Procedural Scope and Delegation**
+## Basic09 Error Handling
 
-This document outlines the authoritative rules and patterns for managing runtime errors in Basic09. It is critical to understand that Basic09's error handling model is based on **procedural scope** and does not support the concept of a single, centralized "global" handler found in modern languages.
+This document defines the project's verified error-handling patterns for Basic09 code.
+Use it together with `bestPractices.md`. `bestPractices.md` gives the short rule set.
+This document explains when a local handler is required, when it is optional, and what
+patterns to use in each case.
 
-#### **I. The Principle of Procedural Scope**
+### 1. Core Model
 
-In Basic09, the scope of an `ON ERROR GOTO` statement is strictly limited to the procedure in which it is defined.[1] This is a core architectural principle:
+Basic09 error handling is procedure-scoped.
 
-  * **Locality:** All variables, line numbers, and labels are local to a procedure.
-  * **No Global Handlers:** There is no mechanism for creating a truly global, application-wide error handler. The pattern of a shared label for an error handler across multiple, separate procedures is syntactically invalid.[1]
+- `ON ERROR GOTO` only affects the procedure in which it appears.
+- Variables, line numbers, and handlers are local to that procedure.
+- There is no valid cross-procedure shared error label pattern.
 
-The correct approach is to implement error handling on a per-procedure basis, with each procedure responsible for managing its own specific errors.
+This means each procedure must decide whether it needs its own handler based on its
+runtime-error surface and cleanup responsibility.
 
-#### **II. The `ON ERROR GOTO` Statement**
+### 2. When a Local Handler Is Required
 
-The `ON ERROR GOTO` statement establishes a local error handler within a procedure. The handler is a labeled section of code (e.g., a line number) that the program jumps to when a runtime error occurs.
+Add `ON ERROR GOTO` when the procedure does any of the following:
 
-**Example 1: Top-Level Handler**
-In a main procedure like `FILEMGR` or `TRANSPILE`, a top-level handler is used to manage general runtime errors and perform cleanup operations, such as closing files, before the program terminates.[1, 1]
+- Performs file I/O such as `OPEN`, `CREATE`, `DELETE`, `GET`, `PUT`, `READ`, or `WRITE`
+- Performs syscall or other OS-facing work
+- Uses conversion or input paths that may trap at runtime, such as `VAL`
+- Owns cleanup that must run on failure, such as closing a path or restoring state
+- Needs to distinguish an expected runtime condition from an unexpected one
+
+Typical examples in this codebase:
+
+- State-file readers and writers
+- Procedures that open or close paths
+- Syscall wrappers and module-loading helpers
+- Procedures that intentionally catch conversion failures and convert them to a status flag
+
+### 3. When a Local Handler May Be Omitted
+
+A small pure-logic procedure may omit a local handler when all of the following are true:
+
+- It performs no file I/O
+- It performs no syscall or OS-facing work
+- It performs no runtime conversion that can trap
+- It owns no cleanup
+- It operates only on already-validated in-memory values
+
+This is an allowed omission, not a default habit. The author should be able to justify
+why the procedure has no meaningful runtime-error surface of its own.
+
+### 4. Expected vs Unexpected Errors
+
+Use a local handler when the procedure must treat one runtime condition as expected.
+
+Examples:
+
+- File-not-found during an existence probe
+- End-of-file in a reader that intentionally reads until exhaustion
+- A `VAL` conversion failure being translated into `ok := FALSE`
+
+In these cases, the handler should convert the runtime event into the procedure's
+documented behavior. Do not print generic diagnostics for an expected control path unless
+the procedure contract says to do so.
+
+### 5. Cleanup Ownership
+
+If a procedure opens a path, allocates temporary state, or changes a resource that must
+be restored, it should usually own a local handler.
+
+Typical pattern:
 
 ```basic09
-PROCEDURE FILEMGR
-! Main file management demonstration procedure
+PROCEDURE readThing
+PARAM ok : BOOLEAN
+DIM path : BYTE
+DIM pathOpen : BOOLEAN
+
 ON ERROR GOTO 900
-...
-! Main program loop
-REPEAT
- ...
-UNTIL done
-...
-! Error handler
-900 errorCode := ERR
-PRINT "Error"; errorCode; "occurred."
-PRINT "File Manager terminated."
+
+pathOpen := FALSE
+ok := FALSE
+
+OPEN #path, "FILE":READ
+pathOpen := TRUE
+
+! normal work here
+
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    ok := FALSE
 END
 ```
 
-**Example 2: Specific, Local Handler**
-For procedures that perform specific tasks with predictable errors, a local handler is used to manage those errors gracefully. The `readFile` procedure, for instance, has a handler specifically for an End of File error (`ERR=211`), which is an expected condition.[1]
+The key point is not the exact message text. The key point is that the procedure cleans
+up what it owns before it returns.
 
-```basic09
-PROCEDURE readFile
-...
-ON ERROR GOTO 210
-OPEN #path, fileName: READ
-...
-210! Error handler - check for EOF
-    IF ERR = 211 THEN
-      PRINT "End of file reached."
-    ELSE
-      PRINT "Error reading file: "; ERR
-    ENDIF
-    IF pathOpen THEN CLOSE #path \ENDIF
-    END
-```
+### 6. Prefer Status Returns for Recoverable Failures
 
-#### **III. The `ERROR(ERR)` Function for Delegation**
+For recoverable operations, prefer explicit status/result out-parameters over attempts to
+escalate with `ERROR(ERR)`.
 
-Instead of a "global" handler, Basic09 uses a delegation pattern known as **error bubbling**. This allows a called procedure to manage its own errors and, if it cannot handle them, to propagate them back up the call stack to the calling procedure's handler.[1] The `ERROR(ERR)` function is the correct mechanism for this behavior.
+Good fit:
 
-The `TRANSPILE` and `LoadDefinitions` procedures provide a canonical example of this delegation.[1]
+- `loadOK : BOOLEAN`
+- `hasState : BOOLEAN`
+- `numOk : BOOLEAN`
 
-**The Delegation Process:**
+Use this pattern when the caller can choose between continue, retry, alternate path, or
+quiet failure.
 
-1.  The `TRANSPILE` procedure calls `LoadDefinitions` and is set up with its own `ON ERROR GOTO 900` handler.[1]
-2.  The `LoadDefinitions` procedure, in turn, has its own local handler at line `100` to deal with file-specific issues.[1]
-3.  If a file-related error occurs within `LoadDefinitions`, such as a "File not found" (`ERR=210`), the program branches to the local handler at `100`.[1]
-4.  After the local handler performs its task (e.g., printing a specific error message and closing the file), it uses `ERROR(ERR)` to pass the original error code back to the calling procedure's (`TRANSPILE`'s) error handler.[1]
-5.  The `TRANSPILE` handler at line `900` then takes over, prints a generic runtime error message, and performs any necessary cleanup, such as closing all remaining open files.[1]
+### 7. Do Not Rely on `ERROR(ERR)` for Delegation
 
-This chain of responsibility ensures that each procedure manages its own context-specific errors while allowing for controlled termination by the main procedure.
+Do not treat `ERROR(ERR)` as a reliable bubbling mechanism in this project.
 
-#### **IV. Common Basic09 Error Codes**
+- It is not the project's verified propagation model.
+- It is especially unsafe inside a procedure's own error-handler block.
+- Using `ERROR(ERR)` inside the `900` handler can loop back into the same handler.
 
-The following table lists common error codes from the provided documentation and their typical meaning:
+If a procedure cannot recover locally, prefer one of these:
 
-| Error Code (`ERR`) | Description | Example Context |
-| :--- | :--- | :--- |
-| `216` | "File not found".[1] | Opening a file for reading that does not exist. |
-| `211` | "End of file".[1] | This is a normal, expected error when reading to the end of a file.[1] |
-| `900` | Generic Runtime Error | A custom error code used by the `TRANSPILE` procedure to flag parameter validation failures.[1] |
+- print a targeted diagnostic and `END`
+- set a status output and `END`
+- return control through documented caller-visible state
+
+### 8. Handler Shape
+
+Choose the smallest handler shape that fits the procedure.
+
+Common patterns:
+
+1. Cleanup plus status return
+2. Cleanup plus targeted diagnostic
+3. Expected-condition branch plus normal completion
+
+Not every handler needs verbose printing. Not every handler needs a separate expected
+condition branch. The procedure contract should drive the choice.
+
+### 9. Review Questions
+
+Before adding or removing a handler, check:
+
+- Does this procedure have any real runtime-error surface?
+- Does it own cleanup?
+- Does it convert an expected runtime event into a documented result?
+- If it omits a handler, is that omission intentional and defensible?
+- If it includes a handler, does the handler actually do useful work?
+
+### 10. Summary Rule
+
+Use `ON ERROR GOTO` where the procedure has something meaningful to catch, clean up, or
+translate. Do not add a `900` block by reflex to tiny pure-logic procedures that have no
+independent failure surface.

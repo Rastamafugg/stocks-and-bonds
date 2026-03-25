@@ -34,7 +34,7 @@ These instructions govern how to build, edit, review, and QA Basic09 code in thi
 
 * **Verify all identifiers against the reserved words list in `bestPractices.md`** before using them as variable names, TYPE attribute names, array names, or procedure names.
 
-* **Write every procedure with an `ON ERROR GOTO` handler** unless there is a documented, explicit reason not to.
+* **Add an `ON ERROR GOTO` handler when the procedure has a real runtime-error surface or owns cleanup.** Use the narrower decision rule in `basic09-error-handling.md`. Small pure-logic procedures may omit a local handler when the omission is intentional and justified by the procedure's behavior.
 
 * **Test memory usage estimates before finalizing array sizes.** Basic09 has a hard 32KB variable memory limit. Arrays that appear reasonable in modern environments may exceed this limit.
 
@@ -78,7 +78,8 @@ Before submitting or approving any Basic09 code change, verify:
 - [ ] No reserved word is used as a variable, type attribute, array, or procedure name. This includes lowercase or mixed case versions of the identifiers.
 - [ ] All `IF` blocks have a matching `ENDIF`; all `WHILE` blocks have `ENDWHILE`; all `FOR` loops have `NEXT`; all `LOOP` blocks have `ENDLOOP`; all `REPEAT` blocks have `UNTIL`; all `EXITIF` blocks have `ENDEXIT`
 - [ ] `ELSE IF` nesting is fully closed with the correct number of `ENDIF` statements
-- [ ] Every procedure has an `ON ERROR GOTO` handler (or a documented exception)
+- [ ] Every procedure with a real runtime-error surface or owned cleanup has an appropriate `ON ERROR GOTO` handler
+- [ ] Any procedure without a local handler is a small pure-logic procedure with no I/O, no syscall work, no conversion trap, and no owned cleanup
 - [ ] Every procedure ends with `END`
 - [ ] `RETURN` is used only inside `GOSUB` subroutines, never to terminate a procedure
 - [ ] `RUN` is used to call procedures, not `CALL`
