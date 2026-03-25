@@ -52,23 +52,23 @@ DIR       EXEC      READ      UPDATE    WRITE
 
 * **Use structured programming techniques.** Large, complex programs are easier to develop, test, and maintain when they are divided into multiple procedures, each with a specific function.
 
-* **Limit source changes to the task at hand.** This is a GitHub-managed project; check-ins should be targeted to solving given tasks only. Leave unrelated code unchanged.
+* **Limit source changes to the task at hand.** This is a GitHub-managed project. Check-ins should be targeted to solving the assigned task only. Leave unrelated code unchanged.
 
-* **Use the `:=` operator for assignment, `=` for comparison.** Although `=` is also accepted for assignment, using `:=` distinguishes assignment from comparison (test for equality).
+* **Use the `:=` operator for assignment, `=` for comparison.** Although `=` is also accepted for assignment, using `:=` distinguishes assignment from comparison.
 
 * **Declare variables with `TYPE`, `PARAM`, and `DIM` at the start of a procedure.** This is not mandatory, but improves readability. The declaration order is strict: `TYPE` first, then `PARAM`, then `DIM`.
 
-* **`TYPE` declarations must occupy a single line** You cannot split a `TYPE` declaration across multiple lines.
+* **`TYPE` declarations must occupy a single line.** You cannot split a `TYPE` declaration across multiple lines.
 
-* **Initialize variables.** Basic09 does not automatically initialize variables - they contain random values when a procedure starts. Assign initial values explicitly.
+* **Initialize variables.** Basic09 does not automatically initialize variables. Assign initial values explicitly.
 
 * **Use parentheses to override operator precedence.** This improves expression readability.
 
 ### Line Numbers and Formatting
 
-* **Reserve line numbers for `GOSUB`, `ON ERROR`, and `ON...GOTO/GOSUB` targets.** Line numbers make programs harder to read and increase compile time. Use them only where required by syntax. 
+* **Reserve line numbers for `GOSUB`, `ON ERROR`, and `ON...GOTO/GOSUB` targets.** Line numbers make programs harder to read and increase compile time. Use them only where required by syntax.
 
-* **Line numbers must increase in value within a procedure.** Separate procedures' line numbering is independent.  Start line numbers at 100, increment by 100. Reserve line number `900` for the end-of-procedure error handler. Keep all other line numbers below this value and increasing in value as you progress down the procedure listing.
+* **Line numbers must increase in value within a procedure.** Separate procedures' line numbering is independent. Start line numbers at 100 and increment by 100. Reserve line number `900` for the end-of-procedure error handler. Keep all other line numbers below this value and increasing in value as you progress down the procedure listing.
 
   ```basic09
   PROCEDURE ProcExample
@@ -76,21 +76,20 @@ DIR       EXEC      READ      UPDATE    WRITE
     ON ERROR GOTO 900
     ON branchValue GOSUB 100, 200
     END
-  
+
   100 \ ! Branch A
     RETURN
-  
+
   200 \ ! Branch B
     RETURN
-  
+
   900 \ ! Error handler
     END
   ```
-* **When to use ON...GOSUB** `ON...GOSUB` earns its compile cost and readability tradeoff when the selector is a contiguous `1..N` integer with N >= ~5, particularly inside loops where repeated evaluation matters. Below that threshold, `IF/ELSE IF` is preferable in this codebase.
 
 * **Write one program statement per line.** The backslash statement concatenation syntax (`\`) hides program structure and offers no speed advantage. Exceptions: inline comments (`\ ! comment`) and multi-`ENDIF` switch closures (`ENDIF \ENDIF \ENDIF`).
 
-* **Program statements cannot be extended across multiple lines** The `\` symbol, in particular, cannot be used to try to bridge a single statement across multiple lines.
+* **Program statements cannot be extended across multiple lines.** The `\` symbol cannot be used to bridge a single statement across multiple lines.
 
 * **Use end-of-line comments to clarify, not narrate.** End-of-line comments use the syntax `\ ! comment text`. The `!` alone is only legal at the start of a line or after a `\`.
 
@@ -100,14 +99,14 @@ DIR       EXEC      READ      UPDATE    WRITE
   ENDIF
   ```
 
-* **Keep lines to 79 characters or fewer.** The maximum is 256 characters, but Basic09's line editor has UI issues beyond 79.
+* **Prefer lines of 79 characters or fewer.** This is a readability guideline, not a hard rule. The maximum is 256 characters, but Basic09's line editor has UI issues beyond 79. Valid one-line exceptions are acceptable when splitting would reduce clarity or break the syntax, especially for single-line `TYPE` declarations, `PRINT USING` statements, and `RUN` statements that must remain intact.
 
 * **Place all comments and logic inside `PROCEDURE` blocks.** Procedure header comments must immediately follow `PROCEDURE name`, before any declarations.
 
   ```basic09
   PROCEDURE demo
   (* ================================================== *)
-  (* PROCEDURE: demo                                    *)
+  (* PROCEDURE: demo                                     *)
   (* ================================================== *)
   TYPE ...
   PARAM ...
@@ -144,42 +143,45 @@ DIR       EXEC      READ      UPDATE    WRITE
   ENDIF \ENDIF \ENDIF
   ```
 
-* **MOD is a function, not an infix operator.** Correct usage: MOD(num1, num2). Wrong: num1 MOD num2.
+* **Reserved-word functions are called in function form, not infix form.** Do not assume that a reserved word that performs a calculation can be written between operands. Write it as a function call with parentheses and arguments.
 
-* **Numeric INPUT logic should handle non-numeric edge cases** INPUT + VAL validation pattern. Always guard with: (1) IF qIn = "" THEN treat as zero/default. (2) ELSE IF VAL(qIn) = 0 AND qIn <> "0" THEN reject as non-numeric.
+  Examples:
+  - Correct: `MOD(num1, num2)`
+  - Wrong: `num1 MOD num2`
+  - Correct: `LAND(mask, $01)`
+  - Wrong: `mask LAND $01`
+  - Correct: `LOR(flagA, flagB)`
+  - Wrong: `flagA LOR flagB`
 
-* **INTEGER Overflow in Percentage Arithmetic** Basic09 `INTEGER` is signed 16-bit. Maximum safe value: 32,767. Any expression `A * B` where the product may exceed 32,767 silently wraps and produces a wrong result. This is a latent defect — it will not raise an error and may only manifest with mid-to-late-game values.
+* **Numeric INPUT logic should handle non-numeric edge cases.** Use an INPUT plus validation pattern. Always guard with: (1) if the string is empty, treat it as zero or the documented default. (2) Otherwise, validate the conversion path explicitly before trusting the numeric result.
 
-    **The pattern to audit:** `value * pct / 100`
-    
-    Overflow occurs when `value * pct > 32,767`, i.e. when `value > 32,767 / pct`.
-    
-    | pct | overflows when value > |
-    |-----|-------|
-    | 100 |   327 |
-    |  75 |   437 |
-    |  50 |   655 |
-    |  40 |   819 |
-    |  25 | 1,310 |
-    |  20 | 1,638 |
-    |  10 | 3,276 |
-    |   5 | 6,553 |
+* **Audit percentage arithmetic for 16-bit overflow.** Basic09 `INTEGER` is signed 16-bit with a maximum safe value of 32,767. Any expression `A * B` where the product may exceed 32,767 silently wraps and produces a wrong result.
 
-  Fix strategies — choose by context:
+  The common pattern to audit is `value * pct / 100`.
 
-  1. Constant pct with a clean reciprocal. Replace with a single integer division. `value * 5 / 100` → `value / 20` Only applicable when the percentage has an exact integer reciprocal and no precision loss is acceptable.
-  2. Value is always a multiple of 10 (share lots). Divide into lots first, scale by pct, then divide by 10. `shares * pct / 100` → `(shares / 10) * pct / 10` Result is exact when shares is a multiple of 10. Max intermediate: `(maxShares/10) * maxPct`.
-  3. General case (arbitrary value, no structural constraint). Divide by 100 first. `value * pct / 100` → `value / 100 * pct` Trades overflow safety for truncation precision: values below 100 round to zero. Acceptable only when the calling context makes sub-100 inputs irrelevant (e.g., cashBal below $100 produces a meaningful 0 in a budget calculation).
+  | pct | overflows when value > |
+  |-----|------------------------|
+  | 100 | 327 |
+  |  75 | 437 |
+  |  50 | 655 |
+  |  40 | 819 |
+  |  25 | 1310 |
+  |  20 | 1638 |
+  |  10 | 3276 |
+  |   5 | 6553 |
 
-  **Rule:** Before writing any `A * B / 100` expression, compute the worst-case product using the maximum in-game value for `A` and the highest tier value for `B`. If the product can exceed 32,767, apply one of the above fixe
+  Fix strategies depend on context:
+  1. Constant percentage with a clean reciprocal. Replace with a single integer division when exact.
+  2. Value is always a multiple of 10. Divide into lots first, then scale.
+  3. General case. Divide before multiplying if the calling context tolerates truncation.
 
 ### Procedure Calls and Parameters
 
 * **Use `RUN` to execute a procedure.** `CALL` is not a valid keyword.
 
-* **Rely on pass-by-reference as the default parameter behavior.** All `PARAM` variables are passed by reference; no special symbol (e.g., `@`) is required. To force pass-by-value, re-evaluate the variable at the call site: `RUN proc(myVar + 0)`.
+* **Rely on pass-by-reference as the default parameter behavior.** All `PARAM` variables are passed by reference. To force pass-by-value, re-evaluate the variable at the call site, for example `RUN proc(myVar + 0)`.
 
-* **Use line numbers (not labels) in `ON...GOTO` and `ON...GOSUB` statements.** Example: `ON ERROR GOTO 100`, not `ON ERROR GOTO MyLabel`.
+* **Use line numbers, not labels, in `ON...GOTO` and `ON...GOSUB` statements.** Example: `ON ERROR GOTO 100`, not `ON ERROR GOTO MyLabel`.
 
 * **Use `END` to terminate a `PROCEDURE`.** `RETURN` is valid only for returning from a `GOSUB` subroutine. It does not return data to the caller. Use passed-by-reference parameters to return values.
 
@@ -193,26 +195,23 @@ DIR       EXEC      READ      UPDATE    WRITE
 
 * **Include an `ON ERROR GOTO` handler in every procedure.** Global error handling is not supported. Each procedure must manage its own errors.
 
-* **Use `ERROR(ERR)` to delegate unhandled errors to the calling procedure.** This bubbles the error up the call stack to the caller's `ON ERROR` handler.
+* **Do not treat `ERROR(ERR)` as a reliable bubbling mechanism.** In this codebase it is not a verified way to delegate an error to the caller's `ON ERROR` handler. Prefer explicit local handling, verified control-flow patterns, or status/result out-parameters.
 
 * **Use `MODULE`/`ENDMODULE` syntax only in other languages.** These are not reserved words in Basic09 and must not appear in `.b09` source files.
 
 ### Naming
 
-* **Use descriptive variable and type names under 10 characters.** This improves readability within Basic09's line editor constraints.
+* **Use descriptive variable and type names.** Favor names that are clear in context. Short names are useful for loop counters or tightly local values, but clarity matters more than forcing an arbitrary length limit.
 
-* **Ensure all variable and type names are unique within a program.** Duplicate names cause "duplicate definition" errors.
+* **Ensure all variable, parameter, and TYPE attribute names are unique within a procedure.** Duplicate names within the same procedure cause definition errors.
 
 * **Never use a reserved word (see table above) as a variable name, TYPE attribute name, array name, or procedure name.**
 
 ### Parameters, Variables, and Types
 
-* **Variable, Param, and Type Attribute names must be unique within a Procedure** It is a syntax error when a variable or parameter shares the same name as a type attribute.
+* **Variable, Param, and Type Attribute names must be unique within a procedure.** It is a syntax error when a variable or parameter shares the same name as a TYPE attribute.
 
-* **PARAM types must exactly match the storage size of the value passed by the caller.**
-  Basic09 does not check type at the call site — it checks only size. A size mismatch
-  causes the called procedure to read bytes from adjacent memory, producing garbage
-  values silently. The rules by caller source are:
+* **PARAM passing is governed by storage size compatibility, not semantic type identity.** Basic09 does not enforce declared type identity at the call site. It checks storage size. This means size-compatible reinterpretation can be intentional, but a size mismatch causes the called procedure to read the wrong bytes silently. The rules by caller source are:
 
   | Caller passes          | BYTE PARAM result        | INTEGER PARAM result |
   |------------------------|--------------------------|----------------------|
@@ -222,39 +221,32 @@ DIR       EXEC      READ      UPDATE    WRITE
   | BYTE struct field      | Correct: field value     | **Reads 2 bytes from field address: same garbage pattern** |
 
   Practical rules derived from the table:
-  - Declare PARAMs as `INTEGER` for any value callers will pass as a literal or
-    `INTEGER` variable.
-  - Never pass a `BYTE` variable or `BYTE` struct field directly to an `INTEGER` PARAM.
-    Stage through a local `INTEGER` DIM variable first (see rule below).
-  - Reserve `BYTE` PARAMs only for procedures whose callers will exclusively pass
-    `BYTE` variables or `BYTE` struct fields — never literals, never `INTEGER` vars.
-  - Reserve `BYTE` for `TYPE` record fields and `BYTE` arrays. Prefer `INTEGER` for
-    all working variables and parameters.
+  - Declare PARAMs to match the storage size the caller will actually pass.
+  - Declare PARAMs as `INTEGER` for values callers will pass as literals or `INTEGER` variables.
+  - Never pass a `BYTE` variable or `BYTE` struct field directly to an `INTEGER` PARAM. Stage through a local `INTEGER` DIM variable first.
+  - Reserve `BYTE` PARAMs only for procedures whose callers will exclusively pass 1-byte storage such as `BYTE` variables or `BYTE` struct fields.
+  - Size-compatible reinterpretation is possible in Basic09, but it must be deliberate and documented at the procedure boundary.
+  - Reserve `BYTE` for `TYPE` record fields and `BYTE` arrays. Prefer `INTEGER` for most working variables, arithmetic, loop counters, and procedure parameters.
 
-* **Stage BYTE fields through an INTEGER variable before passing to an INTEGER PARAM.**
-  Passing a `BYTE` variable or `BYTE` struct field directly to a procedure expecting
-  an `INTEGER` PARAM causes Basic09 to read 2 bytes starting at the BYTE's 1-byte
-  address. The BYTE value lands in the high byte (×256) and the low byte is whatever
-  memory follows — a neighboring variable or the next struct field. The result is
-  `byteValue * 256 + nextMemoryByte`, which is deterministic but always wrong.
-  Confirmed on NitrOS-9 hardware (TSTBYTEINT H2/H5).
+* **Stage BYTE fields through an INTEGER variable before passing to an INTEGER PARAM.** Passing a `BYTE` variable or `BYTE` struct field directly to a procedure expecting an `INTEGER` PARAM causes Basic09 to read 2 bytes starting at the BYTE's 1-byte address. The BYTE value lands in the high byte and the low byte is whatever memory follows, producing deterministic but wrong results.
 
   Always use an explicit INTEGER staging variable:
-```basic09
+
+  ```basic09
   DIM iStage: INTEGER
   iStage := rec.bFld      \ ! safe: BYTE->INTEGER assignment promotes correctly
   RUN someProc(iStage)    \ ! INTEGER var to INTEGER PARAM: correct
-```
+  ```
 
-  The inverse (passing an INTEGER var to a BYTE PARAM) delivers only the high byte,
-  which is zero for any value in the normal 0–255 range. That failure mode is silent.
-  Do not rely on implicit narrowing in either direction.
+  The inverse, passing an `INTEGER` variable to a `BYTE` PARAM, delivers only the high byte. That failure mode is silent. Do not rely on implicit narrowing in either direction.
+
+* **Stage BYTE values into INTEGER working variables before arithmetic, loop bounds, bit tests, and syscall flag handling.** This is a core `Stocks and Bonds` pattern. When a `BYTE` field is about to be used in arithmetic, as a `FOR` bound, or as input to routines such as `LAND` or `LOR`, first copy it into a local `INTEGER` variable.
 
 * **Declare `STRING` variables with an explicit length when the default is insufficient.** Without a length specifier, `STRING` defaults to 32 characters. Use `DIM name:STRING[40]` to declare a longer string.
 
 * **Account for the 32K variable memory limit.** Basic09 has only 32 KB available for variable storage. Size arrays with this constraint in mind.
 
-* **`FOR` incrementer variable must be of type INTEGER** BYTE incrementer variables will cause a syntax error.
+* **`FOR` incrementer variables must be of type INTEGER.** BYTE incrementer variables will cause a syntax error.
 
   ```basic09
   DIM i: INTEGER
@@ -263,13 +255,31 @@ DIR       EXEC      READ      UPDATE    WRITE
   NEXT i
   ```
 
+### Shared Types and Contracts
+
+* **Keep shared TYPE layouts byte-for-byte identical everywhere they are redeclared.** In `Stocks and Bonds`, records such as save headers, player records, market state, syscall register blocks, and AI profiles are redeclared in multiple procedures and modules. When a TYPE defines a cross-procedure or persisted contract, every copy must remain structurally identical: same field order, same field types, same array sizes.
+
+* **Document persisted record contracts when they cross file or process boundaries.** If a TYPE is written to disk, read back later, or passed indirectly through a child-process workflow, its layout is part of the application contract and must be treated as stable unless an intentional format migration is designed.
+
 ### File I/O
 
 * **Isolate file I/O in dedicated procedures.** This enables I/O-specific error handling and allows callers to fail gracefully on I/O errors.
 
+* **Prefer explicit success/failure out-parameters for recoverable I/O and load paths.** In this codebase, procedures such as loaders and lightweight state readers often return a boolean status output rather than trying to escalate via `ERROR(ERR)`. Use that pattern when the caller can recover or choose an alternate path.
+
+### Application Patterns
+
+* **Use a documented save/resume checkpoint contract when a phase can be resumed.** For multi-phase applications such as `Stocks and Bonds`, persist enough state to resume at a known checkpoint. Document the meaning of any saved phase code, player index, stage code, or similar control fields, and ensure readers and writers follow the same contract.
+
+* **Document coordinator/child-process handoff rules explicitly.** If a parent procedure loads modules, forks child phases, or shares state through a file or other indirect mechanism, document which procedure owns each transition, what state the child expects on entry, and what state it must write before exit.
+
+* **Use persistent keyed-editor loops for interactive screens that edit one asset at a time.** In `Stocks and Bonds`, human buy, sell, forced-liquidation, and similar screens keep a stable main screen, let the user select one row to edit, then return to the main view with simulated preview state. Reuse that pattern for consistency rather than inventing a new interaction model per screen.
+
+* **Use standard action-code contracts for screen navigation.** When a screen can continue, save, quit, confirm, or pass, define and document the action codes at the procedure boundary and keep those meanings stable across similar screens.
+
 ### Logging
 
-* **Include progress logging for visibility.** Print statements confirming key operations help with debugging and give confidence that execution is proceeding correctly.
+* **Use diagnostics deliberately, not as default progress chatter.** In screen-driven applications, prefer user-facing screens for normal flow and keep debug logging narrow, optional, and purpose-specific.
 
   ```basic09
   IF logVerbose THEN
@@ -290,7 +300,7 @@ DIR       EXEC      READ      UPDATE    WRITE
     END
   900 \ ! ProcA error handler
     END
-  
+
   PROCEDURE ProcB
     ON ERROR GOTO 900
     ! ...
@@ -299,4 +309,4 @@ DIR       EXEC      READ      UPDATE    WRITE
     END
   ```
 
-* **`STRING` variables with a `$` suffix are automatically typed.** Variables like `title$` are implicitly `STRING[32]`. Explicitly DIM them if a different length is needed.
+* **`STRING` variables with a `$` suffix are automatically typed.** Variables like `title$` are implicitly `STRING[32]`. In this codebase, prefer explicit `DIM ... : STRING[n]` declarations when the variable is part of maintained application code.
