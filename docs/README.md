@@ -44,6 +44,7 @@ A new Color Computer 3 NitrOS-9 project written in Basic09
 - `src/basic`: BASIC09 source
 - `src/tests`: BASIC09 test code source
 - `docs`: Project documentation
+- `disks`: CoCo floppy disk images
 
 ## Build
 
