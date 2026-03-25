@@ -52,10 +52,25 @@ A new Color Computer project targeting output type: **floppy**
 
 ## Build
 
-Run:
+This repository builds directly from `src/basic` and writes the source disk
+image to `disks/snbsrc.dsk`.
+
+Requirement:
+
+- Install the ToolShed `os9` command-line utility and ensure `os9` is on your
+  `PATH`.
+- ToolShed repository: [https://github.com/n6il/toolshed](https://github.com/n6il/toolshed)
+
+Run from the repository root:
 
 ```bash
 ./build.sh
 ```
 
-Or invoke the master script with parameters.
+Build behavior:
+
+- Creates `disks/snbsrc.dsk` if it does not already exist.
+- Uses `os9 format` and `os9 attr` to initialize the floppy image.
+- Copies `.b09` files from `src/basic` directly into the disk image.
+- Excludes `src/basic/global.b09`, which was only used by the removed
+  transpiler flow.

@@ -1,12 +1,8 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-# --- Project-specific variables ---
-PROJECT_NAME="stocksAndBonds"
-TARGET_TYPE="floppy"
-IMAGE_NAME="snb"
+IMAGE_NAME="snbsrc.dsk"
 
-# --- Script location awareness ---
 SOURCE="${BASH_SOURCE[0]}"
 while [ -L "$SOURCE" ]; do
   DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
@@ -14,8 +10,39 @@ while [ -L "$SOURCE" ]; do
   [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
 done
 SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
-cd "$SCRIPT_DIR"
+SOURCE_DIR="$SCRIPT_DIR/src/basic"
+DISK_DIR="$SCRIPT_DIR/disks"
+IMAGE_PATH="$DISK_DIR/$IMAGE_NAME"
 
-# --- Invoke root-level builder ---
-echo "🚀 Running build script with: -f \"$PROJECT_NAME\" \"$TARGET_TYPE\" \"$IMAGE_NAME\""
-../build.sh -f "$PROJECT_NAME" "$TARGET_TYPE" "$IMAGE_NAME"
+if ! command -v os9 >/dev/null 2>&1; then
+  echo "ERROR: ToolShed os9 utility not found on PATH."
+  exit 1
+fi
+
+if [ ! -d "$SOURCE_DIR" ]; then
+  echo "ERROR: Source directory not found: $SOURCE_DIR"
+  exit 1
+fi
+
+mkdir -p "$DISK_DIR"
+
+if [ ! -f "$IMAGE_PATH" ]; then
+  echo "Creating image: $IMAGE_PATH"
+  os9 format "$IMAGE_PATH" -ds -t80 -e -9
+  echo "Setting image attributes: $IMAGE_PATH"
+  os9 attr "$IMAGE_PATH" -ews
+fi
+
+if ! os9 dir "$IMAGE_PATH" >/dev/null 2>&1; then
+  echo "ERROR: '$IMAGE_PATH' is not a valid OS-9 image."
+  exit 1
+fi
+
+echo "Copying Basic09 sources from $SOURCE_DIR to $IMAGE_PATH"
+find "$SOURCE_DIR" -type f -name "*.b09" ! -name "global.b09" | sort | while read -r file; do
+  relative_path="${file#$SOURCE_DIR/}"
+  echo "  Copying $relative_path"
+  os9 copy -l -r "$file" "$IMAGE_PATH,$relative_path"
+done
+
+echo "Build complete: $IMAGE_PATH"
