@@ -1,4 +1,4 @@
-# stocksAndBonds
+# Stocks And Bonds
 
 Status: Current  
 Authority: Documentation index and reading order
@@ -37,18 +37,13 @@ Read these files in this order when working on the game design:
   Historical implementation planning artifact. Not authoritative for current
   rules or architecture.
 
-A new Color Computer project targeting output type: **floppy**
+A new Color Computer 3 NitrOS-9 project written in Basic09
 
 ## Project Structure
 
-- `src/basic`: BASIC source
-- `src/asm`: Assembly source
-- `src/img`: Image assets
-- `src/snd`: Sound/music
-- `src/txt`: Text/data
-- `bin`: Compiled output
+- `src/basic`: BASIC09 source
+- `src/tests`: BASIC09 test code source
 - `docs`: Project documentation
-- `log`: Build logs and diagnostics
 
 ## Build
 
@@ -72,5 +67,3 @@ Build behavior:
 - Creates `disks/snbsrc.dsk` if it does not already exist.
 - Uses `os9 format` and `os9 attr` to initialize the floppy image.
 - Copies `.b09` files from `src/basic` directly into the disk image.
-- Excludes `src/basic/global.b09`, which was only used by the removed
-  transpiler flow.
