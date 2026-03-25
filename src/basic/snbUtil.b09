@@ -623,6 +623,8 @@ PROCEDURE saveGame
 (*             mkt       - current market state                  *)
 (* SIDE EFX  : Creates or replaces savePath on disk.           *)
 (*             Modifies hdr.bnkrFlgs and hdr.checksum.         *)
+(*             On write failure: closes any open path, prints  *)
+(*             a diagnostic, and ENDs locally.                *)
 (* ============================================================ *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
@@ -706,7 +708,6 @@ END
       CLOSE #path
     ENDIF
     PRINT "saveGame error ("; ERR; ") writing: "; savePath
-    ERROR(ERR)
 END
 
 PROCEDURE loadGame
