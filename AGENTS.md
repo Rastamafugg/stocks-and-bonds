@@ -1,6 +1,6 @@
 # Stocks And Bonds Agent Instructions
 
-These instructions apply to all work under `stocksAndBonds/`.
+These instructions apply to all work in this repository.
 
 ## Durable Behavior Changes
 
@@ -10,8 +10,8 @@ These instructions apply to all work under `stocksAndBonds/`.
   unless the user explicitly says not to.
 - Do not present such a behavior change as persistent or "going forward"
   unless the AGENTS update has been made.
-- If the change applies repo-wide, update the root AGENTS file. If it applies
-  to this project subtree, update this local AGENTS file as well.
+- If the change applies in this repository, update this AGENTS file in the
+  same task.
 - Place durable behavior-change rules near the top of the AGENTS file so they
   govern later task-specific instructions.
 
@@ -23,6 +23,11 @@ These instructions apply to all work under `stocksAndBonds/`.
   1. the exact cited issue the user asked to fix
   2. any adjacent same-block issue proposed for bundled repair
 - Do not patch adjacent same-block issues unless they are disclosed first.
+
+## Repository Authority
+
+- Treat the project documentation under `docs/` as authoritative over general
+  language assumptions.
 
 ## First Reads
 
@@ -82,6 +87,7 @@ If a syscall detail appears ambiguous or undocumented, use
 ## Implementation Expectations
 
 - Review the full procedure before editing a `.b09` file.
+- Preserve existing formatting and line structure in source files.
 - For Basic09 control-flow fixes, edit only the named procedure range and use
   exact local context. Do not patch repeated `ENDIF` or similar closure lines
   by broad text replacement across the file.
