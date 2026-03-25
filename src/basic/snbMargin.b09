@@ -5,8 +5,6 @@ PROCEDURE snbMargin
 (*            Lists all procedures in this module.   *)
 (* PARAMS:    None                                    *)
 (* ================================================== *)
-ON ERROR GOTO 900
-
 PRINT "snbMargin"
 PRINT "  scrMgnCall"
 PRINT "  applyLiqOrdr"
@@ -15,9 +13,6 @@ PRINT "  scrMgnInt"
 PRINT "  aiLiqOrdr"
 PRINT "  scrForceLiq"
 PRINT "  scrMgnClr"
-END
-
-900 PRINT "snbMargin error ("; ERR; ")"
 END
 
 PROCEDURE scrMgnCall
@@ -48,8 +43,6 @@ PARAM callPrice : INTEGER
 PARAM amtDue    : INTEGER
 DIM pStr : STRING[8]
 
-ON ERROR GOTO 900
-
 RUN clrScr
 PRINT "*** MARGIN CALL ***"
 PRINT
@@ -69,9 +62,6 @@ PRINT "this obligation."
 PRINT
 RUN waitKey
 
-END
-
-900 PRINT "scrMarginCall error ("; ERR; ")"
 END
 
 PROCEDURE applyLiqOrdr
@@ -124,8 +114,6 @@ DIM qty     : INTEGER
 DIM prcd    : INTEGER
 DIM applyAmt: INTEGER
 
-ON ERROR GOTO 900
-
 bPar(1) := 1000
 bPar(2) := 5000
 bPar(3) := 10000
@@ -169,9 +157,6 @@ NEXT i
 
 END
 
-900 PRINT "applyLiqOrdr error ("; ERR; ")"
-END
-
 PROCEDURE scrBankrupt
 (* ============================================================ *)
 (* PROCEDURE : scrBankrupt                                      *)
@@ -201,8 +186,6 @@ PARAM reason    : BYTE
 PARAM currYear  : INTEGER
 DIM pStr : STRING[8]
 
-ON ERROR GOTO 900
-
 ! Mark the player record before display so that if the display
 ! path errors, the record is already correctly flagged.
 plyr.isBankrupt := TRUE
@@ -229,9 +212,6 @@ PRINT "  "; plyr.plyrName; " has been eliminated from the game."
 PRINT
 RUN waitKey
 
-END
-
-900 PRINT "scrBankrupt error ("; ERR; ")"
 END
 
 PROCEDURE scrMgnInt
@@ -273,8 +253,6 @@ PARAM action   : INTEGER
 DIM pStr : STRING[8]
 DIM navAct: INTEGER
 
-ON ERROR GOTO 900
-
 ! Internal guard: margin interest does not apply in Year 1 or 10.
 IF currYear = 1 OR currYear = 10 THEN
   action := 1
@@ -315,9 +293,6 @@ ELSE
 ENDIF \ENDIF
 END
 
-900 PRINT "scrMgnInt error ("; ERR; ")"
-END
-
 PROCEDURE aiLiqOrdr
 (* ============================================================ *)
 (* PROCEDURE : aiLiqOrdr                                        *)
@@ -352,8 +327,6 @@ DIM prcd    : INTEGER
 DIM i       : INTEGER
 DIM s       : INTEGER
 DIM b       : INTEGER
-
-ON ERROR GOTO 900
 
 bPar(1) := 1000
 bPar(2) := 5000
@@ -408,9 +381,6 @@ FOR b := 1 TO 3
   ENDLOOP
 NEXT b
 
-END
-
-900 PRINT "aiLiqOrdr error ("; ERR; ")"
 END
 
 PROCEDURE scrForceLiq

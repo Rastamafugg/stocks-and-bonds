@@ -40,16 +40,10 @@ PARAM txt:STRING
 
 DIM r:INTEGER
 
-ON ERROR GOTO 900
-
 FOR r := 1 TO row
   PRINT
 NEXT r
 PRINT TAB(col); txt
-END
-
-900 \ ! Error handler
-PRINT "printAt error ("; ERR; ")"
 END
 
 PROCEDURE getLotQty
@@ -316,8 +310,6 @@ DIM padLen:INTEGER
 DIM minWid:INTEGER
 DIM p:INTEGER
 
-ON ERROR GOTO 900
-
 raw := TRIM$(STR$(amt)) \ ! digit string, no trailing spaces
 sLen := LEN(raw)
 minWid := 4
@@ -334,10 +326,6 @@ FOR p := 1 TO padLen
   result := result + " "
 NEXT p
 result := result + raw
-END
-
-900 \ ! Error handler
-PRINT "fmtMoney error ("; ERR; ")"
 END
 
 PROCEDURE fmtPlyrName
@@ -357,8 +345,6 @@ PARAM plyrType : INTEGER
 PARAM aiTier   : INTEGER
 PARAM dispName : STRING[27]
 
-ON ERROR GOTO 900
-
 dispName := plyrName
 IF plyrType = 2 THEN
   IF aiTier = 1 THEN
@@ -369,9 +355,6 @@ IF plyrType = 2 THEN
     dispName := plyrName + " MEDIUM"
   ENDIF \ENDIF
 ENDIF
-END
-
-900 PRINT "fmtPlyrName error ("; ERR; ")"
 END
 
 PROCEDURE getMenuKey
@@ -460,17 +443,12 @@ PROCEDURE getSaveQuitAct
 PARAM keyIn  : STRING
 PARAM action : INTEGER
 
-ON ERROR GOTO 900
-
 action := 0
 IF keyIn = "S" OR keyIn = "s" THEN
   action := 3
 ELSE IF keyIn = "Q" OR keyIn = "q" THEN
   action := 4
 ENDIF \ENDIF
-END
-
-900 PRINT "getSaveQuitAct error ("; ERR; ")"
 END
 
 PROCEDURE quitToMenu
@@ -837,17 +815,12 @@ PROCEDURE guardSave
 PARAM savName : STRING[20]
 PARAM isOK    : BOOLEAN
 
-ON ERROR GOTO 900
-
 IF savName = "SNBSTATE" THEN
   isOK := FALSE
   PRINT "SNBSTATE is reserved and cannot be used as a save file name."
 ELSE
   isOK := TRUE
 ENDIF
-END
-
-900 PRINT "guardSave error ("; ERR; ")"
 END
 
 PROCEDURE initAIProf
@@ -857,7 +830,8 @@ PROCEDURE initAIProf
 (*            tier-specific parameter values per     *)
 (*            ai-difficulty-tiers.md Section 4.      *)
 (*            Tier 1=Easy, 2=Medium, 3=Hard.         *)
-(*            Invalid tier jumps to error handler.   *)
+(*            Invalid tier prints a diagnostic and   *)
+(*            ENDs locally.                          *)
 (* PARAMS   : tier - difficulty tier (1/2/3)         *)
 (*            prof - AIProfile to populate (by ref)  *)
 (* SIDE FX  : Modifies prof in place.                *)
@@ -868,8 +842,6 @@ TYPE AIProfile = tier,concenCap,spltSlPct,distSlPrc,mgnMaxExpo,mgnBuffer,mgnResv
 
 PARAM tNum: INTEGER
 PARAM prof: AIProfile
-
-ON ERROR GOTO 900
 
 IF tNum = 1 THEN \ ! Easy
     prof.tier       := 1
@@ -929,12 +901,10 @@ ELSE IF tNum = 3 THEN \ ! Hard
     prof.useMargin  := TRUE
     prof.bondPriory := FALSE
 ELSE
-    GOTO 900 \ ! Invalid tier; programming error
+    PRINT "initAIProf error (invalid tier)"
+    END
 ENDIF \ENDIF \ENDIF
 
-END
-
-900 PRINT "initAIProf error ("; ERR; ")"
 END
 
 PROCEDURE shuffleDeck
@@ -953,8 +923,6 @@ DIM i   : INTEGER
 DIM j   : INTEGER
 DIM tmp : BYTE
 
-ON ERROR GOTO 900
-
 ! Step 1: populate deck with sequential card IDs 1..36
 FOR i := 1 TO 36
   deckOrd(i) := i
@@ -969,7 +937,4 @@ FOR i := 36 TO 2 STEP -1
   deckOrd(j) := deckOrd(i)
   deckOrd(i) := tmp
 NEXT i
-END
-
-900 PRINT "shuffleDeck error ("; ERR; ")"
 END

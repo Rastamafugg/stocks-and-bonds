@@ -259,8 +259,6 @@ DIM j            : INTEGER
 DIM s            : INTEGER
 DIM tmp          : INTEGER
 
-ON ERROR GOTO 900
-
 ! --- AIProfile field loading (ai-player-logic.md Sec 3) --------
 concentCapW  := prof.concenCap   \ ! BYTE field -> INTEGER working var
 mgnRsvPctW   := prof.mgnResvPct  \ ! BYTE field -> INTEGER working var
@@ -521,10 +519,6 @@ ENDIF
 
 END
 
-900 PRINT "aiBuy error ("; ERR; ")"
-RUN waitKey
-END
-
 PROCEDURE applyBuys
 (* ============================================================ *)
 (* PROCEDURE : applyBuys                                       *)
@@ -584,8 +578,6 @@ DIM cost    : INTEGER
 DIM cashPay : INTEGER
 DIM mgnPay  : INTEGER
 
-ON ERROR GOTO 900
-
 bPar(1) := 1000
 bPar(2) := 5000
 bPar(3) := 10000
@@ -635,9 +627,6 @@ FOR i := 1 TO ordCnt
 
 NEXT i
 
-END
-
-900 PRINT "applyBuys error ("; ERR; ")"
 END
 
 PROCEDURE scrMgnRepay
@@ -746,8 +735,6 @@ DIM b       : INTEGER
 DIM shown   : INTEGER
 DIM pStr    : STRING[8]
 
-ON ERROR GOTO 900
-
 sNam(1) := "Growth Corp"
 sNam(2) := "Metro Props"
 sNam(3) := "Pioneer Mut"
@@ -803,9 +790,6 @@ ENDIF
 PRINT
 RUN getPhaseNav(action)
 
-END
-
-900 PRINT "scrAIBuyTurn error ("; ERR; ")"
 END
 
 PROCEDURE scrBuy

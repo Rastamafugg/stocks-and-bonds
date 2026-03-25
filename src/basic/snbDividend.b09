@@ -335,8 +335,6 @@ PARAM noMgn    : BOOLEAN
 PARAM noSell   : BOOLEAN
 PARAM action   : BYTE
 
-ON ERROR GOTO 900
-
 RUN clrScr
 PRINT
 PRINT "  STOCKS AND BONDS"
@@ -358,9 +356,6 @@ IF noDiv OR noSell OR noMgn THEN
 ENDIF
 RUN waitKey
 action := 1
-END
-
-900 PRINT "scrYearHdr error ("; ERR; ")"
 END
 
 PROCEDURE scrDivInt

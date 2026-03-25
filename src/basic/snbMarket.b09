@@ -280,8 +280,6 @@ DIM tot : INTEGER
 DIM s   : INTEGER
 DIM f   : INTEGER
 
-ON ERROR GOTO 900
-
 IF rollMode = 1 THEN
 
   ! Mode A: single roll, copy to all 9 slots.
@@ -356,9 +354,6 @@ ELSE
 
 ENDIF \ENDIF
 
-END
-
-900 PRINT "doRolls error ("; ERR; ")"
 END
 
 PROCEDURE getMktDelta
@@ -555,8 +550,6 @@ PARAM divSuspNow : BOOLEAN
 PARAM divSuspPrv : BOOLEAN
 DIM rawPrice : INTEGER
 
-ON ERROR GOTO 900
-
 ! Step 1: sum deltas.
 rawPrice := curPrice + mktDelta + cardDelta
 
@@ -583,9 +576,6 @@ ELSE
   splitOccrd := FALSE
 ENDIF
 
-END
-
-900 PRINT "resolvePrice error ("; ERR; ")"
 END
 
 PROCEDURE applyMktYear
@@ -645,8 +635,6 @@ DIM tmpShr : INTEGER
 DIM splt   : BOOLEAN
 DIM dNow   : BOOLEAN
 DIM dPrv   : BOOLEAN
-
-ON ERROR GOTO 900
 
 RUN getCard(cardId, card)
 
@@ -711,9 +699,6 @@ NEXT s
 
 END
 
-900 PRINT "applyMktYear error ("; ERR; ")"
-END
-
 PROCEDURE drawCard
 (* ============================================================ *)
 (* PROCEDURE : drawCard                                         *)
@@ -735,17 +720,12 @@ PARAM deckOrd(36) : BYTE
 PARAM deckPos     : INTEGER
 PARAM cardId      : INTEGER
 
-ON ERROR GOTO 900
-
 cardId  := deckOrd(deckPos)
 deckPos := deckPos + 1
 IF deckPos > 36 THEN
   RUN shuffleDeck(deckOrd)
   deckPos := 1
 ENDIF
-END
-
-900 PRINT "drawCard error ("; ERR; ")"
 END
 
 PROCEDURE scrCard
@@ -1003,8 +983,6 @@ PARAM shrAft(6)   : INTEGER
 PARAM action      : BYTE
 DIM p : INTEGER
 
-ON ERROR GOTO 900
-
 RUN clrScr
 PRINT
 PRINT "  STOCK SPLIT  2 FOR 1"
@@ -1023,9 +1001,6 @@ FOR p := 1 TO plyrCnt
 NEXT p
 PRINT
 RUN getPhaseNav(action)
-END
-
-900 PRINT "scrSplit error ("; ERR; ")"
 END
 
 PROCEDURE scrDivFlag
@@ -1049,8 +1024,6 @@ PARAM newPrc  : INTEGER
 PARAM cutPrc  : INTEGER
 PARAM action  : BYTE
 
-ON ERROR GOTO 900
-
 RUN clrScr
 IF evtType = 1 THEN
   PRINT "=== DIVIDEND SUSPENDED ==="
@@ -1070,7 +1043,4 @@ ELSE
 ENDIF
 PRINT
 RUN getPhaseNav(action)
-END
-
-900 PRINT "scrDivFlag error ("; ERR; ")"
 END

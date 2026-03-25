@@ -318,8 +318,6 @@ DIM holdCnt     : INTEGER
 DIM minPos      : INTEGER
 DIM simCash     : INTEGER \ ! simulated cashBal for bond emergency check
 
-ON ERROR GOTO 900
-
 ! --- AIProfile field loading (ai-player-logic.md Sec 3) --------
 splitSellPW := prof.spltSlPct   \ ! BYTE field -> INTEGER working var
 distSellPW  := prof.distSlPrc   \ ! BYTE field -> INTEGER working var
@@ -556,9 +554,6 @@ ENDIF
 
 END
 
-900 PRINT "aiSell error ("; ERR; ")"
-END
-
 PROCEDURE applySells
 (* ============================================================ *)
 (* PROCEDURE : applySells                                       *)
@@ -595,8 +590,6 @@ DIM s       : INTEGER
 DIM b       : INTEGER
 DIM prcd    : INTEGER
 DIM repay   : INTEGER
-
-ON ERROR GOTO 900
 
 ! Bond par values: small=$1000  medium=$5000  large=$10000
 bPar(1) := 1000
@@ -646,9 +639,6 @@ NEXT i
 
 END
 
-900 PRINT "applySells error ("; ERR; ")"
-END
-
 PROCEDURE scrAISellTurn
 (* ============================================================ *)
 (* PROCEDURE : scrAISellTurn                                    *)
@@ -676,8 +666,6 @@ DIM i       : INTEGER
 DIM s       : INTEGER
 DIM b       : INTEGER
 DIM pStr    : STRING[8]
-
-ON ERROR GOTO 900
 
 sNam(1) := "Growth Corp"
 sNam(2) := "Metro Props"
@@ -717,9 +705,6 @@ ENDIF
 PRINT
 RUN getPhaseNav(action)
 
-END
-
-900 PRINT "scrAISellTurn error ("; ERR; ")"
 END
 
 PROCEDURE scrSell

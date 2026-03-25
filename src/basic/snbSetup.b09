@@ -57,8 +57,6 @@ PARAM plyr: PlyrRec
 
 DIM i: INTEGER
 
-ON ERROR GOTO 900
-
 plyr.plyrName   := ""
 plyr.plyrType   := 0
 plyr.aiTier     := 0
@@ -79,9 +77,6 @@ NEXT i
 
 END
 
-900 PRINT "initPlayer error ("; ERR; ")"
-END
-
 PROCEDURE initMkt
 (* ================================================= *)
 (* PROCEDURE: initMkt                                *)
@@ -99,16 +94,11 @@ PARAM mkt: MktState
 
 DIM i: INTEGER
 
-ON ERROR GOTO 900
-
 FOR i := 1 TO 9
     mkt.stckPrice(i) := 100
     mkt.divSuspnd(i) := FALSE
 NEXT i
 
-END
-
-900 PRINT "initMkt error ("; ERR; ")"
 END
 
 PROCEDURE scrStart
@@ -126,8 +116,6 @@ PROCEDURE scrStart
 (* ================================================== *)
 PARAM action:INTEGER
 
-ON ERROR GOTO 900
-
 RUN clrScr
 
 PRINT
@@ -142,9 +130,6 @@ PRINT "  Select (1-3): ";
 
 RUN getMenuKey(1, 3, action)
 PRINT
-END
-
-900 PRINT "scrStart error ("; ERR; ")"
 END
 
 PROCEDURE scrSetup
@@ -277,8 +262,6 @@ DIM i:INTEGER
 DIM modeLabel:STRING[1]
 DIM dispName:STRING[27]
 
-ON ERROR GOTO 900
-
 RUN clrScr
 
 PRINT
@@ -315,9 +298,6 @@ PRINT "  Select (1-2): ";
 
 RUN getMenuKey(1, 2, action)
 PRINT
-END
-
-900 PRINT "scrConfirm error ("; ERR; ")"
 END
 
 PROCEDURE setup

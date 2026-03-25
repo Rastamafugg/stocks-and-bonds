@@ -89,8 +89,6 @@ DIM s       : INTEGER
 DIM nSep    : STRING[1]
 DIM pStr    : STRING[8]
 
-ON ERROR GOTO 900
-
 sNam(1) := "Growth Corp"
 sNam(2) := "Metro Props"
 sNam(3) := "Pioneer Mut"
@@ -125,9 +123,6 @@ NEXT s
 
 PRINT
 RUN waitKey
-END
-
-900 PRINT "scrFinalMkt error ("; ERR; ")"
 END
 
 PROCEDURE scrWealth
@@ -173,8 +168,6 @@ DIM pStr     : STRING[8]
 DIM dispNam  : STRING[27]
 DIM pTypeVal : INTEGER
 DIM aiTierVal: INTEGER
-
-ON ERROR GOTO 900
 
 bPar(1) := 1000
 bPar(2) := 5000
@@ -250,9 +243,6 @@ NEXT p
 RUN waitKey
 END
 
-900 PRINT "scrWealth error ("; ERR; ")"
-END
-
 PROCEDURE scrWinner
 (* ============================================================ *)
 (* PROCEDURE : scrWinner                                        *)
@@ -282,8 +272,6 @@ DIM pStr : STRING[8]
 DIM dispNam : STRING[27]
 DIM pTypeVal : INTEGER
 DIM aiTierVal: INTEGER
-
-ON ERROR GOTO 900
 
 ! Find highest wealth among non-bankrupt players.
 ! -32767 sentinel: no valid wealth can be lower after liquidation.
@@ -324,9 +312,6 @@ PRINT
 RUN waitKey
 END
 
-900 PRINT "scrWinner error ("; ERR; ")"
-END
-
 PROCEDURE scrPostGame
 (* ============================================================ *)
 (* PROCEDURE : scrPostGame                                      *)
@@ -339,8 +324,6 @@ PROCEDURE scrPostGame
 (* ============================================================ *)
 PARAM action : INTEGER
 
-ON ERROR GOTO 900
-
 RUN clrScr
 PRINT
 PRINT "  GAME OVER"
@@ -352,7 +335,4 @@ PRINT
 PRINT "  Select (1-2): ";
 RUN getMenuKey(1, 2, action)
 PRINT
-END
-
-900 PRINT "scrPostGame error ("; ERR; ")"
 END
