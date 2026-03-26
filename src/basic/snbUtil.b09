@@ -125,65 +125,64 @@ LOOP
   RUN clrScr
   PRINT title
   PRINT
-  IF currCash >= 0 THEN
-    dispQty := qty
-    IF buf <> "" THEN
-      RUN getNumIn(buf, workQty, numOk)
-      IF numOk THEN
-        IF workQty >= 0 THEN
-          lastChr := MID$(buf, LEN(buf), 1)
-          IF lastChr <> "0" THEN
-            workQty := workQty * 10
-          ENDIF
-          IF workQty <= maxQty THEN
-            dispQty := workQty
-          ENDIF
+  dispQty := qty
+  IF buf <> "" THEN
+    RUN getNumIn(buf, workQty, numOk)
+    IF numOk THEN
+      IF workQty >= 0 THEN
+        lastChr := MID$(buf, LEN(buf), 1)
+        IF lastChr <> "0" THEN
+          workQty := workQty * 10
+        ENDIF
+        IF workQty <= maxQty THEN
+          dispQty := workQty
         ENDIF
       ENDIF
     ENDIF
-    cashNow := currCash
-    mgnNow  := currMrgObl
-    IF dispQty > 0 THEN
-      prjCost := dispQty * price
-      IF ordMode = 2 AND canMode <> 0 THEN \ ! MARG
-        prjCash := prjCost / 2
-        cashNow := cashNow - prjCash
-        mgnNow  := mgnNow + (prjCost - prjCash)
-      ELSE IF ordMode = 1 THEN \ ! CASH
-        cashNow := cashNow - prjCost
-      ELSE IF ordMode = 3 THEN \ ! LIQ
-        prjAmt := currMrgObl
-        IF prjCost < prjAmt THEN
-          prjAmt := prjCost
-        ENDIF
-        mgnNow  := currMrgObl - prjAmt
-        cashNow := currCash + (prjCost - prjAmt)
-      ELSE IF ordMode = 2 THEN \ ! MARG sell
-        prjAmt := currMrgObl
-        IF prjCost < prjAmt THEN
-          prjAmt := prjCost
-        ENDIF
-        mgnNow  := currMrgObl - prjAmt
-        cashNow := currCash + (prjCost - prjAmt)
-      ELSE
-        cashNow := currCash + prjCost
-      ENDIF \ENDIF \ENDIF \ENDIF
-    ENDIF
-    RUN fmtMoney(currCash, lblCsh)
-    RUN fmtMoney(cashNow, lblCshPrj)
-    RUN fmtMoney(currMrgObl, lblMgnObl)
-    RUN fmtMoney(mgnNow, lblMgnOblPrj)
-    PRINT "  Cash: $"; lblCsh; " [$"; lblCshPrj; "]";
-    IF ordMode = 3 THEN \ ! LIQ
-      PRINT "  Obligation: $"; lblMgnObl; " [$"; lblMgnOblPrj; "]"
+  ENDIF
+  cashNow := currCash
+  mgnNow  := currMrgObl
+  IF dispQty > 0 THEN
+    prjCost := dispQty * price
+    IF ordMode = 2 AND canMode <> 0 THEN \ ! MARG
+      prjCash := prjCost / 2
+      cashNow := cashNow - prjCash
+      mgnNow  := mgnNow + (prjCost - prjCash)
+    ELSE IF ordMode = 1 THEN \ ! CASH
+      cashNow := cashNow - prjCost
+    ELSE IF ordMode = 3 THEN \ ! LIQ
+      prjAmt := currMrgObl
+      IF prjCost < prjAmt THEN
+        prjAmt := prjCost
+      ENDIF
+      mgnNow  := currMrgObl - prjAmt
+      cashNow := currCash + (prjCost - prjAmt)
+    ELSE IF ordMode = 2 THEN \ ! MARG sell
+      prjAmt := currMrgObl
+      IF prjCost < prjAmt THEN
+        prjAmt := prjCost
+      ENDIF
+      mgnNow  := currMrgObl - prjAmt
+      cashNow := currCash + (prjCost - prjAmt)
     ELSE
-      PRINT "  Margin: $"; lblMgnObl; " [$"; lblMgnOblPrj; "]"
-    ENDIF
-    PRINT
-  ELSE IF info1 <> "" THEN
+      cashNow := currCash + prjCost
+    ENDIF \ENDIF \ENDIF \ENDIF
+  ENDIF
+  RUN fmtMoney(currCash, lblCsh)
+  RUN fmtMoney(cashNow, lblCshPrj)
+  RUN fmtMoney(currMrgObl, lblMgnObl)
+  RUN fmtMoney(mgnNow, lblMgnOblPrj)
+  PRINT "  Cash: $"; lblCsh; " [$"; lblCshPrj; "]";
+  IF ordMode = 3 THEN \ ! LIQ
+    PRINT "  Obligation: $"; lblMgnObl; " [$"; lblMgnOblPrj; "]"
+  ELSE
+    PRINT "  Margin: $"; lblMgnObl; " [$"; lblMgnOblPrj; "]"
+  ENDIF
+  PRINT
+  IF info1 <> "" THEN
     PRINT info1
     PRINT
-  ENDIF \ENDIF
+  ENDIF
   RUN fmtMoney(price, priceLbl)
   infoTxt := "  " + stockNm + "  " + TRIM$(STR$(holdQty))
   infoTxt := infoTxt + " shrs @ $" + priceLbl
