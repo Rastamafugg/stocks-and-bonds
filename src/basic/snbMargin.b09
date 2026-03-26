@@ -1026,6 +1026,7 @@ LOOP
         actualRpy := 0
       ENDIF
       baseCash := baseCash - actualRpy
+      baseMgn  := baseMgn - actualRpy
       valid := FALSE
       WHILE NOT valid DO
         IF mapType(selIdx) = 1 THEN
