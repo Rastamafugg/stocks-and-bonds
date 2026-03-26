@@ -7,7 +7,7 @@ PROCEDURE TSTBOOLPARM
 (*             Failures are visible as RECV/EXPECT mismatches.  *)
 (* PARAMS    : None                                             *)
 (* ============================================================ *)
-TYPE TestRec = flagA,flagB:BOOLEAN;valA,valB:INTEGER
+TYPE TestRec = tflagA,tflagB:BOOLEAN;valA,valB:INTEGER
 DIM rec      : TestRec
 DIM flagA    : BOOLEAN
 DIM flagB    : BOOLEAN
@@ -153,16 +153,16 @@ RUN waitKey
 ! ============================================================
 PRINT "--- Block 9: TYPE record boolean field inline ---"
 PRINT
-rec.flagA := TRUE
-rec.flagB := FALSE
-PRINT "  Test 9.1  Expect TRUE  (rec.flagA=TRUE)"
-RUN boolRecv(rec.flagA)
-PRINT "  Test 9.2  Expect FALSE (rec.flagB=FALSE)"
-RUN boolRecv(rec.flagB)
-PRINT "  Test 9.3  Expect FALSE (NOT rec.flagA)"
-RUN boolRecv(NOT rec.flagA)
-PRINT "  Test 9.4  Expect FALSE (rec.flagA AND rec.flagB)"
-RUN boolRecv(rec.flagA AND rec.flagB)
+rec.tflagA := TRUE
+rec.tflagB := FALSE
+PRINT "  Test 9.1  Expect TRUE  (rec.tflagA=TRUE)"
+RUN boolRecv(rec.tflagA)
+PRINT "  Test 9.2  Expect FALSE (rec.tflagB=FALSE)"
+RUN boolRecv(rec.tflagB)
+PRINT "  Test 9.3  Expect FALSE (NOT rec.tflagA)"
+RUN boolRecv(NOT rec.tflagA)
+PRINT "  Test 9.4  Expect FALSE (rec.tflagA AND rec.tflagB)"
+RUN boolRecv(rec.tflagA AND rec.tflagB)
 PRINT
 RUN waitKey
 
@@ -222,9 +222,5 @@ PROCEDURE boolRecv
 (* ============================================================ *)
 PARAM bVal : BOOLEAN
 
-IF bVal THEN
-  PRINT "  RECV: TRUE"
-ELSE
-  PRINT "  RECV: FALSE"
-ENDIF
+PRINT "  RECV: "; bVal
 END
