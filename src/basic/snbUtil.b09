@@ -55,7 +55,6 @@ PROCEDURE getLotQty
 (*            Enter commits typed digits or clears.   *)
 (*            X confirms the committed quantity.      *)
 (* PARAMS:    title    - editor title line            *)
-(*            info1    - optional status line         *)
 (*            stockNm  - stock display name           *)
 (*            holdQty  - shares currently held        *)
 (*            price    - stock price                  *)
@@ -75,7 +74,6 @@ PROCEDURE getLotQty
 (* ================================================== *)
 TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
 PARAM title    : STRING
-PARAM info1    : STRING
 PARAM stockNm  : STRING
 PARAM holdQty  : INTEGER
 PARAM price    : INTEGER
@@ -179,10 +177,6 @@ LOOP
     PRINT "  Margin: $"; lblMgnObl; " [$"; lblMgnOblPrj; "]"
   ENDIF
   PRINT
-  IF info1 <> "" THEN
-    PRINT info1
-    PRINT
-  ENDIF
   RUN fmtMoney(price, priceLbl)
   infoTxt := "  " + stockNm + "  " + TRIM$(STR$(holdQty))
   infoTxt := infoTxt + " shrs @ $" + priceLbl

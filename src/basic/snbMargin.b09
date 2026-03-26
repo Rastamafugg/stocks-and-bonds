@@ -658,7 +658,7 @@ LOOP
           ENDIF
           qtyAct := 1
           ! Line exceeds 79 chars; getLotQty call requires full arguments.
-          RUN getLotQty("=== FORCED LIQUIDATION ===", "", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, 3, 0, plyr.stckShrs(s), baseCash, baseOblg, 0, qtyAct) \ ! ordMode=LIQ allowNav=0
+          RUN getLotQty("=== FORCED LIQUIDATION ===", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, 3, 0, plyr.stckShrs(s), baseCash, baseOblg, 0, qtyAct) \ ! ordMode=LIQ allowNav=0
           valid := TRUE
         ELSE
           RUN fmtMoney(bPar(b), pStr)
@@ -1039,7 +1039,7 @@ LOOP
           ENDIF
           qtyAct := 1
           ! Line exceeds 79 chars; getLotQty call requires full arguments.
-          RUN getLotQty("=== YEAR 10 - MARGIN CLEARANCE REQUIRED ===", "", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, 2, 0, plyr.stckShrs(s), baseCash, baseMgn, 0, qtyAct) \ ! ordMode=MARG allowNav=0
+          RUN getLotQty("=== YEAR 10 - MARGIN CLEARANCE REQUIRED ===", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, 2, 0, plyr.stckShrs(s), baseCash, baseMgn, 0, qtyAct) \ ! ordMode=MARG allowNav=0
           valid := TRUE
         ELSE
           RUN fmtMoney(bPar(b), pStr)

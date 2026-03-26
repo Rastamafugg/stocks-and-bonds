@@ -1188,7 +1188,7 @@ LOOP
           infoTxt := infoTxt + "  Margin: $" + pStr3 + " [$" + pStr4 + "]"
           qtyAct := 1
           ! Line exceeds 79 chars; getLotQty call requires full arguments.
-          RUN getLotQty("=== BUY QUANTITY ===", infoTxt, sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, purch, canMgn, maxQty, baseCash, baseMgn, 1, qtyAct) \ ! allowNav=1
+          RUN getLotQty("=== BUY QUANTITY ===", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, purch, canMgn, maxQty, baseCash, baseMgn, 1, qtyAct) \ ! allowNav=1
           IF qtyAct = 3 THEN
             ordCnt   := 0
             mgnRepay := 0
