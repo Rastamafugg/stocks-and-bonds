@@ -190,6 +190,29 @@ END
 900 PRINT "TSTBOOLPARM error ("; ERR; ")"
 END
 
+PROCEDURE waitKey
+(* ================================================== *)
+(* PROCEDURE: waitKey                                 *)
+(* PURPOSE:   Display continue prompt, block on key. *)
+(* PARAMS:    None                                    *)
+(* EFFECTS:   Prints prompt to stdout. Waits for one *)
+(*            key from stdin, discards it, then      *)
+(*            prints newline after key.              *)
+(* ================================================== *)
+DIM k:STRING[1]
+
+ON ERROR GOTO 900
+
+PRINT
+PRINT "  Press any key to continue...";
+GET #0, k
+PRINT
+END
+
+900 \ ! Error handler
+PRINT "waitKey error ("; ERR; ")"
+END
+
 PROCEDURE boolRecv
 (* ============================================================ *)
 (* PROCEDURE : boolRecv                                         *)
