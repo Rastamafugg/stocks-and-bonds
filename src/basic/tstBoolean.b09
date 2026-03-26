@@ -222,5 +222,11 @@ PROCEDURE boolRecv
 (* ============================================================ *)
 PARAM bVal : BOOLEAN
 
-PRINT "  RECV: "; bVal
+IF bVal THEN
+  PRINT "  RECV: TRUE"
+ELSE
+  PRINT "  RECV: FALSE"
+ENDIF
+PRINT "DONE"
+
 END
