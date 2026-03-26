@@ -167,7 +167,7 @@ LOOP
         cashNow := currCash + (prjCost - prjAmt)
       ELSE
         cashNow := currCash + prjCost
-      ENDIF
+      ENDIF \ENDIF \ENDIF \ENDIF
     ENDIF
     RUN fmtMoney(currCash, lblCsh)
     RUN fmtMoney(cashNow, lblCshPrj)
