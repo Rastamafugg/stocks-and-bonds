@@ -143,6 +143,24 @@ DIR       EXEC      READ      UPDATE    WRITE
   ENDIF \ENDIF \ENDIF
   ```
 
+* **Count `IF` tokens to verify `ENDIF` count before finalizing any
+  procedure.** The number of `ENDIF` statements in a procedure must
+  exactly equal the number of `IF` keywords, including every `IF` that
+  appears after `ELSE`. This is a mechanical count, not a visual check.
+  Indentation is not reliable evidence of correct closure.
+
+  Quick reference:
+
+  | Pattern                          | IF count | ENDIF count |
+  |----------------------------------|----------|-------------|
+  | `IF...ENDIF`                     | 1        | 1           |
+  | `IF...ELSE IF...ENDIF \ENDIF`    | 2        | 2           |
+  | `IF...ELSE IF...ELSE IF...ENDIF \ENDIF \ENDIF` | 3 | 3    |
+
+  The `\ENDIF \ENDIF` suffix pattern on a single line is correct and
+  required when closing nested `ELSE IF` chains; it is not a style
+  preference.
+  
 * **Reserved-word functions are called in function form, not infix form.** Do not assume that a reserved word that performs a calculation can be written between operands. Write it as a function call with parentheses and arguments.
 
   Examples:
