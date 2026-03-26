@@ -46,7 +46,6 @@ TYPE ProtoHdr
     certCount  : BYTE
     checksum   : BYTE
 ```
-```
 
 Notes:
 
@@ -69,7 +68,6 @@ TYPE ProtoPlyr
     stckShrs(9) : INTEGER
     bondUnts(3) : INTEGER
 ```
-```
 
 Notes:
 
@@ -86,7 +84,6 @@ TYPE CertRec
     sharesQty  : INTEGER
     purchPrc   : INTEGER
     marginBal  : INTEGER
-```
 ```
 
 Interpretation:
