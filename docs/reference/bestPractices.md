@@ -106,7 +106,7 @@ DIR       EXEC      READ      UPDATE    WRITE
   ```basic09
   PROCEDURE demo
   (* ================================================== *)
-  (* PROCEDURE: demo                                     *)
+  (* PROCEDURE: demo                                    *)
   (* ================================================== *)
   TYPE ...
   PARAM ...

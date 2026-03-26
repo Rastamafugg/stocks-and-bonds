@@ -60,9 +60,14 @@ PROCEDURE getLotQty
 (*            holdQty  - shares currently held        *)
 (*            price    - stock price                  *)
 (*            qty      - IN/OUT committed quantity    *)
-(*            ordMode  - IN/OUT 0=SELL 1=CASH 2=MARG  *)
+(*            ordMode  - IN/OUT 0=SELL 1=CASH         *)
+(*                       2=MARG 3=LIQ                 *)
 (*            canMode  - 1 enables C/M mode toggle    *)
 (*            maxQty   - maximum allowed quantity     *)
+(*            currCash - current cash for live        *)
+(*                       projection; <0 disables      *)
+(*            currMrgObl - current margin or current  *)
+(*                       obligation, per ordMode      *)
 (*            allowNav - 1 allows S/Q, else no nav    *)
 (*            navAct   - OUT 1=confirm 3=save 4=quit  *)
 (* EFFECTS:   Clears screen and redraws editor using  *)
@@ -78,25 +83,37 @@ PARAM qty      : INTEGER
 PARAM ordMode  : INTEGER
 PARAM canMode  : INTEGER
 PARAM maxQty   : INTEGER
+PARAM currCash : INTEGER
+PARAM currMrgObl : INTEGER
 PARAM allowNav : INTEGER
 PARAM navAct   : INTEGER
 
-DIM buf     : STRING[8]
-DIM dispTxt : STRING[48]
-DIM infoTxt : STRING[80]
-DIM errTxt  : STRING[48]
-DIM maxTxt  : STRING[8]
-DIM pStr    : STRING[8]
-DIM kIn     : STRING[1]
-DIM lastChr : STRING[1]
-DIM keyCode : INTEGER
-DIM numOk   : BOOLEAN
-DIM workQty : INTEGER
-DIM totalQty: INTEGER
-DIM regs    : Register
-DIM callCod : BYTE
-DIM iCC     : INTEGER
-DIM iBits   : INTEGER
+DIM buf          : STRING[8]
+DIM dispTxt      : STRING[48]
+DIM infoTxt      : STRING[80]
+DIM errTxt       : STRING[48]
+DIM maxTxt       : STRING[8]
+DIM priceLbl     : STRING[8]
+DIM lblCsh       : STRING[8]
+DIM lblCshPrj    : STRING[8]
+DIM lblMgnObl    : STRING[8]
+DIM lblMgnOblPrj : STRING[8]
+DIM kIn          : STRING[1]
+DIM lastChr      : STRING[1]
+DIM keyCode      : INTEGER
+DIM numOk        : BOOLEAN
+DIM workQty      : INTEGER
+DIM totalQty     : INTEGER
+DIM regs         : Register
+DIM callCod      : BYTE
+DIM iCC          : INTEGER
+DIM iBits        : INTEGER
+DIM dispQty      : INTEGER
+DIM cashNow      : INTEGER
+DIM mgnNow       : INTEGER
+DIM prjCost      : INTEGER
+DIM prjCash      : INTEGER
+DIM prjAmt       : INTEGER
 
 ON ERROR GOTO 900
 
@@ -108,19 +125,74 @@ LOOP
   RUN clrScr
   PRINT title
   PRINT
-  IF info1 <> "" THEN
+  IF currCash >= 0 THEN
+    dispQty := qty
+    IF buf <> "" THEN
+      RUN getNumIn(buf, workQty, numOk)
+      IF numOk THEN
+        IF workQty >= 0 THEN
+          lastChr := MID$(buf, LEN(buf), 1)
+          IF lastChr <> "0" THEN
+            workQty := workQty * 10
+          ENDIF
+          IF workQty <= maxQty THEN
+            dispQty := workQty
+          ENDIF
+        ENDIF
+      ENDIF
+    ENDIF
+    cashNow := currCash
+    mgnNow  := currMrgObl
+    IF dispQty > 0 THEN
+      prjCost := dispQty * price
+      IF ordMode = 2 AND canMode <> 0 THEN \ ! MARG
+        prjCash := prjCost / 2
+        cashNow := cashNow - prjCash
+        mgnNow  := mgnNow + (prjCost - prjCash)
+      ELSE IF ordMode = 1 THEN \ ! CASH
+        cashNow := cashNow - prjCost
+      ELSE IF ordMode = 3 THEN \ ! LIQ
+        prjAmt := currMrgObl
+        IF prjCost < prjAmt THEN
+          prjAmt := prjCost
+        ENDIF
+        mgnNow  := currMrgObl - prjAmt
+        cashNow := currCash + (prjCost - prjAmt)
+      ELSE IF ordMode = 2 THEN \ ! MARG sell
+        prjAmt := currMrgObl
+        IF prjCost < prjAmt THEN
+          prjAmt := prjCost
+        ENDIF
+        mgnNow  := currMrgObl - prjAmt
+        cashNow := currCash + (prjCost - prjAmt)
+      ELSE
+        cashNow := currCash + prjCost
+      ENDIF
+    ENDIF
+    RUN fmtMoney(currCash, lblCsh)
+    RUN fmtMoney(cashNow, lblCshPrj)
+    RUN fmtMoney(currMrgObl, lblMgnObl)
+    RUN fmtMoney(mgnNow, lblMgnOblPrj)
+    PRINT "  Cash: $"; lblCsh; " [$"; lblCshPrj; "]";
+    IF ordMode = 3 THEN \ ! LIQ
+      PRINT "  Obligation: $"; lblMgnObl; " [$"; lblMgnOblPrj; "]"
+    ELSE
+      PRINT "  Margin: $"; lblMgnObl; " [$"; lblMgnOblPrj; "]"
+    ENDIF
+    PRINT
+  ELSE IF info1 <> "" THEN
     PRINT info1
     PRINT
   ENDIF
-  RUN fmtMoney(price, pStr)
+  RUN fmtMoney(price, priceLbl)
   infoTxt := "  " + stockNm + "  " + TRIM$(STR$(holdQty))
-  infoTxt := infoTxt + " shrs @ $" + pStr
+  infoTxt := infoTxt + " shrs @ $" + priceLbl
   IF qty > 0 THEN
-    IF ordMode = 0 THEN
+    IF ordMode = 0 OR ordMode = 3 OR (ordMode = 2 AND canMode = 0) THEN \ ! SELL / LIQ / MARG sell
       infoTxt := infoTxt + "  [Sell " + TRIM$(STR$(qty)) + "]"
     ELSE
       totalQty := holdQty + qty
-      IF ordMode = 2 THEN
+      IF ordMode = 2 THEN \ ! MARG
         infoTxt := infoTxt + "  + [" + TRIM$(STR$(qty))
         infoTxt := infoTxt + " Shrs M] = " + TRIM$(STR$(totalQty))
       ELSE
@@ -219,11 +291,11 @@ LOOP
   ELSE IF allowNav <> 0 AND keyCode = ASC("Q") THEN
     navAct := 4
     END
-  ELSE IF canMode <> 0 AND keyCode = ASC("C") THEN
-    ordMode := 1
+  ELSE IF canMode <> 0 AND keyCode = ASC("C") THEN \ ! CASH
+    ordMode := 1 \ ! CASH
     buf := ""
-  ELSE IF canMode <> 0 AND keyCode = ASC("M") THEN
-    ordMode := 2
+  ELSE IF canMode <> 0 AND keyCode = ASC("M") THEN \ ! MARG
+    ordMode := 2 \ ! MARG
     buf := ""
   ELSE IF keyCode = 8 THEN
     IF LEN(buf) = 1 THEN

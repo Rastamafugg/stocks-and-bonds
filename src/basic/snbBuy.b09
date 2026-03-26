@@ -1155,9 +1155,15 @@ LOOP
         IF mapType(selIdx) = 1 THEN
           RUN fmtMoney(mkt.stckPrice(s), pStr)
           editTxt := "  " + sNam(s) + " @ $" + pStr
+          purch := 1
           qty := 0
           IF slotIdx > 0 THEN
             qty := ordQty(slotIdx)
+            IF ordPurch(slotIdx) = 2 THEN
+              purch := 2
+            ELSE
+              purch := 1
+            ENDIF
           ENDIF
           maxQty := 32760 / mkt.stckPrice(s)
           maxQty := (maxQty / 10) * 10
@@ -1182,7 +1188,7 @@ LOOP
           infoTxt := infoTxt + "  Margin: $" + pStr3 + " [$" + pStr4 + "]"
           qtyAct := 1
           ! Line exceeds 79 chars; getLotQty call requires full arguments.
-          RUN getLotQty("=== BUY QUANTITY ===", infoTxt, sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, purch, canMgn, maxQty, 1, qtyAct)
+          RUN getLotQty("=== BUY QUANTITY ===", infoTxt, sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, purch, canMgn, maxQty, baseCash, baseMgn, 1, qtyAct) \ ! allowNav=1
           IF qtyAct = 3 THEN
             ordCnt   := 0
             mgnRepay := 0
@@ -1274,7 +1280,11 @@ LOOP
         ordType(slotIdx)  := mapType(selIdx)
         ordId(slotIdx)    := mapId(selIdx)
         ordQty(slotIdx)   := qty
-        ordPurch(slotIdx) := purch
+        IF purch = 2 THEN
+          ordPurch(slotIdx) := 2
+        ELSE
+          ordPurch(slotIdx) := 1
+        ENDIF
       ENDIF
     ENDIF
   ENDIF \ENDIF \ENDIF

@@ -451,6 +451,9 @@ DIM repay   : INTEGER
 DIM prcd    : INTEGER
 DIM editTxt : STRING[48]
 DIM qtyAct  : INTEGER
+DIM baseCash : INTEGER
+DIM baseMgn  : INTEGER
+DIM baseOblg : INTEGER
 
 ON ERROR GOTO 900
 
@@ -622,6 +625,27 @@ LOOP
           slotIdx := i
         ENDIF
       NEXT i
+      baseCash := plyr.cashBal
+      baseMgn  := plyr.marginTot
+      baseOblg := oblgRem
+      FOR i := 1 TO ordCnt
+        IF i <> slotIdx THEN
+          IF ordType(i) = 1 THEN
+            prcd := ordQty(i) * mkt.stckPrice(ordId(i))
+          ELSE
+            prcd := ordQty(i) * bPar(ordId(i))
+          ENDIF
+          repay := baseOblg
+          IF prcd < repay THEN
+            repay := prcd
+          ENDIF
+          baseOblg := baseOblg - repay
+          baseCash := baseCash + (prcd - repay)
+          IF baseOblg < 0 THEN
+            baseOblg := 0
+          ENDIF
+        ENDIF
+      NEXT i
       valid := FALSE
       WHILE NOT valid DO
         IF mapType(selIdx) = 1 THEN
@@ -634,7 +658,7 @@ LOOP
           ENDIF
           qtyAct := 1
           ! Line exceeds 79 chars; getLotQty call requires full arguments.
-          RUN getLotQty("=== FORCED LIQUIDATION ===", "", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, 0, 0, plyr.stckShrs(s), 0, qtyAct)
+          RUN getLotQty("=== FORCED LIQUIDATION ===", "", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, 3, 0, plyr.stckShrs(s), baseCash, baseOblg, 0, qtyAct) \ ! ordMode=LIQ allowNav=0
           valid := TRUE
         ELSE
           RUN fmtMoney(bPar(b), pStr)
@@ -749,6 +773,8 @@ DIM prcd       : INTEGER
 DIM editTxt    : STRING[48]
 DIM qtyAct     : INTEGER
 DIM doneClr    : BOOLEAN
+DIM baseCash   : INTEGER
+DIM baseMgn    : INTEGER
 
 ON ERROR GOTO 900
 
@@ -972,6 +998,34 @@ LOOP
           slotIdx := i
         ENDIF
       NEXT i
+      baseCash := plyr.cashBal
+      baseMgn  := plyr.marginTot
+      FOR i := 1 TO ordCnt
+        IF i <> slotIdx THEN
+          IF ordType(i) = 1 THEN
+            prcd := ordQty(i) * mkt.stckPrice(ordId(i))
+          ELSE
+            prcd := ordQty(i) * bPar(ordId(i))
+          ENDIF
+          actualRpy := baseMgn
+          IF prcd < actualRpy THEN
+            actualRpy := prcd
+          ENDIF
+          baseMgn  := baseMgn - actualRpy
+          baseCash := baseCash + (prcd - actualRpy)
+        ENDIF
+      NEXT i
+      actualRpy := repay
+      IF actualRpy > baseMgn THEN
+        actualRpy := baseMgn
+      ENDIF
+      IF actualRpy > baseCash THEN
+        actualRpy := baseCash
+      ENDIF
+      IF actualRpy < 0 THEN
+        actualRpy := 0
+      ENDIF
+      baseCash := baseCash - actualRpy
       valid := FALSE
       WHILE NOT valid DO
         IF mapType(selIdx) = 1 THEN
@@ -984,7 +1038,7 @@ LOOP
           ENDIF
           qtyAct := 1
           ! Line exceeds 79 chars; getLotQty call requires full arguments.
-          RUN getLotQty("=== YEAR 10 - MARGIN CLEARANCE REQUIRED ===", "", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, 0, 0, plyr.stckShrs(s), 0, qtyAct)
+          RUN getLotQty("=== YEAR 10 - MARGIN CLEARANCE REQUIRED ===", "", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, 2, 0, plyr.stckShrs(s), baseCash, baseMgn, 0, qtyAct) \ ! ordMode=MARG allowNav=0
           valid := TRUE
         ELSE
           RUN fmtMoney(bPar(b), pStr)

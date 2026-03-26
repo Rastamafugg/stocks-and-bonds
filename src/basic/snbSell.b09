@@ -784,6 +784,9 @@ DIM cnfIn    : STRING[1]
 DIM selIdx   : INTEGER
 DIM editTxt  : STRING[48]
 DIM qtyAct   : INTEGER
+DIM baseCash : INTEGER
+DIM baseMgn  : INTEGER
+DIM ordModeVal : INTEGER
 
 ON ERROR GOTO 900
 
@@ -1027,6 +1030,27 @@ LOOP
           slotIdx := i
         ENDIF
       NEXT i
+      baseCash := plyr.cashBal
+      baseMgn  := plyr.marginTot
+      FOR i := 1 TO ordCnt
+        IF i <> slotIdx THEN
+          IF ordType(i) = 1 THEN
+            prcd := ordQty(i) * mkt.stckPrice(ordId(i))
+            IF plyr.mgnHeld(ordId(i)) THEN
+              repay := baseMgn
+              IF prcd < repay THEN
+                repay := prcd
+              ENDIF
+              baseMgn  := baseMgn - repay
+              baseCash := baseCash + (prcd - repay)
+            ELSE
+              baseCash := baseCash + prcd
+            ENDIF
+          ELSE
+            baseCash := baseCash + (ordQty(i) * bDen(ordId(i)))
+          ENDIF
+        ENDIF
+      NEXT i
       valid := FALSE
       WHILE NOT valid DO
         IF mapType(selIdx) = 1 THEN
@@ -1037,9 +1061,13 @@ LOOP
           IF slotIdx > 0 THEN
             qty := ordQty(slotIdx)
           ENDIF
+          ordModeVal := 0 \ ! SELL
+          IF plyr.mgnHeld(s) THEN
+            ordModeVal := 2 \ ! MARG
+          ENDIF
           qtyAct := 1
           ! Line exceeds 79 chars; getLotQty call requires full arguments.
-          RUN getLotQty("=== SELL QUANTITY ===", "", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, 0, 0, plyr.stckShrs(s), 0, qtyAct)
+          RUN getLotQty("=== SELL QUANTITY ===", "", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, ordModeVal, 0, plyr.stckShrs(s), baseCash, baseMgn, 0, qtyAct) \ ! allowNav=0
           valid := TRUE
         ELSE
           PRINT "$"; bDen(b); " bond  "; plyr.bondUnts(b); " unit(s) held"
