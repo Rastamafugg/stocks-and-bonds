@@ -42,6 +42,31 @@ These instructions govern how to build, edit, review, and QA Basic09 code in thi
 
 * **End-of-line comment syntax (`\ !`) must be used without exception.** In Basic09, the `!` character only introduces a comment when it appears at the start of a line. An inline comment appended to a statement requires the line concatenation operator first: `statement \ ! comment`. The form `statement ! comment` is a syntax error. Before finalizing any procedure, scan every line that contains `!` not at column 1 and confirm it is preceded by `\`.
 
+## 3a. IF/ENDIF Counting Rule (Mandatory Pre-Submit Step)
+
+Basic09 `ELSE IF` is NOT a single keyword. It is a nested `IF` block opened inside an `ELSE` clause. Every `IF` keyword — whether it opens a top-level block or follows an `ELSE` — requires exactly one `ENDIF`.
+
+Counting formula: count every occurrence of the word `IF` in the procedure (including those immediately after `ELSE`). The number of `ENDIF` tokens must equal that count exactly.
+
+Example:
+```
+IF a THEN        <- IF #1
+  ...
+ELSE IF b THEN   <- IF #2 (nested inside ELSE of IF #1)
+  ...
+ELSE IF c THEN   <- IF #3 (nested inside ELSE of IF #2)
+  ...
+ENDIF \ENDIF \ENDIF   <- three ENDIF tokens required
+```
+
+Before finalizing ANY procedure edit that touches an IF block:
+1. Count every `IF` token in the procedure (case-insensitive).
+2. Count every `ENDIF` token.
+3. If the counts do not match, the code is wrong. Fix it before
+   proceeding. Do not submit a response until they match.
+
+This count must be performed as a deliberate mechanical step, not inferred from visual inspection of indentation.
+
 ---
 
 ## 4. Editing Existing Code
@@ -76,7 +101,8 @@ Before submitting or approving any Basic09 code change, verify:
 
 - [ ] Unless directed otherwise, leave comments in place in code that you update, only altering them when the situation requires it (For example, logic changes).
 - [ ] No reserved word is used as a variable, type attribute, array, or procedure name. This includes lowercase or mixed case versions of the identifiers.
-- [ ] All `IF` blocks have a matching `ENDIF`; all `WHILE` blocks have `ENDWHILE`; all `FOR` loops have `NEXT`; all `LOOP` blocks have `ENDLOOP`; all `REPEAT` blocks have `UNTIL`; all `EXITIF` blocks have `ENDEXIT`
+- [ ] IF/ENDIF count verified mechanically: total `IF` tokens == total `ENDIF` tokens in each edited procedure (see Section 3a)
+- [ ] All `WHILE` blocks have `ENDWHILE`; all `FOR` loops have `NEXT`; all `LOOP` blocks have `ENDLOOP`; all `REPEAT` blocks have `UNTIL`; all `EXITIF` blocks have `ENDEXIT`
 - [ ] `ELSE IF` nesting is fully closed with the correct number of `ENDIF` statements
 - [ ] Every procedure with a real runtime-error surface or owned cleanup has an appropriate `ON ERROR GOTO` handler
 - [ ] Any procedure without a local handler is a small pure-logic procedure with no I/O, no syscall work, no conversion trap, and no owned cleanup
