@@ -124,20 +124,6 @@ LOOP
   PRINT title
   PRINT
   dispQty := qty
-  IF buf <> "" THEN
-    RUN getNumIn(buf, workQty, numOk)
-    IF numOk THEN
-      IF workQty >= 0 THEN
-        lastChr := MID$(buf, LEN(buf), 1)
-        IF lastChr <> "0" THEN
-          workQty := workQty * 10
-        ENDIF
-        IF workQty <= maxQty THEN
-          dispQty := workQty
-        ENDIF
-      ENDIF
-    ENDIF
-  ENDIF
   cashNow := currCash
   mgnNow  := currMrgObl
   IF dispQty > 0 THEN
