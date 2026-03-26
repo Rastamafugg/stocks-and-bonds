@@ -183,7 +183,7 @@ LOOP
   ELSE IF info1 <> "" THEN
     PRINT info1
     PRINT
-  ENDIF
+  ENDIF \ENDIF
   RUN fmtMoney(price, priceLbl)
   infoTxt := "  " + stockNm + "  " + TRIM$(STR$(holdQty))
   infoTxt := infoTxt + " shrs @ $" + priceLbl
