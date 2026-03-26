@@ -111,11 +111,31 @@ Player {
         stockId      → sharesOwned : INTEGER
         bondId       → bondUnits   : INTEGER
     }
+    certificates[]   : ARRAY of StockCertificate
     marginTotal      : INTEGER   (init: 0)
     marginChargesDue : INTEGER
     isBankrupt       : BOOLEAN   (init: false)
 }
 ```
+
+```
+StockCertificate {
+    stockId          : INTEGER
+    sharesOwned      : INTEGER   (round lot; multiple of 10)
+    purchasePrice    : INTEGER   (price per share at purchase time)
+    purchaseType     : ENUM{CASH, MARGIN}
+    marginBalance    : INTEGER   (0 for CASH certificates)
+}
+```
+
+Interpretation:
+
+- Stock is tracked both as aggregate holdings by stock for market/dividend
+  calculations and as individual certificates for sell and margin logic.
+- A margin certificate's `marginBalance` is fixed at purchase time and is not
+  recomputed from the current market price.
+- `marginTotal` is the sum of all outstanding `marginBalance` values across the
+  player's certificates.
 
 ---
 
@@ -327,7 +347,14 @@ cashPayment   = purchasePrice * MarginRate       (50%)
 marginPortion = purchasePrice * MarginRate       (50%)
 
 cashBalance  -= cashPayment
-marginTotal  += marginPortion
+create certificate {
+    stockId       = stockId
+    sharesOwned   = shares
+    purchasePrice = currentPrice
+    purchaseType  = MARGIN
+    marginBalance = marginPortion
+}
+marginTotal = sum(certificate.marginBalance for all margin certificates)
 ```
 
 ### 9.3 Annual Margin Interest (Step 2)
@@ -335,6 +362,12 @@ marginTotal  += marginPortion
 ```
 marginCharge  = marginTotal * MarginInterestRate
 cashBalance  -= marginCharge
+```
+
+Where:
+
+```
+marginTotal = sum(certificate.marginBalance for all margin certificates)
 ```
 
 If `cashBalance` becomes negative after deducting margin interest:
@@ -351,14 +384,17 @@ Triggered if `currentPrice <= MarginCallPrice` (i.e., price falls to $25
 or below):
 
 ```
-margin_balance_due_immediately()
+for each margin certificate in that stock:
+    marginBalance for that certificate becomes due immediately
 ```
 
 If `currentPrice <= BankruptcyPrice` (price reaches $0):
 
 ```
-sharesOwned = 0          (stock surrendered)
-marginBalance still due  (debt does not forgive)
+for each certificate in that stock:
+    sharesOwned = 0      (certificate surrendered)
+for each margin certificate in that stock:
+    marginBalance still due immediately
 ```
 
 On the next year's market resolution pass, any stock whose carried price is $0
@@ -368,8 +404,22 @@ effects.
 ### 9.5 Repaying Margin
 
 ```
-cashBalance  -= amountPaid
-marginTotal  -= amountPaid
+cashBalance -= amountPaid
+```
+
+Repayment rules:
+
+- Voluntary repayment is applied to specific margin certificates, not to an
+  undifferentiated per-stock or per-player pool.
+- Selling shares from a margin certificate requires repayment of the
+  corresponding original margin amount for the shares sold, based on that
+  certificate's purchase-time cost basis, not the current market price.
+- Partial sale of a margin certificate reduces `sharesOwned` and
+  `marginBalance` proportionally by the shares sold.
+- After any repayment or forced payoff, recompute:
+
+```
+marginTotal = sum(certificate.marginBalance for all margin certificates)
 ```
 
 All outstanding margin must be cleared before end-of-game wealth is computed in
@@ -412,11 +462,25 @@ Bond price is always par; no partial bond units.
 ```
 proceeds             = sharesSold * currentPrice
 cashBalance         += proceeds
+sell from a specific certificate selected by the player
+certificate.sharesOwned -= sharesSold
 holdings[stock]     -= sharesSold
 ```
 
 `sharesSold` must be a positive multiple of 10 and
 `<= holdings[stock]`.
+
+If the selected certificate is a margin certificate:
+
+```
+repayAmount = certificate.marginBalance * sharesSold / certificate.sharesOwned
+cashBalance -= repayAmount
+certificate.marginBalance -= repayAmount
+marginTotal = sum(certificate.marginBalance for all margin certificates)
+```
+
+`repayAmount` is based on the certificate's original margin balance, not the
+current stock price.
 
 ### 11.2 Bond
 

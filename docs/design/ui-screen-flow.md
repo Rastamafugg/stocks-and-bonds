@@ -252,12 +252,15 @@ IN:  currentYear    : INTEGER
      playerName     : STRING
      cashBalance    : INTEGER
      marginTotal    : INTEGER
-     portfolio[]    : ARRAY of {
-         stockId     : INTEGER
-         stockName   : STRING
-         sharesOwned : INTEGER
-         currentPrice: INTEGER
-         marginHeld  : BOOLEAN
+     certificates[] : ARRAY of {
+         certId         : INTEGER
+         stockId        : INTEGER
+         stockName      : STRING
+         sharesOwned    : INTEGER
+         currentPrice   : INTEGER
+         purchaseType   : ENUM{CASH, MARGIN}
+         purchasePrice  : INTEGER
+         marginBalance  : INTEGER
      }
      bondHoldings[] : ARRAY of {
          bondId      : INTEGER
@@ -269,6 +272,7 @@ IN:  currentYear    : INTEGER
 OUT: sellOrders[] : ARRAY of {
          assetType : ENUM{STOCK, BOND}
          assetId   : INTEGER
+         certId    : INTEGER   (required for STOCK, 0 for BOND)
          quantity  : INTEGER
      }
      action : ENUM{CONFIRM, PASS}
@@ -348,6 +352,12 @@ IN:  playerName      : STRING
      stockName       : STRING
      currentPrice    : INTEGER
      marginCallPrice : INTEGER
+     certificatesDue[] : ARRAY of {
+         certId        : INTEGER
+         sharesOwned   : INTEGER
+         purchasePrice : INTEGER
+         marginBalance : INTEGER
+     }
      amountDue       : INTEGER
 
 OUT: action : ENUM{ENTER_LIQUIDATION}
@@ -365,13 +375,15 @@ Re-entered in a loop until obligation is met or bankruptcy is declared.
 IN:  playerName          : STRING
      obligationRemaining : INTEGER
      cashBalance         : INTEGER
-     portfolio[]         : ARRAY of {stockId, stockName, sharesOwned,
-                                     currentPrice, marginHeld}
+     certificates[]      : ARRAY of {certId, stockId, stockName, sharesOwned,
+                                     currentPrice, purchaseType,
+                                     purchasePrice, marginBalance}
      bondHoldings[]      : ARRAY of {bondId, denomination, units, parValue}
 
 OUT: liquidationOrders[] : ARRAY of {
          assetType : ENUM{STOCK, BOND}
          assetId   : INTEGER
+         certId    : INTEGER   (required for STOCK, 0 for BOND)
          quantity  : INTEGER
      }
      action : ENUM{SUBMIT, DECLARE_BANKRUPTCY}
@@ -409,12 +421,15 @@ must be cleared before end-of-game wealth is computed.
 IN:  playerName  : STRING
      marginTotal : INTEGER
      cashBalance : INTEGER
-     portfolio[] : ARRAY of {stockId, stockName, sharesOwned, currentPrice}
+     certificates[] : ARRAY of {certId, stockId, stockName, sharesOwned,
+                                currentPrice, purchaseType, purchasePrice,
+                                marginBalance}
      bondHoldings[] : ARRAY of {bondId, denomination, units, parValue}
 
 OUT: repayActions[] : ARRAY of {
          assetType : ENUM{STOCK, BOND}
          assetId   : INTEGER
+         certId    : INTEGER   (required for STOCK, 0 for BOND)
          quantity  : INTEGER
      }
 ```

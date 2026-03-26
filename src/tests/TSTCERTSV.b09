@@ -1,0 +1,579 @@
+PROCEDURE TSTCERTSV
+(* ============================================================ *)
+(* PROCEDURE : TSTCERTSV                                        *)
+(* PURPOSE   : Prototype certificate-state save/load harness.   *)
+(*             Writes a separate test file using a candidate    *)
+(*             certificate-aware format, reloads it, and        *)
+(*             validates that aggregate holdings and margin     *)
+(*             totals match the certificate records.            *)
+(* PARAMS    : None                                             *)
+(* SIDE EFX  : Creates and deletes TSTCERTS. Interactive pauses *)
+(*             between result blocks for review.                *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE ProtoHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,certCount,checksum:BYTE
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE ProtoPlyr = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;bondUnts(3):INTEGER
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+TYPE CertRec = ownerId,stockId,purchTyp:BYTE;sharesQty,purchPrc,marginBal:INTEGER
+DIM hdrA        : ProtoHdr
+DIM hdrB        : ProtoHdr
+DIM deckA(36)   : BYTE
+DIM deckB(36)   : BYTE
+DIM plyrsA(6)   : ProtoPlyr
+DIM plyrsB(6)   : ProtoPlyr
+DIM mktA        : MktState
+DIM mktB        : MktState
+DIM certsA(24)  : CertRec
+DIM certsB(24)  : CertRec
+DIM loadOK      : BOOLEAN
+DIM isOK        : BOOLEAN
+DIM failCnt     : INTEGER
+DIM msgTxt      : STRING[80]
+DIM i           : INTEGER
+
+ON ERROR GOTO 900
+
+failCnt := 0
+RUN initProtoState(hdrA, deckA, plyrsA, mktA, certsA)
+
+hdrA.magic      := $54
+hdrA.fmtVersion := 2
+hdrA.maxYears   := 10
+hdrA.plyrCount  := 2
+hdrA.rollMode   := 1
+hdrA.mgnRule    := 1
+hdrA.currYear   := 4
+hdrA.savedPhase := 2
+hdrA.savedPlyr  := 1
+hdrA.gameStage  := 2
+hdrA.bnkrFlgs   := 0
+hdrA.certCount  := 3
+
+FOR i := 1 TO 36
+  deckA(i) := i
+NEXT i
+
+plyrsA(1).plyrName    := "ALICE"
+plyrsA(1).plyrType    := 1
+plyrsA(1).cashBal     := 3200
+plyrsA(1).marginTot   := 2500
+plyrsA(1).hadCashPur  := TRUE
+plyrsA(1).stckShrs(1) := 50
+plyrsA(1).stckShrs(2) := 10
+
+plyrsA(2).plyrName    := "BETA"
+plyrsA(2).plyrType    := 2
+plyrsA(2).cashBal     := 5000
+plyrsA(2).marginTot   := 3000
+plyrsA(2).hadCashPur  := TRUE
+plyrsA(2).aiTier      := 2
+plyrsA(2).stckShrs(4) := 20
+
+FOR i := 1 TO 9
+  mktA.stckPrice(i) := 100
+  mktA.divSuspnd(i) := FALSE
+NEXT i
+mktA.stckPrice(2) := 90
+mktA.stckPrice(4) := 25
+
+certsA(1).ownerId   := 1
+certsA(1).stockId   := 1
+certsA(1).purchTyp  := 2
+certsA(1).sharesQty := 50
+certsA(1).purchPrc  := 100
+certsA(1).marginBal := 2500
+
+certsA(2).ownerId   := 1
+certsA(2).stockId   := 2
+certsA(2).purchTyp  := 1
+certsA(2).sharesQty := 10
+certsA(2).purchPrc  := 90
+certsA(2).marginBal := 0
+
+certsA(3).ownerId   := 2
+certsA(3).stockId   := 4
+certsA(3).purchTyp  := 2
+certsA(3).sharesQty := 20
+certsA(3).purchPrc  := 300
+certsA(3).marginBal := 3000
+
+PRINT "=== TSTCERTSV: CERTIFICATE SAVE PROTOTYPE ==="
+PRINT
+PRINT "Block 1: round-trip save/load with valid certificate data."
+RUN protoSave("TSTCERTS", hdrA, deckA, plyrsA, mktA, certsA)
+RUN initProtoState(hdrB, deckB, plyrsB, mktB, certsB)
+RUN protoLoad("TSTCERTS", hdrB, deckB, plyrsB, mktB, certsB, loadOK)
+IF NOT loadOK THEN
+  PRINT "  FAIL: load failed."
+  failCnt := failCnt + 1
+ELSE
+  RUN protoValidate(hdrB, plyrsB, certsB, isOK, msgTxt)
+  IF NOT isOK THEN
+    PRINT "  FAIL: "; msgTxt
+    failCnt := failCnt + 1
+  ELSE IF hdrB.certCount <> 3 THEN
+    PRINT "  FAIL: certCount expected 3, got "; hdrB.certCount
+    failCnt := failCnt + 1
+  ELSE IF plyrsB(1).marginTot <> 2500 THEN
+    PRINT "  FAIL: player 1 marginTot mismatch."
+    failCnt := failCnt + 1
+  ELSE IF plyrsB(2).stckShrs(4) <> 20 THEN
+    PRINT "  FAIL: player 2 stock 4 share count mismatch."
+    failCnt := failCnt + 1
+  ELSE
+    PRINT "  PASS: round-trip load validated."
+  ENDIF \ENDIF \ENDIF \ENDIF
+PRINT
+RUN tWaitKey
+
+PRINT "Block 2: reject incorrect player margin total."
+RUN protoLoad("TSTCERTS", hdrB, deckB, plyrsB, mktB, certsB, loadOK)
+plyrsB(1).marginTot := 2400
+RUN protoValidate(hdrB, plyrsB, certsB, isOK, msgTxt)
+IF isOK THEN
+  PRINT "  FAIL: validator accepted bad margin total."
+  failCnt := failCnt + 1
+ELSE
+  PRINT "  PASS: "; msgTxt
+ENDIF
+PRINT
+RUN tWaitKey
+
+PRINT "Block 3: reject aggregate share mismatch."
+RUN protoLoad("TSTCERTS", hdrB, deckB, plyrsB, mktB, certsB, loadOK)
+plyrsB(2).stckShrs(4) := 10
+RUN protoValidate(hdrB, plyrsB, certsB, isOK, msgTxt)
+IF isOK THEN
+  PRINT "  FAIL: validator accepted bad share aggregate."
+  failCnt := failCnt + 1
+ELSE
+  PRINT "  PASS: "; msgTxt
+ENDIF
+PRINT
+RUN tWaitKey
+
+PRINT "Block 4: reject cash certificate with margin balance."
+RUN protoLoad("TSTCERTS", hdrB, deckB, plyrsB, mktB, certsB, loadOK)
+certsB(2).marginBal := 100
+RUN protoValidate(hdrB, plyrsB, certsB, isOK, msgTxt)
+IF isOK THEN
+  PRINT "  FAIL: validator accepted invalid cash certificate."
+  failCnt := failCnt + 1
+ELSE
+  PRINT "  PASS: "; msgTxt
+ENDIF
+PRINT
+RUN tWaitKey
+
+DELETE "TSTCERTS"
+PRINT "=== TSTCERTSV SUMMARY ==="
+PRINT "Failures: "; failCnt
+IF failCnt = 0 THEN
+  PRINT "TSTCERTSV: PASS"
+ELSE
+  PRINT "TSTCERTSV: FAIL"
+ENDIF
+END
+
+900 PRINT "TSTCERTSV error ("; ERR; ")"
+PRINT "TSTCERTSV: FAIL"
+END
+
+PROCEDURE initProtoState
+(* ============================================================ *)
+(* PROCEDURE : initProtoState                                   *)
+(* PURPOSE   : Initialize all prototype state records and       *)
+(*             arrays to zero or FALSE defaults.                *)
+(* PARAMS    : hdr      - prototype header                      *)
+(*             deckOrd  - prototype deck array                  *)
+(*             plyrs    - prototype player array                *)
+(*             mkt      - market state                          *)
+(*             certs    - certificate slot array                *)
+(* SIDE EFX  : Modifies all passed records in place.            *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE ProtoHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,certCount,checksum:BYTE
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE ProtoPlyr = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;bondUnts(3):INTEGER
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+TYPE CertRec = ownerId,stockId,purchTyp:BYTE;sharesQty,purchPrc,marginBal:INTEGER
+PARAM hdr        : ProtoHdr
+PARAM deckOrd(36): BYTE
+PARAM plyrs(6)   : ProtoPlyr
+PARAM mkt        : MktState
+PARAM certs(24)  : CertRec
+DIM i            : INTEGER
+DIM p            : INTEGER
+DIM b            : INTEGER
+
+hdr.magic      := 0
+hdr.fmtVersion := 0
+hdr.maxYears   := 0
+hdr.plyrCount  := 0
+hdr.rollMode   := 0
+hdr.mgnRule    := 0
+hdr.currYear   := 0
+hdr.savedPhase := 0
+hdr.savedPlyr  := 0
+hdr.gameStage  := 0
+hdr.bnkrFlgs   := 0
+hdr.certCount  := 0
+hdr.checksum   := 0
+
+FOR i := 1 TO 36
+  deckOrd(i) := 0
+NEXT i
+
+FOR p := 1 TO 6
+  plyrs(p).plyrName   := ""
+  plyrs(p).plyrType   := 0
+  plyrs(p).cashBal    := 0
+  plyrs(p).marginTot  := 0
+  plyrs(p).obligation := 0
+  plyrs(p).isBankrupt := FALSE
+  plyrs(p).hadCashPur := FALSE
+  plyrs(p).aiTier     := 0
+  FOR i := 1 TO 9
+    plyrs(p).stckShrs(i) := 0
+  NEXT i
+  FOR b := 1 TO 3
+    plyrs(p).bondUnts(b) := 0
+  NEXT b
+NEXT p
+
+FOR i := 1 TO 9
+  mkt.stckPrice(i) := 0
+  mkt.divSuspnd(i) := FALSE
+NEXT i
+
+FOR i := 1 TO 24
+  certs(i).ownerId   := 0
+  certs(i).stockId   := 0
+  certs(i).purchTyp  := 0
+  certs(i).sharesQty := 0
+  certs(i).purchPrc  := 0
+  certs(i).marginBal := 0
+NEXT i
+END
+
+PROCEDURE protoSave
+(* ============================================================ *)
+(* PROCEDURE : protoSave                                        *)
+(* PURPOSE   : Write the prototype certificate-aware state      *)
+(*             file to disk.                                    *)
+(* PARAMS    : savePath  - target file name                     *)
+(*             hdr       - prototype header; checksum set here  *)
+(*             deckOrd   - deck order                           *)
+(*             plyrs     - player state                         *)
+(*             mkt       - market state                         *)
+(*             certs     - certificate slots                    *)
+(* SIDE EFX  : Creates or replaces savePath.                    *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE ProtoHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,certCount,checksum:BYTE
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE ProtoPlyr = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;bondUnts(3):INTEGER
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+TYPE CertRec = ownerId,stockId,purchTyp:BYTE;sharesQty,purchPrc,marginBal:INTEGER
+PARAM savePath   : STRING[20]
+PARAM hdr        : ProtoHdr
+PARAM deckOrd(36): BYTE
+PARAM plyrs(6)   : ProtoPlyr
+PARAM mkt        : MktState
+PARAM certs(24)  : CertRec
+DIM path         : BYTE
+DIM pathOpen     : BOOLEAN
+DIM chkSum       : INTEGER
+DIM iMaxYr       : INTEGER
+DIM iDeckCnt     : INTEGER
+DIM iCertCnt     : INTEGER
+DIM i            : INTEGER
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+chkSum := hdr.magic + hdr.fmtVersion + hdr.maxYears
+chkSum := chkSum + hdr.plyrCount + hdr.rollMode
+chkSum := chkSum + hdr.mgnRule + hdr.currYear
+chkSum := chkSum + hdr.savedPhase + hdr.savedPlyr
+chkSum := chkSum + hdr.gameStage + hdr.bnkrFlgs
+chkSum := chkSum + hdr.certCount
+hdr.checksum := LAND(chkSum, 255)
+
+ON ERROR GOTO 100
+DELETE savePath
+
+100 ON ERROR GOTO 900
+
+CREATE #path, savePath:WRITE
+pathOpen := TRUE
+
+PUT #path, hdr
+
+iMaxYr := hdr.maxYears
+iDeckCnt := iMaxYr + 1
+IF iDeckCnt > 36 THEN
+  iDeckCnt := 36
+ENDIF
+FOR i := 1 TO iDeckCnt
+  PUT #path, deckOrd(i)
+NEXT i
+
+PUT #path, plyrs
+PUT #path, mkt
+
+iCertCnt := hdr.certCount
+IF iCertCnt > 24 THEN
+  iCertCnt := 24
+ENDIF
+FOR i := 1 TO iCertCnt
+  PUT #path, certs(i)
+NEXT i
+
+CLOSE #path
+pathOpen := FALSE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "protoSave error ("; ERR; ") writing: "; savePath
+END
+
+PROCEDURE protoLoad
+(* ============================================================ *)
+(* PROCEDURE : protoLoad                                        *)
+(* PURPOSE   : Read the prototype certificate-aware state       *)
+(*             file from disk.                                  *)
+(* PARAMS    : savePath  - source file name                     *)
+(*             hdr       - receives header                      *)
+(*             deckOrd   - receives deck section                *)
+(*             plyrs     - receives player state                *)
+(*             mkt       - receives market state                *)
+(*             certs     - receives certificate slots           *)
+(*             loadOK    - TRUE on success                      *)
+(* SIDE EFX  : Prints diagnostics on failure.                   *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE ProtoHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,certCount,checksum:BYTE
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE ProtoPlyr = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;bondUnts(3):INTEGER
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+TYPE CertRec = ownerId,stockId,purchTyp:BYTE;sharesQty,purchPrc,marginBal:INTEGER
+PARAM savePath   : STRING[20]
+PARAM hdr        : ProtoHdr
+PARAM deckOrd(36): BYTE
+PARAM plyrs(6)   : ProtoPlyr
+PARAM mkt        : MktState
+PARAM certs(24)  : CertRec
+PARAM loadOK     : BOOLEAN
+DIM path         : BYTE
+DIM pathOpen     : BOOLEAN
+DIM chkExp       : INTEGER
+DIM iMaxYr       : INTEGER
+DIM iDeckCnt     : INTEGER
+DIM iCertCnt     : INTEGER
+DIM i            : INTEGER
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+loadOK := FALSE
+RUN initProtoState(hdr, deckOrd, plyrs, mkt, certs)
+
+OPEN #path, savePath:READ
+pathOpen := TRUE
+GET #path, hdr
+
+IF hdr.magic <> $54 THEN
+  PRINT "protoLoad: not a prototype save file: "; savePath
+  END
+ENDIF
+IF hdr.fmtVersion <> 2 THEN
+  PRINT "protoLoad: unsupported format version: "; savePath
+  END
+ENDIF
+
+chkExp := hdr.magic + hdr.fmtVersion + hdr.maxYears
+chkExp := chkExp + hdr.plyrCount + hdr.rollMode
+chkExp := chkExp + hdr.mgnRule + hdr.currYear
+chkExp := chkExp + hdr.savedPhase + hdr.savedPlyr
+chkExp := chkExp + hdr.gameStage + hdr.bnkrFlgs
+chkExp := chkExp + hdr.certCount
+chkExp := LAND(chkExp, 255)
+IF chkExp <> hdr.checksum THEN
+  PRINT "protoLoad: corrupt header checksum: "; savePath
+  END
+ENDIF
+
+iMaxYr := hdr.maxYears
+iDeckCnt := iMaxYr + 1
+IF iDeckCnt > 36 THEN
+  iDeckCnt := 36
+ENDIF
+FOR i := 1 TO iDeckCnt
+  GET #path, deckOrd(i)
+NEXT i
+
+GET #path, plyrs
+GET #path, mkt
+
+iCertCnt := hdr.certCount
+IF iCertCnt > 24 THEN
+  PRINT "protoLoad: certCount exceeds slot limit."
+  END
+ENDIF
+FOR i := 1 TO iCertCnt
+  GET #path, certs(i)
+NEXT i
+
+CLOSE #path
+pathOpen := FALSE
+loadOK := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "protoLoad error ("; ERR; ") reading: "; savePath
+    loadOK := FALSE
+END
+
+PROCEDURE protoValidate
+(* ============================================================ *)
+(* PROCEDURE : protoValidate                                    *)
+(* PURPOSE   : Validate the in-memory prototype state against   *)
+(*             certificate-aware consistency rules.             *)
+(* PARAMS    : hdr      - prototype header                      *)
+(*             plyrs    - player state                          *)
+(*             certs    - certificate slots                     *)
+(*             isOK     - TRUE when all checks pass             *)
+(*             msgTxt   - failure message on first defect       *)
+(* SIDE EFX  : None.                                            *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE ProtoHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,certCount,checksum:BYTE
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE ProtoPlyr = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;bondUnts(3):INTEGER
+TYPE CertRec = ownerId,stockId,purchTyp:BYTE;sharesQty,purchPrc,marginBal:INTEGER
+PARAM hdr      : ProtoHdr
+PARAM plyrs(6) : ProtoPlyr
+PARAM certs(24): CertRec
+PARAM isOK     : BOOLEAN
+PARAM msgTxt   : STRING[80]
+DIM sumShrs(6,9): INTEGER
+DIM sumMgn(6)   : INTEGER
+DIM i           : INTEGER
+DIM p           : INTEGER
+DIM s           : INTEGER
+DIM iPCnt       : INTEGER
+DIM iCertCnt    : INTEGER
+DIM ownVal      : INTEGER
+DIM stkVal      : INTEGER
+DIM typVal      : INTEGER
+
+isOK := FALSE
+msgTxt := ""
+
+IF hdr.magic <> $54 THEN
+  msgTxt := "invalid header magic"
+  END
+ENDIF
+IF hdr.fmtVersion <> 2 THEN
+  msgTxt := "invalid format version"
+  END
+ENDIF
+
+iPCnt := hdr.plyrCount
+iCertCnt := hdr.certCount
+IF iPCnt < 1 OR iPCnt > 6 THEN
+  msgTxt := "player count out of range"
+  END
+ENDIF
+IF iCertCnt < 0 OR iCertCnt > 24 THEN
+  msgTxt := "certificate count out of range"
+  END
+ENDIF
+
+FOR p := 1 TO 6
+  sumMgn(p) := 0
+  FOR s := 1 TO 9
+    sumShrs(p, s) := 0
+  NEXT s
+NEXT p
+
+FOR i := 1 TO iCertCnt
+  ownVal := certs(i).ownerId
+  stkVal := certs(i).stockId
+  typVal := certs(i).purchTyp
+  IF ownVal < 1 OR ownVal > iPCnt THEN
+    msgTxt := "certificate owner out of range"
+    END
+  ENDIF
+  IF stkVal < 1 OR stkVal > 9 THEN
+    msgTxt := "certificate stock out of range"
+    END
+  ENDIF
+  IF certs(i).sharesQty <= 0 THEN
+    msgTxt := "certificate shares must be positive"
+    END
+  ENDIF
+  IF MOD(certs(i).sharesQty, 10) <> 0 THEN
+    msgTxt := "certificate shares must be a multiple of 10"
+    END
+  ENDIF
+  IF typVal <> 1 AND typVal <> 2 THEN
+    msgTxt := "certificate purchase type invalid"
+    END
+  ENDIF
+  IF typVal = 1 THEN
+    IF certs(i).marginBal <> 0 THEN
+      msgTxt := "cash certificate has non-zero margin balance"
+      END
+    ENDIF
+  ELSE
+    IF certs(i).marginBal <= 0 THEN
+      msgTxt := "margin certificate has non-positive margin"
+      END
+    ENDIF
+  ENDIF
+  sumShrs(ownVal, stkVal) := sumShrs(ownVal, stkVal) + certs(i).sharesQty
+  sumMgn(ownVal) := sumMgn(ownVal) + certs(i).marginBal
+NEXT i
+
+FOR p := 1 TO iPCnt
+  IF plyrs(p).marginTot <> sumMgn(p) THEN
+    msgTxt := "player margin total does not match certificates"
+    END
+  ENDIF
+  FOR s := 1 TO 9
+    IF plyrs(p).stckShrs(s) <> sumShrs(p, s) THEN
+      msgTxt := "player share totals do not match certificates"
+      END
+    ENDIF
+  NEXT s
+NEXT p
+
+isOK := TRUE
+msgTxt := "state valid"
+END
+
+PROCEDURE tWaitKey
+(* ============================================================ *)
+(* PROCEDURE : tWaitKey                                         *)
+(* PURPOSE   : Local wait-for-key helper for TSTCERTSV.         *)
+(* PARAMS    : None                                             *)
+(* SIDE EFX  : Prints prompt and waits for one key.             *)
+(* ============================================================ *)
+DIM k : STRING[1]
+
+ON ERROR GOTO 900
+
+PRINT "  Press any key to continue...";
+GET #0, k
+PRINT
+END
+
+900 PRINT "tWaitKey error ("; ERR; ")"
+END

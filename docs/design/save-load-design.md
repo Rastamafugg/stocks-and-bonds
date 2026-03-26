@@ -202,11 +202,10 @@ TYPE PlyrRec
     hadCashPur  : BOOLEAN      ! TRUE if prior cash purchase made
     aiTier      : BYTE         ! AI difficulty: 1=Easy,2=Med,3=Hard;0=human
     stckShrs(9) : INTEGER      ! Shares owned per stock (index 1–9)
-    mgnHeld(9)  : BOOLEAN      ! TRUE if shares at index i held on margin
     bondUnts(3) : INTEGER      ! Bond units held per denomination (index 1–3)
 ```
 
-SIZE per player: 20 + 1 + 2 + 2 + 2 + 1 + 1 + 1 + 18 + 9 + 6 = **63 bytes**.
+SIZE per player: 20 + 1 + 2 + 2 + 2 + 1 + 1 + 1 + 18 + 6 = **54 bytes**.
 
 `obligation` records the outstanding forced liquidation amount for this
 player when `savedPhase = 3`. It is 0 for all players when `savedPhase`
@@ -221,7 +220,37 @@ players store 0.
 `hadCashPur` records whether the player has made at least one prior cash
 purchase, required for margin eligibility (spec Section 9.1).
 
-### 5.3 MktState
+The previous `mgnHeld(9)` field is not sufficient for rules-faithful margin
+play and is retired from the authoritative design. Margin is tracked per
+certificate, not per stock aggregate.
+
+### 5.3 StockCertRec
+
+One record per stock certificate. This is the authoritative unit for selling
+stock held on margin and for margin-call enforcement.
+
+```
+TYPE StockCertRec
+    ownerId       : BYTE      ! 1..6 player slot; 0 = unused
+    stockId       : BYTE      ! 1..9 stock index
+    sharesOwned   : INTEGER   ! Remaining shares in this certificate
+    purchasePrice : INTEGER   ! Per-share purchase price at acquisition
+    purchType     : BYTE      ! 1 = CASH, 2 = MARGIN
+    marginBal     : INTEGER   ! Outstanding margin on this certificate
+```
+
+Interpretation:
+
+- Cash certificates store `marginBal = 0`.
+- Margin certificates store the original unpaid half-cost, reduced only as that
+  same certificate is repaid or partially sold.
+- `marginTot` in `PlyrRec` is a cached aggregate equal to the sum of
+  `marginBal` across that player's margin certificates.
+
+The number of certificate slots is implementation-defined and should be sized
+to the maximum number of concurrently held round lots supported by the game.
+
+### 5.4 MktState
 
 Current stock market state after the most recent price resolution.
 
@@ -244,10 +273,14 @@ configured game length. The maximum game length is 10 years.
 |-----------------------|-------------------------|--------------|
 | SaveHdr               | 1 record                | 11           |
 | deckOrd (trimmed)     | (maxYears+1) × BYTE     | 11           |
-| PlyrRec               | 6 records × 63          | 378          |
+| PlyrRec               | 6 records × 54          | 324          |
+| StockCertRec          | implementation-defined  | variable     |
 | MktState              | 1 record                | 27           |
-| **Total (max)**       |                         | **427**      |
-| **Total (min, 1 yr)** |                         | **418**      |
+| **Total**             |                         | variable     |
+
+The save format must be extended with a certificate section once certificate-
+level margin tracking is implemented. The prior fixed-size total is no longer
+authoritative after that change.
 
 426 bytes is negligible on any OS-9 storage medium. The variable memory
 budget (32KB) is unaffected: the TYPE definitions and working variables
