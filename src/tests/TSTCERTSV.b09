@@ -28,8 +28,11 @@ DIM certsA(24)  : CertRec
 DIM certsB(24)  : CertRec
 DIM loadOK      : BOOLEAN
 DIM isOK        : BOOLEAN
+DIM opOK        : BOOLEAN
+DIM blockOK     : BOOLEAN
 DIM failCnt     : INTEGER
 DIM msgTxt      : STRING[80]
+DIM expCash     : INTEGER
 DIM i           : INTEGER
 
 ON ERROR GOTO 900
@@ -127,7 +130,128 @@ ELSE
 PRINT
 RUN tWaitKey
 
-PRINT "Block 2: reject incorrect player margin total."
+PRINT "Block 2: split one margin certificate into two children."
+RUN protoLoad("TSTCERTS", hdrB, deckB, plyrsB, mktB, certsB, loadOK)
+blockOK := TRUE
+IF NOT loadOK THEN
+  PRINT "  FAIL: load failed."
+  failCnt := failCnt + 1
+  blockOK := FALSE
+ENDIF
+IF blockOK THEN
+  opOK := FALSE
+  RUN protoSplitCert(hdrB, plyrsB, certsB, 1, opOK, msgTxt)
+  IF NOT opOK THEN
+    PRINT "  FAIL: "; msgTxt
+    failCnt := failCnt + 1
+    blockOK := FALSE
+  ENDIF
+ENDIF
+IF blockOK THEN
+  RUN protoValidate(hdrB, plyrsB, certsB, isOK, msgTxt)
+  IF NOT isOK THEN
+    PRINT "  FAIL: "; msgTxt
+    failCnt := failCnt + 1
+    blockOK := FALSE
+  ENDIF
+ENDIF
+IF blockOK THEN
+  IF hdrB.certCount <> 4 THEN
+    PRINT "  FAIL: split did not create a fourth certificate."
+    failCnt := failCnt + 1
+    blockOK := FALSE
+  ENDIF
+ENDIF
+IF blockOK THEN
+  IF certsB(1).sharesQty <> 50 OR certsB(4).sharesQty <> 50 THEN
+    PRINT "  FAIL: split certificate share counts are wrong."
+    failCnt := failCnt + 1
+    blockOK := FALSE
+  ENDIF
+ENDIF
+IF blockOK THEN
+  IF certsB(1).marginBal <> 1250 OR certsB(4).marginBal <> 1250 THEN
+    PRINT "  FAIL: split margin balances are wrong."
+    failCnt := failCnt + 1
+    blockOK := FALSE
+  ENDIF
+ENDIF
+IF blockOK THEN
+  IF plyrsB(1).stckShrs(1) <> 100 OR plyrsB(1).marginTot <> 2500 THEN
+    PRINT "  FAIL: player aggregates were not rebuilt after split."
+    failCnt := failCnt + 1
+    blockOK := FALSE
+  ENDIF
+ENDIF
+IF blockOK THEN
+  PRINT "  PASS: split preserved aggregate share and margin state."
+ENDIF
+PRINT
+RUN tWaitKey
+
+PRINT "Block 3: apply a partial sale from one split certificate."
+RUN protoLoad("TSTCERTS", hdrB, deckB, plyrsB, mktB, certsB, loadOK)
+blockOK := TRUE
+IF NOT loadOK THEN
+  PRINT "  FAIL: load failed."
+  failCnt := failCnt + 1
+  blockOK := FALSE
+ENDIF
+IF blockOK THEN
+  opOK := FALSE
+  RUN protoSplitCert(hdrB, plyrsB, certsB, 1, opOK, msgTxt)
+  IF NOT opOK THEN
+    PRINT "  FAIL: "; msgTxt
+    failCnt := failCnt + 1
+    blockOK := FALSE
+  ENDIF
+ENDIF
+IF blockOK THEN
+  expCash := 3200 + (20 * 120) - 500
+  opOK := FALSE
+  RUN protoSellPart(plyrsB, 2, certsB, hdrB.certCount, 1, 20, 120, opOK, msgTxt)
+  IF NOT opOK THEN
+    PRINT "  FAIL: "; msgTxt
+    failCnt := failCnt + 1
+    blockOK := FALSE
+  ENDIF
+ENDIF
+IF blockOK THEN
+  RUN protoValidate(hdrB, plyrsB, certsB, isOK, msgTxt)
+  IF NOT isOK THEN
+    PRINT "  FAIL: "; msgTxt
+    failCnt := failCnt + 1
+    blockOK := FALSE
+  ENDIF
+ENDIF
+IF blockOK THEN
+  IF certsB(1).sharesQty <> 30 OR certsB(1).marginBal <> 750 THEN
+    PRINT "  FAIL: partial sale did not reduce certificate 1 correctly."
+    failCnt := failCnt + 1
+    blockOK := FALSE
+  ENDIF
+ENDIF
+IF blockOK THEN
+  IF plyrsB(1).stckShrs(1) <> 80 OR plyrsB(1).marginTot <> 2000 THEN
+    PRINT "  FAIL: player aggregates were not rebuilt after partial sale."
+    failCnt := failCnt + 1
+    blockOK := FALSE
+  ENDIF
+ENDIF
+IF blockOK THEN
+  IF plyrsB(1).cashBal <> expCash THEN
+    PRINT "  FAIL: cash balance after partial sale is wrong."
+    failCnt := failCnt + 1
+    blockOK := FALSE
+  ENDIF
+ENDIF
+IF blockOK THEN
+  PRINT "  PASS: partial sale updated cash, shares, and margin correctly."
+ENDIF
+PRINT
+RUN tWaitKey
+
+PRINT "Block 4: reject incorrect player margin total."
 RUN protoLoad("TSTCERTS", hdrB, deckB, plyrsB, mktB, certsB, loadOK)
 plyrsB(1).marginTot := 2400
 RUN protoValidate(hdrB, plyrsB, certsB, isOK, msgTxt)
@@ -140,7 +264,7 @@ ENDIF
 PRINT
 RUN tWaitKey
 
-PRINT "Block 3: reject aggregate share mismatch."
+PRINT "Block 5: reject aggregate share mismatch."
 RUN protoLoad("TSTCERTS", hdrB, deckB, plyrsB, mktB, certsB, loadOK)
 plyrsB(2).stckShrs(4) := 10
 RUN protoValidate(hdrB, plyrsB, certsB, isOK, msgTxt)
@@ -153,7 +277,7 @@ ENDIF
 PRINT
 RUN tWaitKey
 
-PRINT "Block 4: reject cash certificate with margin balance."
+PRINT "Block 6: reject cash certificate with margin balance."
 RUN protoLoad("TSTCERTS", hdrB, deckB, plyrsB, mktB, certsB, loadOK)
 certsB(2).marginBal := 100
 RUN protoValidate(hdrB, plyrsB, certsB, isOK, msgTxt)
@@ -438,6 +562,209 @@ END
     ENDIF
     PRINT "protoLoad error ("; ERR; ") reading: "; savePath
     loadOK := FALSE
+END
+
+PROCEDURE protoRebuildAgg
+(* ============================================================ *)
+(* PROCEDURE : protoRebuildAgg                                  *)
+(* PURPOSE   : Recompute player stock aggregates and margin     *)
+(*             totals from the active certificate slots.        *)
+(* PARAMS    : plyrs - player records updated in place          *)
+(*             pCnt  - active player count                      *)
+(*             certs - certificate slots                        *)
+(*             cCnt  - active certificate count                 *)
+(* SIDE EFX  : Rebuilds stckShrs() and marginTot on players.    *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE ProtoPlyr = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;bondUnts(3):INTEGER
+TYPE CertRec = ownerId,stockId,purchTyp:BYTE;sharesQty,purchPrc,marginBal:INTEGER
+PARAM plyrs(6) : ProtoPlyr
+PARAM pCnt     : INTEGER
+PARAM certs(24): CertRec
+PARAM cCnt     : INTEGER
+DIM p          : INTEGER
+DIM s          : INTEGER
+DIM i          : INTEGER
+DIM ownVal     : INTEGER
+DIM stkVal     : INTEGER
+
+FOR p := 1 TO pCnt
+  plyrs(p).marginTot := 0
+  FOR s := 1 TO 9
+    plyrs(p).stckShrs(s) := 0
+  NEXT s
+NEXT p
+
+FOR i := 1 TO cCnt
+  ownVal := certs(i).ownerId
+  stkVal := certs(i).stockId
+  IF ownVal >= 1 AND ownVal <= pCnt THEN
+    IF stkVal >= 1 AND stkVal <= 9 THEN
+      plyrs(ownVal).stckShrs(stkVal) := plyrs(ownVal).stckShrs(stkVal) + certs(i).sharesQty
+      plyrs(ownVal).marginTot := plyrs(ownVal).marginTot + certs(i).marginBal
+    ENDIF \ENDIF
+NEXT i
+END
+
+PROCEDURE protoSplitCert
+(* ============================================================ *)
+(* PROCEDURE : protoSplitCert                                   *)
+(* PURPOSE   : Prototype a 2-for-1 split by duplicating one     *)
+(*             certificate into a second child certificate and  *)
+(*             dividing margin debt across the two children.    *)
+(* PARAMS    : hdr    - header; certCount updated in place      *)
+(*             plyrs  - player aggregates rebuilt here          *)
+(*             certs  - certificate slots modified in place     *)
+(*             cIdx   - certificate index to split             *)
+(*             didOK  - TRUE on success                         *)
+(*             msgTxt - status or error text                    *)
+(* SIDE EFX  : Increments certCount by one on success.          *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE ProtoHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,certCount,checksum:BYTE
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE ProtoPlyr = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;bondUnts(3):INTEGER
+TYPE CertRec = ownerId,stockId,purchTyp:BYTE;sharesQty,purchPrc,marginBal:INTEGER
+PARAM hdr      : ProtoHdr
+PARAM plyrs(6) : ProtoPlyr
+PARAM certs(24): CertRec
+PARAM cIdx     : INTEGER
+PARAM didOK    : BOOLEAN
+PARAM msgTxt   : STRING[80]
+DIM iCertCnt   : INTEGER
+DIM newIdx     : INTEGER
+DIM oldMgn     : INTEGER
+DIM halfMgn    : INTEGER
+DIM newPrc     : INTEGER
+
+didOK := FALSE
+msgTxt := ""
+iCertCnt := hdr.certCount
+IF cIdx < 1 OR cIdx > iCertCnt THEN
+  msgTxt := "split certificate index out of range"
+  END
+ENDIF
+IF iCertCnt >= 24 THEN
+  msgTxt := "no free certificate slot for split"
+  END
+ENDIF
+IF certs(cIdx).sharesQty <= 0 THEN
+  msgTxt := "cannot split an empty certificate"
+  END
+ENDIF
+IF MOD(certs(cIdx).sharesQty, 10) <> 0 THEN
+  msgTxt := "split source shares must be a multiple of 10"
+  END
+ENDIF
+
+newIdx := iCertCnt + 1
+certs(newIdx).ownerId := certs(cIdx).ownerId
+certs(newIdx).stockId := certs(cIdx).stockId
+certs(newIdx).purchTyp := certs(cIdx).purchTyp
+certs(newIdx).sharesQty := certs(cIdx).sharesQty
+
+newPrc := certs(cIdx).purchPrc / 2
+IF MOD(certs(cIdx).purchPrc, 2) <> 0 THEN
+  newPrc := newPrc + 1
+ENDIF
+certs(cIdx).purchPrc := newPrc
+certs(newIdx).purchPrc := newPrc
+
+oldMgn := certs(cIdx).marginBal
+IF certs(cIdx).purchTyp = 2 THEN
+  halfMgn := oldMgn / 2
+  certs(cIdx).marginBal := halfMgn
+  certs(newIdx).marginBal := oldMgn - halfMgn
+ELSE
+  certs(cIdx).marginBal := 0
+  certs(newIdx).marginBal := 0
+ENDIF
+
+hdr.certCount := newIdx
+RUN protoRebuildAgg(plyrs, hdr.plyrCount, certs, hdr.certCount)
+didOK := TRUE
+msgTxt := "split applied"
+END
+
+PROCEDURE protoSellPart
+(* ============================================================ *)
+(* PROCEDURE : protoSellPart                                    *)
+(* PURPOSE   : Prototype a partial certificate sale while       *)
+(*             repaying proportional margin debt from the same  *)
+(*             certificate.                                     *)
+(* PARAMS    : plyrs   - player state updated in place          *)
+(*             pCnt    - active player count                    *)
+(*             certs   - certificate slots updated in place     *)
+(*             cCnt    - active certificate count               *)
+(*             cIdx    - certificate index to sell from         *)
+(*             qtySell - shares to sell; partial only           *)
+(*             currPrc - current sale price per share           *)
+(*             didOK   - TRUE on success                        *)
+(*             msgTxt  - status or error text                   *)
+(* SIDE EFX  : Updates cash, share count, and margin balance.   *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE ProtoPlyr = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;bondUnts(3):INTEGER
+TYPE CertRec = ownerId,stockId,purchTyp:BYTE;sharesQty,purchPrc,marginBal:INTEGER
+PARAM plyrs(6) : ProtoPlyr
+PARAM pCnt     : INTEGER
+PARAM certs(24): CertRec
+PARAM cCnt     : INTEGER
+PARAM cIdx     : INTEGER
+PARAM qtySell  : INTEGER
+PARAM currPrc  : INTEGER
+PARAM didOK    : BOOLEAN
+PARAM msgTxt   : STRING[80]
+DIM ownVal     : INTEGER
+DIM lotCnt     : INTEGER
+DIM sellLots   : INTEGER
+DIM repayAmt   : INTEGER
+DIM proceeds   : INTEGER
+
+didOK := FALSE
+msgTxt := ""
+IF cIdx < 1 OR cIdx > cCnt THEN
+  msgTxt := "sale certificate index out of range"
+  END
+ENDIF
+IF qtySell <= 0 THEN
+  msgTxt := "sale quantity must be positive"
+  END
+ENDIF
+IF MOD(qtySell, 10) <> 0 THEN
+  msgTxt := "sale quantity must be a multiple of 10"
+  END
+ENDIF
+IF qtySell >= certs(cIdx).sharesQty THEN
+  msgTxt := "prototype partial sale requires qty < certificate shares"
+  END
+ENDIF
+IF currPrc < 0 THEN
+  msgTxt := "current price must be non-negative"
+  END
+ENDIF
+
+ownVal := certs(cIdx).ownerId
+IF ownVal < 1 OR ownVal > pCnt THEN
+  msgTxt := "sale certificate owner out of range"
+  END
+ENDIF
+
+proceeds := qtySell * currPrc
+repayAmt := 0
+IF certs(cIdx).purchTyp = 2 THEN
+  lotCnt := certs(cIdx).sharesQty / 10
+  sellLots := qtySell / 10
+  repayAmt := certs(cIdx).marginBal / lotCnt
+  repayAmt := repayAmt * sellLots
+ENDIF
+
+plyrs(ownVal).cashBal := plyrs(ownVal).cashBal + proceeds - repayAmt
+certs(cIdx).sharesQty := certs(cIdx).sharesQty - qtySell
+certs(cIdx).marginBal := certs(cIdx).marginBal - repayAmt
+RUN protoRebuildAgg(plyrs, pCnt, certs, cCnt)
+didOK := TRUE
+msgTxt := "partial sale applied"
 END
 
 PROCEDURE protoValidate

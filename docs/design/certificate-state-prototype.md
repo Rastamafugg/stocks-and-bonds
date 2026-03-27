@@ -94,6 +94,49 @@ Interpretation:
   from that same certificate.
 - Cash certificates must carry `marginBal = 0`.
 
+## Prototype operations
+
+### Stock split
+
+The prototype models a 2-for-1 stock split by replacing one certificate with
+two child certificates:
+
+1. both child certificates keep the same `ownerId`, `stockId`, and `purchTyp`,
+2. each child certificate receives `sharesQty` equal to the original pre-split
+   share count,
+3. `purchPrc` is halved and rounded up for both child certificates,
+4. if the certificate is on margin, `marginBal` is split in half across the
+   two child certificates.
+
+If `marginBal` is odd, the prototype keeps the remainder on the second child so
+the two balances still sum to the original amount.
+
+### Partial certificate sale
+
+The prototype models a partial sale from one certificate only:
+
+1. `qtySell` must be positive,
+2. `qtySell` must be a multiple of 10,
+3. `qtySell` must be less than the certificate's `sharesQty`.
+
+For margin certificates, the repaid debt is computed proportionally by round
+lot:
+
+```
+repayAmt = (marginBal / (sharesQty / 10)) * (qtySell / 10)
+```
+
+Then:
+
+```
+cashBal   += saleProceeds - repayAmt
+sharesQty -= qtySell
+marginBal -= repayAmt
+```
+
+The prototype harness covers partial sale only. Full certificate deletion and
+slot compaction are intentionally left out of this isolated first step.
+
 ## Validation rules
 
 The prototype validator should reject state when any of the following occurs:
@@ -108,7 +151,9 @@ The prototype validator should reject state when any of the following occurs:
 8. player `stckShrs(stock)` does not equal the sum of that player's
    certificates for the stock,
 9. player `marginTot` does not equal the sum of that player's margin
-   certificate balances.
+   certificate balances,
+10. a split or partial sale leaves any certificate with a non-multiple-of-10
+    share count.
 
 ## Prototype decision
 
