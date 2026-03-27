@@ -27,7 +27,7 @@ PRINT
 iA := 5
 iB := 5
 PRINT "  Test 3.1  Expect TRUE  (5 = 5)"
-RUN boolRecv((iA = iB))
+RUN boolRecv(iA = iB)
 PRINT
 RUN waitKey
 
