@@ -33,6 +33,8 @@ DIM blockOK     : BOOLEAN
 DIM failCnt     : INTEGER
 DIM msgTxt      : STRING[80]
 DIM expCash     : INTEGER
+DIM iPCnt       : INTEGER
+DIM iCertCnt    : INTEGER
 DIM i           : INTEGER
 
 ON ERROR GOTO 900
@@ -140,6 +142,8 @@ IF NOT loadOK THEN
 ENDIF
 IF blockOK THEN
   opOK := FALSE
+  iPCnt := hdrB.plyrCount
+  iCertCnt := hdrB.certCount
   RUN protoSplitCert(hdrB, plyrsB, certsB, 1, opOK, msgTxt)
   IF NOT opOK THEN
     PRINT "  FAIL: "; msgTxt
@@ -199,6 +203,8 @@ IF NOT loadOK THEN
 ENDIF
 IF blockOK THEN
   opOK := FALSE
+  iPCnt := hdrB.plyrCount
+  iCertCnt := hdrB.certCount
   RUN protoSplitCert(hdrB, plyrsB, certsB, 1, opOK, msgTxt)
   IF NOT opOK THEN
     PRINT "  FAIL: "; msgTxt
@@ -209,7 +215,8 @@ ENDIF
 IF blockOK THEN
   expCash := 3200 + (20 * 120) - 500
   opOK := FALSE
-  RUN protoSellPart(plyrsB, 2, certsB, hdrB.certCount, 1, 20, 120, opOK, msgTxt)
+  iCertCnt := hdrB.certCount
+  RUN protoSellPart(plyrsB, 2, certsB, iCertCnt, 1, 20, 120, opOK, msgTxt)
   IF NOT opOK THEN
     PRINT "  FAIL: "; msgTxt
     failCnt := failCnt + 1
@@ -636,6 +643,8 @@ DIM newIdx     : INTEGER
 DIM oldMgn     : INTEGER
 DIM halfMgn    : INTEGER
 DIM newPrc     : INTEGER
+DIM iPCnt      : INTEGER
+DIM newCnt     : INTEGER
 
 didOK := FALSE
 msgTxt := ""
@@ -681,7 +690,9 @@ ELSE
 ENDIF
 
 hdr.certCount := newIdx
-RUN protoRebuildAgg(plyrs, hdr.plyrCount, certs, hdr.certCount)
+iPCnt := hdr.plyrCount
+newCnt := hdr.certCount
+RUN protoRebuildAgg(plyrs, iPCnt, certs, newCnt)
 didOK := TRUE
 msgTxt := "split applied"
 END
