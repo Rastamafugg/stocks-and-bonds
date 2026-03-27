@@ -24,6 +24,18 @@ These instructions apply to all work in this repository.
   2. any adjacent same-block issue proposed for bundled repair
 - Do not patch adjacent same-block issues unless they are disclosed first.
 
+## Control-Flow Closure Accounting
+
+- For unmatched-control-structure diagnosis, do not stop at whole-procedure
+  token parity. Also account for where each closure belongs inside the local
+  nested block.
+- When an `ELSE IF` chain spans multiple closure lines, verify the closure
+  distribution line-by-line against the actual nesting depth at each point, not
+  just the net number of `ENDIF` tokens in the surrounding procedure.
+- If a repair could be made by moving an `ENDIF` between adjacent closure
+  lines, report that as a distinct same-block formatting/structure issue rather
+  than only proposing a net token-count fix.
+
 ## Repository Authority
 
 - Treat the project documentation under `docs/` as authoritative over general
