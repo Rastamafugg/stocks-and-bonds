@@ -60,6 +60,129 @@ RUN boolRecv(iA = iB)
 PRINT
 RUN waitKey
 
+! ============================================================
+! Block 4: Less-than and greater-than comparisons inline
+! ============================================================
+PRINT "--- Block 4: Inline < and > comparisons ---"
+PRINT
+iA := 3
+iB := 8
+PRINT "  Test 4.1  Expect TRUE  (3 < 8)"
+RUN boolRecv(iA < iB)
+PRINT "  Test 4.2  Expect FALSE (3 > 8)"
+RUN boolRecv(iA > iB)
+iA := 10
+PRINT "  Test 4.3  Expect TRUE  (10 > 8)"
+RUN boolRecv(iA > iB)
+PRINT
+RUN waitKey
+
+! ============================================================
+! Block 5: NOT applied inline to a boolean variable
+! ============================================================
+PRINT "--- Block 5: Inline NOT of a boolean variable ---"
+PRINT
+flagA := TRUE
+PRINT "  Test 5.1  Expect FALSE (NOT TRUE)"
+RUN boolRecv(NOT flagA)
+flagA := FALSE
+PRINT "  Test 5.2  Expect TRUE  (NOT FALSE)"
+RUN boolRecv(NOT flagA)
+PRINT
+RUN waitKey
+
+! ============================================================
+! Block 6: Compound AND inline
+! ============================================================
+PRINT "--- Block 6: Inline compound AND ---"
+PRINT
+flagA := TRUE
+flagB := TRUE
+PRINT "  Test 6.1  Expect TRUE  (TRUE AND TRUE)"
+RUN boolRecv(flagA AND flagB)
+flagB := FALSE
+PRINT "  Test 6.2  Expect FALSE (TRUE AND FALSE)"
+RUN boolRecv(flagA AND flagB)
+flagA := FALSE
+PRINT "  Test 6.3  Expect FALSE (FALSE AND FALSE)"
+RUN boolRecv(flagA AND flagB)
+PRINT
+RUN waitKey
+
+! ============================================================
+! Block 7: Compound OR inline
+! ============================================================
+PRINT "--- Block 7: Inline compound OR ---"
+PRINT
+flagA := FALSE
+flagB := FALSE
+PRINT "  Test 7.1  Expect FALSE (FALSE OR FALSE)"
+RUN boolRecv(flagA OR flagB)
+flagB := TRUE
+PRINT "  Test 7.2  Expect TRUE  (FALSE OR TRUE)"
+RUN boolRecv(flagA OR flagB)
+flagA := TRUE
+PRINT "  Test 7.3  Expect TRUE  (TRUE OR TRUE)"
+RUN boolRecv(flagA OR flagB)
+PRINT
+RUN waitKey
+
+! ============================================================
+! Block 8: Parenthesized mixed compound inline
+! ============================================================
+PRINT "--- Block 8: Inline parenthesized compound ---"
+PRINT
+iA := 10
+iB := 5
+flagA := TRUE
+PRINT "  Test 8.1  Expect TRUE  ((10>5) AND TRUE)"
+RUN boolRecv((iA > iB) AND flagA)
+PRINT "  Test 8.2  Expect FALSE ((10>5) AND FALSE)"
+flagA := FALSE
+RUN boolRecv((iA > iB) AND flagA)
+PRINT "  Test 8.3  Expect TRUE  ((10>5) OR FALSE)"
+RUN boolRecv((iA > iB) OR flagA)
+iA := 2
+PRINT "  Test 8.4  Expect FALSE ((2>5) AND FALSE)"
+RUN boolRecv((iA > iB) AND flagA)
+PRINT
+RUN waitKey
+
+! ============================================================
+! Block 9: Boolean field from a TYPE record inline
+! ============================================================
+PRINT "--- Block 9: TYPE record boolean field inline ---"
+PRINT
+rec.tflagA := TRUE
+rec.tflagB := FALSE
+PRINT "  Test 9.1  Expect TRUE  (rec.tflagA=TRUE)"
+RUN boolRecv(rec.tflagA)
+PRINT "  Test 9.2  Expect FALSE (rec.tflagB=FALSE)"
+RUN boolRecv(rec.tflagB)
+PRINT "  Test 9.3  Expect FALSE (NOT rec.tflagA)"
+RUN boolRecv(NOT rec.tflagA)
+PRINT "  Test 9.4  Expect FALSE (rec.tflagA AND rec.tflagB)"
+RUN boolRecv(rec.tflagA AND rec.tflagB)
+PRINT
+RUN waitKey
+
+! ============================================================
+! Block 10: Inline comparison using TYPE integer fields
+! ============================================================
+PRINT "--- Block 10: Inline comparison of TYPE integer fields ---"
+PRINT
+rec.valA := 100
+rec.valB := 200
+PRINT "  Test 10.1  Expect TRUE  (rec.valA < rec.valB)"
+RUN boolRecv(rec.valA < rec.valB)
+PRINT "  Test 10.2  Expect FALSE (rec.valA > rec.valB)"
+RUN boolRecv(rec.valA > rec.valB)
+rec.valB := 100
+PRINT "  Test 10.3  Expect TRUE  (rec.valA = rec.valB)"
+RUN boolRecv(rec.valA = rec.valB)
+PRINT
+RUN waitKey
+
 PRINT "TSTBOOLPARM: complete. Review RECV lines above."
 PRINT "Any RECV/Expect mismatch = packing or evaluation bug."
 END
