@@ -123,7 +123,7 @@ ELSE
     failCnt := failCnt + 1
   ELSE
     PRINT "  PASS: round-trip load validated."
-  ENDIF \ENDIF \ENDIF \ENDIF
+  ENDIF \ENDIF \ENDIF \ENDIF \ENDIF
 PRINT
 RUN tWaitKey
 
