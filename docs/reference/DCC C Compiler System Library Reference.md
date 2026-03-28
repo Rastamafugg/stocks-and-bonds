@@ -32,15 +32,15 @@ The standard I/O functions implement an efficient user-level buffering scheme. T
 
 higher level routines that read or write data essentially call one of them in a loop. Actual file input/output for these buffered files is performed in batches, when the buffer is detected to be empty (for read mode) or full (for write mode). A file with its associated buffer is called a stream, and is declared to be a pointer to a defined type FILE. The function fopen() opens a file using an OS-9 system call, and associates that file with a stream. The standard I/O functions should not be confused with the low-level system call functions, many of which have similar names. Nor should file streams be confused with path numbers, also called file descriptors or just fds. Passing a stream to a system call, or a file descriptor to a standard I/O function, is a common mistake made by new or unwary users of the C standard library. When it occurs, the usual result is a program crash or hang. Be careful!
 
-### abort — Cause abnormal program termination
+### abort
+
+**Cause abnormal program termination**
 
 #### Synopsis
 
-```text
+```c
 #include <stdlib.h>
-```
 
-```text
 abort()
 ```
 
@@ -53,18 +53,17 @@ The abort function writes the program’s memory to the file core in the current
 This function never returns.
 
 #### See Also
+[exit](#exit-exit), _exit — Task termination
 
-exit, _exit — Task termination
+### abs
 
-### abs — Get the absolute value of an integer
+**Get the absolute value of an integer**
 
 #### Synopsis
 
-```text
+```c
 #include <stdlib.h>
-```
 
-```text
 int abs(i)
 int i;
 ```
@@ -78,22 +77,21 @@ The abs function returns the absolute value (distance from zero on the number li
 Attempting to get the absolute value of the most negative integer returns the most negative integer. That is, abs(-32768) gives -32768.
 
 #### See Also
+[fabs()](#fabs)
 
-```text
-fabs()
-```
+### asctime, ctime
 
-### asctime, ctime — Format date and time into a string
+**Format date and time into a string**
 
-### assert — Program verification
+### assert
+
+**Program verification**
 
 #### Synopsis
 
-```text
+```c
 #include <assert.h>
-```
 
-```text
 assert(expression);
 ```
 
@@ -107,25 +105,21 @@ F:N: Assertion 'expression' failed
 
 In this example, F is the source file, and N the source line number of the call to assert.
 
-### atof, atoi, atol — Convert ASCII string to a number
+### atof, atoi, atol
+
+**Convert ASCII string to a number**
 
 #### Synopsis
 
-```text
+```c
 #include <stdlib.h>
-```
 
-```text
 double atof (str)
 char *str;
-```
 
-```text
 int atoi (str)
 char *str;
-```
 
-```text
 long atol (str)
 char *str;
 ```
@@ -143,20 +137,17 @@ Whitespace is as recognized by isspace(). A sign is one of the characters + or -
 Overflow may cause unpredictable results. There is no error reporting.
 
 #### See Also
+[scanf()](#scanf-fscanf-sscanf)
 
-```text
-scanf()
-```
+### bsearch
 
-### bsearch — Binary search of a sorted array
+**Binary search of a sorted array**
 
 #### Synopsis
 
-```text
+```c
 #include <stdlib.h>
-```
 
-```text
 char *bsearch (key, base, count, size, compar)
 char *key, *base;
 size_t count, size;
@@ -176,40 +167,29 @@ On success, bsearch returns a pointer to a matching member of the array, or NULL
 For string variables, strcmp()may be a good choice for compar.
 
 #### See Also
+[strcmp()](#strcmp-strncmp), [qsort()](#qsort)
 
-```text
-strcmp(), qsort()
-```
+### exp[10], log[10], pow
 
-### exp[10], log[10], pow — Exponential and logarithmic functions
+**Exponential and logarithmic functions**
 
 #### Synopsis
 
-```text
+```c
 #include <math.h>
-```
 
-```text
 double exp (x)
 double x;
-```
 
-```text
 double exp10 (x)
 double x;
-```
 
-```text
 double log (x)
 double x;
-```
 
-```text
 double log10 (x)
 double x;
-```
 
-```text
 double pow (x, y)
 double x, y;
 ```
@@ -235,15 +215,15 @@ While (for example) exp(x) and pow(M_E, x) are equivalent and should result in t
 value, the former is generally preferred as it is likely to execute more quickly.
 ```
 
-### fabs — Get absolute value of floating — point number
+### fabs
+
+**Get absolute value of floating-point number**
 
 #### Synopsis
 
-```text
+```c
 #include <math.h>
-```
 
-```text
 double fabs(x)
 double x;
 ```
@@ -253,20 +233,17 @@ double x;
 The fabs function returns the absolute value of the floating-point number x. If the number is negative, the value returned is the same, except positive. For backward compatibility, this function also has the name dabs.
 
 #### See Also
+[abs()](#abs)
 
-```text
-abs()
-```
+### fclose
 
-### fclose — Close a stream
+**Close a stream**
 
 #### Synopsis
 
-```text
+```c
 #include <stdio.h>
-```
 
-```text
 int fclose (stream)
 FILE *stream;
 ```
@@ -280,30 +257,23 @@ The fclose function flushes the stream pointed to by stream (writing any buffere
 On success, 0 is returned; otherwise, EOF is returned and errno is set. Regardless of error status, any further access to the stream (including another call to fclose) results in undefined behavior.
 
 #### See Also
+[fflush()](#fflush), system call close — close a file
 
-```text
-fflush(), system call close — close a file
-```
+### feof, ferror, clearerr
 
-### feof, ferror, clearerr — Check and reset stream status
+**Check and reset stream status**
 
 #### Synopsis
 
-```text
+```c
 #include <stdio.h>
-```
 
-```text
 clearerr (stream)
 FILE *stream;
-```
 
-```text
 int feof (stream)
 FILE *stream;
-```
 
-```text
 int ferror (stream)
 FILE *stream;
 ```
@@ -321,20 +291,17 @@ clearerr resets the error condition on stream. This does not fix the error condi
 These functions are implemented as macros defined in <stdio.h>, so their names may not be re-declared.
 
 #### See Also
+[fopen()](#fopen-freopen), [fseek()](#fseek-ftell-rewind), system call open()
 
-```text
-fopen(), fseek(), system call open()
-```
+### fflush
 
-### fflush — Flush a stream buffer
+**Flush a stream buffer**
 
 #### Synopsis
 
-```text
+```c
 #include <stdio.h>
-```
 
-```text
 int fflush (stream)
 FILE *stream;
 ```
@@ -352,25 +319,20 @@ EOF is returned if stream is a not an output stream, or if there is an error wri
 It is not normally necessary to call fflush, but it can be useful whenmixing output between stdout (which is normally buffered) and stderr (which is not). If fflush is not used and stdout and stderr are both connected to a terminal, it is possible for stderrmessages to appear before messages written to stdout, even when the write to stdout was performed first. Calling fflush(stdout) before a write to stderrmay help in this case. Normal program termination indirectly causes all open streams to be flushed.
 
 #### See Also
+[fopen()](#fopen-freopen), [setbuf()](#setbuf)
 
-```text
-fopen(), setbuf()
-```
+### fgetc, getc, getchar, ungetc
 
-### fgetc, getc, getchar, ungetc — Character input from streams
+**Character input from streams**
 
 #### Synopsis
 
-```text
+```c
 #include <stdio.h>
-```
 
-```text
 int fgetc (stream)
 FILE *stream;
-```
 
-```text
 int getc (stream)
 FILE *stream;
 ```
@@ -404,20 +366,17 @@ input functions. The choice is made when the first call to fgetc is made after t
 EOF is returned in case of end-of-file or error, and errno is set accordingly.
 
 #### See Also
+[fputc()](#fputc-fputs-putc-putchar-puts), [fread()](#fread-fwrite), [fopen()](#fopen-freopen), [fgets()](#fgets), system calls read(), [readln()](#read-readln)
 
-```text
-fputc(), fread(), fopen(), fgets(), system calls read(), readln()
-```
+### fgets
 
-### fgets — Read a string from a stream
+**Read a string from a stream**
 
 #### Synopsis
 
-```text
+```c
 #include <stdio.h>
-```
 
-```text
 char *fgets(s, size, stream)
 char *s;
 int size;
@@ -433,25 +392,20 @@ fgets reads up to (size−1) characters from stream and stores them into the buf
 fgets returns s on success, and NULL on error or when end of file occurred after having read no characters.
 
 #### See Also
+[fread()](#fread-fwrite), [fgetc()](#fgetc-getc-getchar-ungetc), [puts()](#fputc-fputs-putc-putchar-puts), [scanf()](#scanf-fscanf-sscanf)
 
-```text
-fread(), fgetc(), puts(), scanf()
-```
+### fopen, freopen
 
-### fopen, freopen — Open a stream
+**Open a stream**
 
 #### Synopsis
 
-```text
+```c
 #include <stdio.h>
-```
 
-```text
 FILE *fopen (pathname, mode)
 char *pathname, *mode;
-```
 
-```text
 FILE *freopen (pathname, mode, stream)
 char *pathname, *mode;
 FILE *stream;
@@ -496,43 +450,32 @@ These functions return NULL if the open was unsuccessful, and set errno accordin
 This implementation does not currently support the bmodifier from the ANSI standard for mode. If used, these functions will fail.
 
 #### See Also
+[fclose()](#fclose), fdopen(), system call open()
 
-```text
-fclose(), fdopen(), system call open()
-```
+### fputc, fputs, putc, putchar, puts
 
-### fputc, fputs, putc, putchar, puts — Character output to streams
+**Character output to streams**
 
 #### Synopsis
 
-```text
+```c
 #include <stdio.h>
-```
 
-```text
 int fputc (c, stream)
 int c;
 FILE *stream;
-```
 
-```text
 int fputs (s, stream)
 char *s;
 FILE *stream;
-```
 
-```text
 int putc (c, stream)
 int c;
 FILE *stream;
-```
 
-```text
 int putchar (c)
 int c;
-```
 
-```text
 int puts (s)
 char *s;
 ```
@@ -558,27 +501,22 @@ fputc, putc, and putchar return c from a successful call, and EOF on end of file
 The puts function appends a newline, while fputs does not. This inconsistency is dictated by history and backwards compatibility.
 
 #### See Also
+[fgetc()](#fgetc-getc-getchar-ungetc), [fwrite()](#fread-fwrite), [printf()](#printf-fprintf-sprintf)
 
-```text
-fgetc(), fwrite(), printf()
-```
+### fread, fwrite
 
-### fread, fwrite — Binary stream input/output
+**Binary stream input/output**
 
 #### Synopsis
 
-```text
+```c
 #include <stdio.h>
-```
 
-```text
 size_t fread (ptr, size, count, stream)
 char *buf;
 size_t size, count;
 FILE *stream;
-```
 
-```text
 size_t fwrite (ptr, size, count, stream)
 char *buf;
 size_t size, count;
@@ -605,40 +543,34 @@ On success, these functions return the number of items actually read or written.
 The best way to find the appropriate size is usually by use of the sizeof operator. fread does not distinguish between the end of file and error conditions; use feof() or ferror() to find out which occurred.
 
 #### See Also
+[feof()](#feof-ferror-clearerr), [ferror()](#feof-ferror-clearerr), system calls read(), [Write](#write-writeln), Writeln — write to a file or device
 
-```text
-feof(), ferror(), system calls read(), Write, Writeln — write to a file or device
-```
+### frexp
 
-### frexp — Split a floating — point number into its components
+**Split a floating-point number into its components**
 
 #### Synopsis
 
 #### Description
 
 #### See Also
+### fseek, ftell, rewind
 
-### fseek, ftell, rewind — Reposition a stream
+**Reposition a stream**
 
 #### Synopsis
 
-```text
+```c
 #include <stdio.h>
-```
 
-```text
 int fseek (stream, offset, whence)
 FILE *stream;
 long offset;
 int whence;
-```
 
-```text
 long ftell (stream)
 FILE *stream;
-```
 
-```text
 rewind (stream)
 FILE *stream;
 ```
@@ -656,18 +588,17 @@ rewind performs the equivalent of fseek (stream, 0L, SEEK_SET); to return the fi
 On success, fseek returns 0, and ftell returns the current offset; otherwise EOF is returned and errno is set to indicate the error. The rewind function returns no value.
 
 #### See Also
-
 System call lseek — position in file
 
-### gets — Read a string from stdin (deprecated)
+### gets
+
+**Read a string from stdin (deprecated)**
 
 #### Synopsis
 
-```text
+```c
 #include <stdio.h>
-```
 
-```text
 char *gets(s)
 char *s;
 ```
@@ -685,16 +616,15 @@ gets returns s on success, and NULL on error or when end of file is encountered 
 gets is broken by design. It is impossible to tell, without knowing the data in advance, how many characters gets will read. Because the function has no built-in limiting functionality, it is able to overwrite any possible buffer you can allocate and is perfectly capable of destroying the program. Never use this function.
 
 #### See Also
+[fgets()](#fgets), [fputc()](#fputc-fputs-putc-putchar-puts), [fgetc()](#fgetc-getc-getchar-ungetc), [fread()](#fread-fwrite), [puts()](#fputc-fputs-putc-putchar-puts), [scanf()](#scanf-fscanf-sscanf)
 
-```text
-fgets(), fputc(), fgetc(), fread(), puts(), scanf()
-```
+### is*
 
-### is* — Character classification functions
+**Character classification functions**
 
 #### Synopsis
 
-```text
+```c
 #include <ctype.h>
 isclass(c);
 ```
@@ -707,7 +637,9 @@ isalpha c is a letter
 
 isdigit c is a digit
 
-isupper c is an uppercase letter A-Z
+### 
+
+****
 
 islower c is a lower case letter a-z
 
@@ -721,30 +653,24 @@ isprint c is printable J32..126K isascii c is in the range J−1..127K (-1 is a 
 
 ### localtime
 
-malloc, calloc, realloc, free—Allocate and freememory
+### malloc, calloc, realloc, free
+
+**Allocate and freememory**
 
 #### Synopsis
 
-```text
+```c
 #include <stdlib.h>
-```
 
-```text
 char *malloc (size)
 size_t size;
-```
 
-```text
 free (ptr)
 char *ptr;
-```
 
-```text
 char *calloc (nmemb, size)
 size_t nmemb, size;
-```
 
-```text
 char *realloc (ptr, size)
 char *ptr;
 size_t size;
@@ -771,18 +697,17 @@ malloc and calloc return NULL if no free memory can be added, or if there was an
 calloc does not check that the multiplication nmemb * size will not result in integer overflow, but due to address space limitations of the 6x09 attempting to allocatemore than 65535 bytes will not succeed.
 
 #### See Also
+System calls ibrk, [brk()](#brk-sbrk), unbrk
 
-System calls ibrk, brk(), unbrk
+### memchr
 
-memchr— Scanmemory for a character
+**Scanmemory for a character**
 
 #### Synopsis
 
-```text
+```c
 #include <string.h>
-```
 
-```text
 char *memchr (s, c, n)
 char *s;
 int c;
@@ -798,26 +723,21 @@ The memchr function scans the initial n bytes of the memory area pointed to by s
 The memchr function returns a pointer to the matching byte, or NULL if the character is not found in the given memory area.
 
 #### See Also
+[strchr()](#strchr-strrchr)
 
-```text
-strchr()
-```
+### memcpy, memccpy
 
-memcpy, memccpy—Copy amemory area
+**Copy amemory area**
 
 #### Synopsis
 
-```text
+```c
 #include <string.h>
-```
 
-```text
 char *memcpy (dest, src, n)
 char *dest, *src;
 size_t n;
-```
 
-```text
 char *memccpy (dest, src, c, n)
 char *dest, *src;
 int c;
@@ -835,20 +755,17 @@ memccpy copies up to n bytes frommemory area src tomemory area dest, stopping wh
 memcpy returns a pointer to dest. memccpy returns a pointer to the next byte in dest after c, or NULL if c was not found in the first n bytes of src.
 
 #### See Also
+[strcpy()](#strcpy-strncpy)
 
-```text
-strcpy()
-```
+### memset
 
-### memset — Fill memory area with a constant byte
+**Fill memory area with a constant byte**
 
 #### Synopsis
 
-```text
+```c
 #include <string.h>
-```
 
-```text
 char *memset (s, c, n)
 char *s;
 int c;
@@ -864,31 +781,24 @@ The memset functionwrites the byte value of c to the first n bytes of thememory 
 The memset function returns a pointer to the memory area s.
 
 #### See Also
-
-```text
 calloc()
-```
 
-### printf, fprintf, sprintf — Formatted output conversion
+### printf, fprintf, sprintf
+
+**Formatted output conversion**
 
 #### Synopsis
 
-```text
+```c
 #include <stdio.h>
-```
 
-```text
 int printf (format, ...)
 char *format;
-```
 
-```text
 int fprintf (stream, format, ...)
 FILE *stream;
 char *format;
-```
 
-```text
 int sprintf (str, format, ...)
 char *str, *format;
 ```
@@ -926,20 +836,17 @@ g, G The double argument is formatted in either f format or e format, whichever 
 In order to save program space, by default printf does not contain code to format long integers or floating point numbers. If you need to format long integers, your program must contain a reference to the function pflinit() to force the inclusion of the necessary code. Likewise, if you need to format floating point numbers, your program must reference the function pffinit() somewhere. Even if these functions are never called, the reference is sufficient to cause the code to be included. In double conversions, the final digit is rounded. When using sprintf, it is the caller’s responsibility to ensure that the buffer str is large enough to hold all output.
 
 #### See Also
+[fputc()](#fputc-fputs-putc-putchar-puts), [scanf()](#scanf-fscanf-sscanf)
 
-```text
-fputc(), scanf()
-```
+### qsort
 
-### qsort — Sort an array
+**Sort an array**
 
 #### Synopsis
 
-```text
+```c
 #include <stdlib.h>
-```
 
-```text
 qsort (base, nmemb, size, compar)
 char *base;
 size_t nmemb, size;
@@ -951,31 +858,24 @@ int (*compar) ();
 qsort implements the quick-sort algorithm for sorting an arbitrary array of items. base is the address of an array of nmemb elements, each of which is size bytes in width. A comparison routine, compar, is supplied by the caller. The compar routine is called with two arguments, which are pointers to the elements being compared. The routine is expected to return an integer less than, equal to, or greater than zero if the first argument is to be considered less than, equal to, or greater than, the second argument. In this manner, any arbitrary type of data may be sorted as long as the comparison function knows what it is.
 
 #### See Also
+[strcmp()](#strcmp-strncmp)
 
-```text
-strcmp()
-```
+### scanf, fscanf, sscanf
 
-### scanf, fscanf, sscanf — Input string interpretation
+**Input string interpretation**
 
 #### Synopsis
 
-```text
+```c
 #include <stdio.h>
-```
 
-```text
 int scanf (format, ...)
 char *format;
-```
 
-```text
 int fscanf (stream, format, ...)
 FILE *stream;
 char *format;
-```
 
-```text
 int sscanf (char *str, char *format, ...)
 char *str, *format;
 ```
@@ -1027,29 +927,24 @@ The returned count of matches/assignments does not include character matches or 
 These functions return EOF on end of input or error and a count which is shorter than expected for unexpected or unmatched items.
 
 #### See Also
+[atof()](#atof-atoi-atol), [fgetc()](#fgetc-getc-getchar-ungetc), [printf()](#printf-fprintf-sprintf)
 
-```text
-atof(), fgetc(), printf()
-```
+### sin, cos, tan, asin, acos, atan
 
-### sin, cos, tan, asin, acos, atan — Trigonometric functions
+**Trigonometric functions**
 
 #### Synopsis
 
-```text
+```c
 #include <math.h>
-```
 
-```text
 double sin(x) double x;
 double cos(x) double x;
 double tan(x) double x;
 double asin(x) double x;
 double acos(x) double x;
 double atan(x) double x;
-```
 
-```text
 deg();
 rad();
 ```
@@ -1094,20 +989,17 @@ The asin and acos functions are defined only over the interval [−1, 1].
 ```
 
 #### See Also
+[sinh()](#sinh-cosh-tanh-asinh-acosh-atanh)
 
-```text
-sinh()
-```
+### sinh, cosh, tanh, asinh, acosh, atanh
 
-### sinh, cosh, tanh, asinh, acosh, atanh — Hyperbolic functions
+**Hyperbolic functions**
 
 #### Synopsis
 
-```text
+```c
 #include <math.h>
-```
 
-```text
 double sinh (x) double x;
 double cosh (x) double x;
 double tanh (x) double x;
@@ -1143,20 +1035,17 @@ atanh is the inverse of the tanh function, and is defined as tanh−1 x = 1 2 ln
 These functions generate an EILLARG (Illegal Argument) error when passed values outside the domain of the function. Because logarithms are not defined for real numbers less than or equal to zero, acosh is valid only over the interval [1, ∞); and atanh is valid only over the interval (−1, 1).
 
 #### See Also
+log(), pow(), [sqrt()](#sqrt)
 
-```text
-log(), pow(), sqrt()
-```
+### setbuf
 
-### setbuf — Fix file buffer
+**Fix file buffer**
 
 #### Synopsis
 
-```text
+```c
 #include <stdio.h>
-```
 
-```text
 setbuf (stream, buf)
 FILE *stream;
 char *buf;
@@ -1171,25 +1060,20 @@ Immediately before the first character is read from or written to a newly opened
 The standard error output is unbuffered by default, and the standard output is buffered by default. This canmean that error outputmay actually be printed to the screen before normal output. For this reason, it is sometimes useful to call fflush() on stdout before writing to stderr.
 
 #### See Also
+[fopen()](#fopen-freopen), [fflush()](#fflush), [fgetc()](#fgetc-getc-getchar-ungetc), [fputc()](#fputc-fputs-putc-putchar-puts)
 
-```text
-fopen(), fflush(), fgetc(), fputc()
-```
+### setjmp, longjmp
 
-### setjmp, longjmp — Jump to another function
+**Jump to another function**
 
 #### Synopsis
 
-```text
+```c
 #include <setjmp.h>
-```
 
-```text
 int setjmp (env)
 jmp_buf env;
-```
 
-```text
 longjmp (env, val)
 jmp_buf env;
 int val;
@@ -1205,15 +1089,15 @@ longjmp uses the information contained within the buffer env to transfer control
 
 The function from which setjmp is called must not have returned when longjmp is called; if it has returned, the contents of the stack (including any auto variables declared within the function) will be unpredictable.
 
-### sqrt — Square root function
+### sqrt
+
+**Square root function**
 
 #### Synopsis
 
-```text
+```c
 #include <math.h>
-```
 
-```text
 double sqrt (x)
 double x;
 ```
@@ -1228,20 +1112,18 @@ On success, the sqrt function returns the non-negative square root of x. If x is
 
 Since this implementation does not support complex numbers, it is not possible to take the square root of a negative number.
 
-### strcat, strncat — Concatenate two strings
+### strcat, strncat
+
+**Concatenate two strings**
 
 #### Synopsis
 
-```text
+```c
 #include <string.h>
-```
 
-```text
 char *strcat (dest, src)
 char *dest, *src;
-```
 
-```text
 char *strncat (dest, src, n)
 char *dest, *src;
 size_t n;
@@ -1262,26 +1144,21 @@ The strcat and strncat functions return a pointer to the resulting string dest.
 These functions have no means of checking that the space provided is large enough to hold the combined string. If dest is not large enough, the program’s behavior becomes unpredictable — buffer overruns are an excellent way to attack programs that are meant to be secure.
 
 #### See Also
+[strchr()](#strchr-strrchr), [strcmp()](#strcmp-strncmp), [strcpy()](#strcpy-strncpy)
 
-```text
-strchr(), strcmp(), strcpy()
-```
+### strchr, strrchr
 
-### strchr, strrchr — Locate a character in string
+**Locate a character in string**
 
 #### Synopsis
 
-```text
+```c
 #include <string.h>
-```
 
-```text
 char *strchr(s, c)
 char *s;
 int c;
-```
 
-```text
 char *strrchr(s, c)
 char *s;
 int c;
@@ -1302,25 +1179,20 @@ The strchr and strrchr functions return a pointer to the matched character, or N
 In these functions, “character”means “byte”; the argument c is cast to unsigned char before doing any comparisons.
 
 #### See Also
+[findstr()](#findstr-findnstr).
 
-```text
-findstr().
-```
+### strcmp, strncmp
 
-### strcmp, strncmp — Compare two strings
+**Compare two strings**
 
 #### Synopsis
 
-```text
+```c
 #include <string.h>
-```
 
-```text
 int strcmp (s1, s2)
 char *s1, s2;
-```
 
-```text
 int strncmp (s1, s2, n)
 char *s1, *s2;
 size_t n;
@@ -1337,25 +1209,20 @@ strncmp does the same, but instead of potentially continuing to check forever, c
 These functions return an integer less than, equal to, or greater than 0 depending onwhether s1 is less than, equal to, or greater than s2.
 
 #### See Also
+[findstr()](#findstr-findnstr)
 
-```text
-findstr()
-```
+### strcpy, strncpy
 
-### strcpy, strncpy — Copy string data
+**Copy string data**
 
 #### Synopsis
 
-```text
+```c
 #include <string.h>
-```
 
-```text
 char *strcpy (dest, src)
 char *dest, *src;
-```
 
-```text
 char *strncpy (dest, src, n)
 char *dest, *src;
 size_t n;
@@ -1376,20 +1243,17 @@ Both functions return a pointer to the destination string.
 strcpy has no means of checking that the space provided is large enough. It is the user’s responsibility to ensure that string space does not overflow.
 
 #### See Also
+[findstr()](#findstr-findnstr), memcpy(), [strcat()](#strcat-strncat)
 
-```text
-findstr(), memcpy(), strcat()
-```
+### strlen
 
-### strlen — Get the length of a string
+**Get the length of a string**
 
 #### Synopsis
 
-```text
+```c
 #include <string.h>
-```
 
-```text
 size_t strlen (s)
 char *s;
 ```
@@ -1399,20 +1263,17 @@ char *s;
 The strlen function finds the length of the string pointed to by s, excluding its terminating null byte ('\0').
 
 #### See Also
+[findstr()](#findstr-findnstr), [strchr()](#strchr-strrchr), [strcmp()](#strcmp-strncmp), [strcpy()](#strcpy-strncpy)
 
-```text
-findstr(), strchr(), strcmp(), strcpy()
-```
+### strpbrk
 
-### strpbrk — Search a string for any of a set of bytes
+**Search a string for any of a set of bytes**
 
 #### Synopsis
 
-```text
+```c
 #include <string.h>
-```
 
-```text
 char *strpbrk (s, accept)
 char *s, *accept;
 ```
@@ -1426,25 +1287,20 @@ The strpbrk function locates the first occurrence within the string s, of any ch
 This function returns a pointer to a byte in s that is equal to one of the bytes in accept, or NULL if no matching byte is present.
 
 #### See Also
+memchr(), [strchr()](#strchr-strrchr), [strspn()](#strspn-strcspn), [strtok()](#strtok)
 
-```text
-memchr(), strchr(), strspn(), strtok()
-```
+### strspn, strcspn
 
-### strspn, strcspn — Get length of a prefix set
+**Get length of a prefix set**
 
 #### Synopsis
 
-```text
+```c
 #include <string.h>
-```
 
-```text
 size_t strspn (s, accept)
 char *s, *accept;
-```
 
-```text
 size_t strcspn (s, reject)
 char *s, *reject;
 ```
@@ -1455,22 +1311,24 @@ The strspn function returns the length of the initial segment of s which consist
 
 strcspn is similar, except it returns the length of the initial segment of s which consists only of characters not present in the string reject. The second argument of these functions is treated as a set of characters, not as a substring. Each function
 
-### strtok — Extract tokens from a string
+### strtok
+
+**Extract tokens from a string**
 
 #### Synopsis
 
-```text
+```c
 #include <string.h>
-```
 
-```text
 char *strtok (str, delim)
 char *str, *delim;
 ```
 
 #### Description
 
-The strtok function breaks a string into a sequence of zero or more non-empty tokens. On the first call to strtok, the string to be parsed is specified in str. For each subsequent call parsing the same string, strmust be NULL.The delim argument specifies a set of byte values that are used to delimit the tokens in the parsed string. You may specify different delimiter strings for different calls parsing the same string.
+### 
+
+****
 
 Each call to strtok returns a pointer to a null-terminated string containing the next token. This string does not include any delimiting bytes. If no more tokens are found, strtok returns NULL.
 
@@ -1493,20 +1351,17 @@ This function modifies its first argument. For this reason, it should be noted t
 • Since the delimiting byte ending a token is rewritten with a null byte on return, there is no way to tell the identity of the terminating delimiter.
 
 #### See Also
+memchr(), [strchr()](#strchr-strrchr), [strpbrk()](#strpbrk), [strspn](#strspn-strcspn)
 
-```text
-memchr(), strchr(), strpbrk(), strspn
-```
+### system
 
-### system — Issue a shell command
+**Issue a shell command**
 
 #### Synopsis
 
-```text
+```c
 #include <stdlib.h>
-```
 
-```text
 int system (command)
 char *command;
 ```
@@ -1524,25 +1379,24 @@ The system function is simple and convenient, handling the details of creating a
 The maximum length of string for the command line is 80 characters. If a longer string is needed, call os9fork() directly.
 
 #### See Also
-
 System calls os9fork(), wait — wait for child process to end.
 
-### time — get the current clock time
+### time
 
-### tolower, toupper — Convert uppercase or lowercase
+**get the current clock time**
+
+### tolower, toupper
+
+**Convert uppercase or lowercase**
 
 #### Synopsis
 
-```text
+```c
 #include <ctype.h>
-```
 
-```text
 int tolower (c)
 int c;
-```
 
-```text
 int toupper (c)
 int c;
 ```
@@ -1575,15 +1429,15 @@ POSIX.1 The Portable Operating System Interface (formally, IEEE 1003) is a set o
 
 SVID The SystemV Interface Definition, the specifications of which describe AT&TUNIX System V. System V is one of the attempts AT&T made to commercialize Unix, and the start of the other major group that took part in the “Unix wars”.
 
-### fdopen — Open a stream on a system path number
+### fdopen
+
+**Open a stream on a system path number**
 
 #### Synopsis
 
-```text
+```c
 #include <stdio.h>
-```
 
-```text
 FILE *fdopen (fd, mode)
 int fd;
 char *mode;
@@ -1610,20 +1464,17 @@ This implementation does not currently support the bmodifier from the ANSI stand
 The function fdopen also exists in POSIX.1, OSK, and OS-9000.
 
 #### See Also
+[fopen()](#fopen-freopen), [fclose()](#fclose), system call open()
 
-```text
-fopen(), fclose(), system call open()
-```
+### fileno
 
-### fileno — Get system path number from stream
+**Get system path number from stream**
 
 #### Synopsis
 
-```text
+```c
 #include <stdio.h>
-```
 
-```text
 int fileno (stream)
 FILE *stream;
 ```
@@ -1641,24 +1492,21 @@ This function is implemented as a macro in <stdio.h>, so its name may not be red
 The function fileno also exists in POSIX.1, OSK, and OS-9000.
 
 #### See Also
-
 System call open()
 
-### findstr, findnstr — Substring searches
+### findstr, findnstr
+
+**Substring searches**
 
 #### Synopsis
 
-```text
+```c
 #include <strings.h>
-```
 
-```text
 int findstr (pos, haystack, needle)
 int pos;
 char *haystack, *needle;
-```
 
-```text
 int findnstr (pos, haystack, needle, count)
 int pos, count;
 char *haystack, *needle;
@@ -1679,25 +1527,20 @@ Because the returned value is suitable for use as an argument, these functions m
 The first position is 1, not zero. The current implementation does not use the most efficient algorithm for pattern matching so that use on very long strings is likely to be somewhat slower than it might be.
 
 #### See Also
+[strchr()](#strchr-strrchr), [strpfx()](#strpfx), [strrchr()](#strchr-strrchr)
 
-```text
-strchr(), strpfx(), strrchr()
-```
+### getw, putw
 
-### getw, putw — Input and output of words (ints)
+**Input and output of words (ints)**
 
 #### Synopsis
 
-```text
+```c
 #include <stdio.h>
-```
 
-```text
 int getw (stream)
 FILE *stream;
-```
 
-```text
 int putw (w, stream)
 int w;
 FILE *stream;
@@ -1725,20 +1568,17 @@ ferror() to distinguish between a correct read of the value of EOF and an error.
 These functions also exist in the SVID, OSK, and OS-9000.
 
 #### See Also
+[ferror()](#feof-ferror-clearerr), [fread()](#fread-fwrite), [fwrite()](#fread-fwrite), [getc()](#fgetc-getc-getchar-ungetc), [fputc()](#fputc-fputs-putc-putchar-puts)
 
-```text
-ferror(), fread(), fwrite(), getc(), fputc()
-```
+### ibrk
 
-### ibrk — Request internal memory
+**Request internal memory**
 
 #### Synopsis
 
-```text
+```c
 #include <stdlib.h>
-```
 
-```text
 char *ibrk (size)
 size_t size;
 ```
@@ -1766,25 +1606,20 @@ Be careful to leave space for the stack when using ibrk calls. When the program 
 The ibrk function also exists in OSK and OS-9000.
 
 #### See Also
+malloc(), system calls brk(), [sbrk()](#brk-sbrk)
 
-```text
-malloc(), system calls brk(), sbrk()
-```
+### inv, sqr
 
-### inv, sqr — Get the inverse of or square a number
+**Get the inverse of or square a number**
 
 #### Synopsis
 
-```text
+```c
 #include <math.h>
-```
 
-```text
 double inv (x)
 double x;
-```
 
-```text
 double sqr (x)
 double x;
 ```
@@ -1798,26 +1633,21 @@ The inv function divides 1.0 by the number x, returning the result.
 sqr multiplies the number x by itself, returning the result. Because these functions use assembly algorithms that are faster (but larger) than the code the compiler emits for the equivalent expressions, in situations where speed is more important than size using inv or sqrmay be a good choice.
 
 #### See Also
+[sqrt()](#sqrt)
 
-```text
-sqrt()
-```
+### l3tol, ltol3
 
-### l3tol, ltol3 — convert between 3 — byte and long integers
+**Convert between 3-byte and long integers**
 
 #### Synopsis
 
-```text
+```c
 #include <stdlib.h>
-```
 
-```text
 l3tol (lp, cp, n)
 long *lp;
 char *cp;
-```
 
-```text
 ltol3 (cp, lp, n)
 char *cp;
 long *lp;
@@ -1833,30 +1663,24 @@ ltol3 does the opposite, converting from long integers (lp) to three-byte intege
 
 These functions also exist on the PDP-11 versions of Unix.
 
-### min, max, umin, umax — Compare integers
+### min, max, umin, umax
+
+**Compare integers**
 
 #### Synopsis
 
-```text
+```c
 #include <stdlib.h>
-```
 
-```text
 int min (i1, i2)
 int i1, i2;
-```
 
-```text
 int max (i1, i2)
 int i1, i2;
-```
 
-```text
 unsigned umin (i1, i2)
 unsigned u1, u2;
-```
 
-```text
 unsigned umax (i1, i2)
 unsigned u1, u2;
 ```
@@ -1867,15 +1691,15 @@ The min and umin functions return either i1 or i2, whichever has the lower value
 
 .
 
-### mktemp — Create unique temporary filename
+### mktemp
+
+**Create unique temporary filename**
 
 #### Synopsis
 
-```text
+```c
 #include <stdlib.h>
-```
 
-```text
 char *mktemp (template)
 char *template;
 ```
@@ -1897,23 +1721,20 @@ mktemp is not a secure method of creating a temporary file. The current method o
 The function mktemp also exists in BSD Unix, POSIX.1, OSK, and OS-9000.
 
 #### See Also
-
 System call getpid — get the task id
 
-### sleep — Sleep for a specified number of seconds
+### sleep
+
+**Sleep for a specified number of seconds**
 
 #### Synopsis
 
-```text
+```c
 #include <unistd.h>
-```
 
-```text
 OR
 #include <signal.h>
-```
 
-```text
 unsigned sleep (seconds)
 unsigned seconds;
 ```
@@ -1941,14 +1762,15 @@ This function uses the system call tsleep(), and does not alter the return value
 The function sleep also exists in POSIX.1, OSK, and OS-9000.
 
 #### See Also
-
 System call tsleep()
 
-### stacksize, freemem — get stack reservation info
+### stacksize, freemem
+
+**get stack reservation info**
 
 #### Synopsis
 
-```text
+```c
 size_t stacksize();
 size_t freemem();
 ```
@@ -1960,16 +1782,15 @@ For a description of the meaning and use of this call, the user is referred to t
 freemem returns the number of bytes of the stack that has not been used.
 
 #### See Also
+[ibrk()](#ibrk), System call sbrk(), Global variable memend and constant end.
 
-```text
-ibrk(), System call sbrk(), Global variable memend and constant end.
-```
+### _strass
 
-### _strass — byte by byte copy
+**byte by byte copy**
 
 #### Synopsis
 
-```text
+```c
 _strass(char *s1, char *s2, int count);
 ```
 
@@ -1977,15 +1798,15 @@ _strass(char *s1, char *s2, int count);
 
 Until such time as the compiler can deal with structure assignment, this function is useful for copying one structure to another. ”Count” bytes are copied from memory location at ”s2” to memory as ”s1” regardless of the contents.
 
-### strclr — Clear a string
+### strclr
+
+**Clear a string**
 
 #### Synopsis
 
-```text
+```c
 #include <strings.h>
-```
 
-```text
 char *strclr (s, n)
 char *s;
 int n;
@@ -1996,20 +1817,17 @@ int n;
 The strclr function writes n null bytes ('\0') into the buffer pointed to by s. No attempt is made to verify the buffer is large enough to hold n bytes.
 
 #### See Also
-
-```text
 memcpy()
-```
 
-### strpfx — Check string prefix
+### strpfx
+
+**Check string prefix**
 
 #### Synopsis
 
-```text
+```c
 #include <strings.h>
-```
 
-```text
 int strpfx (s, prefix)
 char *s, *prefix;
 ```
@@ -2022,17 +1840,19 @@ The strpfx function returns nonzero if the string prefix is a prefix of s, zero 
 
 The empty string, "", is a prefix of every string (including itself).
 
-strucmp, strnucmp, strucpy, strucat — Uppercase string functions
+### strucmp, strnucmp, strucpy, strucat
 
-### strhcpy — Copy an OS — 9 string
+**Uppercase string functions**
+
+### strhcpy
+
+**Copy an OS-9 string**
 
 #### Synopsis
 
-```text
+```c
 #include <strings.h>
-```
 
-```text
 char *strhcpy (dest, src)
 char *dest, *src;
 ```
@@ -2042,37 +1862,30 @@ char *dest, *src;
 The strhcpy function copies characters from src into the buffer pointed at by dest, until encountering a character that has the high bit set. That character is copied without its high bit, and a terminating null byte ('\0') is appended. This function is useful for dealing with strings returned by OS-9 system calls, the last characters of which are ORed with the value 128 to make them negative.
 
 #### See Also
-
-```text
-strcpy()
-```
+[strcpy()](#strcpy-strncpy)
 
 ## Chapter 3. OS-9 System Calls
 
 This section of the C compiler manual is a guide to the system calls available from C programs. It is not intended as a definitive description of OS-9 service requests as these are described in the OS-9 System Programmer’s Manual. However, for most calls, enough information is available here to enable the programmer to write systems calls into programs without looking further. The names used for the system calls are chosen so that programs transported from other machines or operating systems should compile and runwith as littlemodification as possible. However, care should be taken as the parameters and returned values of some calls may not be compatible with those on other systems. Programmers that are already familiar with OS- 9 names and values should take particular care. Some calls do not share the same names as the OS-9 assembly language equivalents. The assembly language equivalent call is shown, where there is one, on the relevant page of the C call description, and a cross-reference list is provided for those already familiar with OS-9 calls. The normal error signal on return from a system call is a returned value of -1. The relevant error will be found in the predefined int errno. errno always contains the error from the last erroneous system call. Definitions for the errors for inclusion in the programs are in <errno.h>. In the ”See Also” sections on the following pages, unless otherwise stated, the references are to other system calls. Where header files are shown, it is notmandatory to include them, but itmight be convenient to use the manifest constants defined in them rather than integers; it certainly makes for more readable programs.
 
-### Stub-implemented system calls
-
-For compatibility reasons, it is sometimes useful to provide “system calls” that do nothing. These are “stub” implementations.
+Stub-implemented system calls For compatibility reasons, it is sometimes useful to provide “system calls” that do nothing. These are “stub” implementations.
 
 lock On Unix, the lock system call prevents the current process from being swapped out (evicted from memory while asleep). OS-9 does not swap processes out, so this function is not needed.
 
 sync On Unix, the sync system call causes all uncommitted (cached) writes to be committed to disk, synchronizing the state of the file system. In order to maintain predictable real-time behavior, OS-9 does not cache disk writes, so this function has no use.
 
-### access — Check user’s permissions for a file
+### access
+
+**Check user’s permissions for a file**
 
 #### Synopsis
 
-```text
+```c
 #include <modes.h>
-```
 
-```text
 OR
 #include <unistd.h>
-```
 
-```text
 int access (pathname, mode)
 char *pathname;
 int mode;
@@ -2099,20 +1912,18 @@ This function returns 0 on success, and -1 on failure. In case of failure, errno
 
 The set of numeric values for mode are not directly compatible with other systems. As such, be sure to use the appropriate symbolic constants for code intended to be portable, and closely examine calls to accessmade by foreign code.
 
-### brk, sbrk — change data area size
+### brk, sbrk
+
+**change data area size**
 
 #### Synopsis
 
-```text
+```c
 #include <unistd.h>
-```
 
-```text
 int brk (addr)
 char *addr;
-```
 
-```text
 char *sbrk (increment)
 intptr_t increment;
 ```
@@ -2146,20 +1957,17 @@ See the Memory Management section of the C compiler manual for a more complete e
 The brk and sbrk system calls also exist in Unix-like operating systems.
 
 #### See Also
+[ibrk()](#ibrk), malloc()
 
-```text
-ibrk(), malloc()
-```
+### chain
 
-### chain — load and execute a new program
+**load and execute a new program**
 
 #### Synopsis
 
-```text
+```c
 #include <process.h>
-```
 
-```text
 chain (name, argsz, args, type, lang, datsz)
 char *name, *args;
 size_t argsz, datsz;
@@ -2181,16 +1989,15 @@ The action of F$Chain is described fully in the OS-9 documentation. The chain fu
 This function never returns, and has no diagnostic capability.
 
 #### See Also
+[os9fork()](#os9fork)
 
-```text
-os9fork()
-```
+### chdir, chxdir
 
-### chdir, chxdir — change directory
+**change directory**
 
 #### Synopsis
 
-```text
+```c
 chdir(char *dirname);
 chxdir(char *dirname);
 ```
@@ -2210,18 +2017,17 @@ These calls change the current data directory and the current execution director
 Each call returns 0 after a successful call, or -1 if ”dirname” is not a directory path name, or it is not searchable.
 
 #### See Also
-
 OS-9 Shell commands Chd and Chx.
 
-### chmod — change access permissions of a file
+### chmod
+
+**change access permissions of a file**
 
 #### Synopsis
 
-```text
+```c
 #include <modes.h>
-```
 
-```text
 chmod(char *fname, int perm);
 ```
 
@@ -2249,14 +2055,15 @@ Only the owner or the super user may change the permissions of a file.
 A successful call returns 0. A -1 is returned if the caller is not entitled to change permissions of ”fname” cannot be found.
 
 #### See Also
-
 OS-9 command Attr
 
-### chown — change the ownership of a file
+### chown
+
+**change the ownership of a file**
 
 #### Synopsis
 
-```text
+```c
 chown(char *fname, int ownerid);
 ```
 
@@ -2268,11 +2075,13 @@ This call is available only to the super user. ”Fname” is a pointer to a fil
 
 Zero is returned from a successful call. -1 is returned from on error.
 
-### close — close a file
+### close
+
+**close a file**
 
 #### Synopsis
 
-```text
+```c
 close(int pn);
 ```
 
@@ -2287,16 +2096,15 @@ os9 F$Close
 Close takes a path number, ”pn”, as returned from system calls ”open()”, ”creat()”, or ”dup()”, and closes the associated file. Termination of a task always closes all open files automatically, but it is necessary to close files where multiple files are opened by the task, and it is desired to re-use path numbers to avoid going over the system or process path number limit.
 
 #### See Also
+[creat()](#creat), [open()](#open), dup — duplicate an open path number
 
-```text
-creat(), open(), dup — duplicate an open path number
-```
+### crc
 
-### crc — compute a cyclic redundancy count
+**compute a cyclic redundancy count**
 
 #### Synopsis
 
-```text
+```c
 crc(char *start, int count, char accum[3]);
 ```
 
@@ -2310,15 +2118,15 @@ os9 F$CRC
 
 This call accumulates a crc into a three byte array at ”accum” for ”count” bytes starting at ”start”. All three bytes of ”accum” should be initialized to 0xff before the first call to ”crc()”. However, repeated calls can be subsequently made to cover an entire module. If the result is to be used as an OS-9 module crc, it should have its bytes complemented before insertion at the end of the module.
 
-### creat — Create a file
+### creat
+
+**Create a file**
 
 #### Synopsis
 
-```text
+```c
 #include <modes.h>
-```
 
-```text
 int creat (pathname, mode)
 char *pathname;
 mode_t mode;
@@ -2359,14 +2167,15 @@ Directories may not be created with this call; use ”mknod()” instead.
 This call returns -1 if there are too many files open. If the pathname cannot be searched, if permission to write is denied, or if the file exists and is a directory.
 
 #### See Also
+[Write](#write-writeln), Writeln — write to a file or device, close — close a file, chmod — change access permissions of a file
 
-Write, Writeln — write to a file or device, close — close a file, chmod — change access permissions of a file
+### Defdrive
 
-### Defdrive — get default system drive
+**get default system drive**
 
 #### Synopsis
 
-```text
+```c
 char *defdrive(void);
 ```
 
@@ -2378,11 +2187,13 @@ A call to defdrive returns a pointer to a string containing the name of the defa
 
 -1 is returned if the ”Init” module cannot be linked to.
 
-### dup — duplicate an open path number
+### dup
+
+**duplicate an open path number**
 
 #### Synopsis
 
-```text
+```c
 dup(int pn);
 ```
 
@@ -2401,16 +2212,15 @@ Dup takes the path number, ”pn”, as returned from ”open()” or ”creat()
 A -1 is returned is the call fails because there are too many files open or the path nmber is invalid.
 
 #### See Also
+[open()](#open), [creat()](#creat), close — close a file
 
-```text
-open(), creat(), close — close a file
-```
+### exit, _exit
 
-### exit, _exit — Task termination
+**Task termination**
 
 #### Synopsis
 
-```text
+```c
 exit(int status);
 _exit(int status);
 ```
@@ -2430,14 +2240,15 @@ Exit is the normal means of terminating a task. Exit does any cleaning up operat
 In older versions of this implementation, normal termination of aCprogramwith no explicit call to exit, _exit — Task termination unconditionally called exit(0) after returning from the main function. The current version uses the value returned from main as the exit status if no call to exit, _exit — Task termination is made. Note that the C language requires a value to be returned from main.
 
 #### See Also
-
 wait — wait for child process to end
 
-### getpid — get the task id
+### getpid
+
+**get the task id**
 
 #### Synopsis
 
-```text
+```c
 getpid(void);
 ```
 
@@ -2457,40 +2268,28 @@ Anumber unique to the current running task is often useful in creating names for
 os9fork(), standard library function mktemp().
 ```
 
-### getstat — get file status
+### getstat
+
+**get file status**
 
 #### Synopsis
 
-```text
+```c
 #include <sgstat.h>
 /* code 0 */
-```
 
-```text
 getstat(int code, int filenum, char *buffer);
-```
 
-```text
 /* codes 1 and 6 */
-```
 
-```text
 getstat(int code, int filenum);
-```
 
-```text
 /* code 2 */
-```
 
-```text
 getstat(int code, int filenum, long *size);
-```
 
-```text
 /* code 5 */
-```
 
-```text
 getstat(int code, int filenum, long *pos);
 ```
 
@@ -2520,11 +2319,13 @@ Code 6: Returns -1 on EOF and error and 0 on success.
 
 NOTE that when one of the previous calls returns -1, then actual error is returned in errno.
 
-### getuid — return user id
+### getuid
+
+**return user id**
 
 #### Synopsis
 
-```text
+```c
 uid_t getuid ();
 ```
 
@@ -2538,11 +2339,13 @@ os9 F$ID
 
 Getuid returns the real user id of the current task (as maintained in the password file).
 
-### intercept — set function for interrupt processing
+### intercept
+
+**set function for interrupt processing**
 
 #### Synopsis
 
-```text
+```c
 intercept(int (* func) (int));
 ```
 
@@ -2604,18 +2407,17 @@ exit(sig);
 ”Intercept()” and ”signal()” are mutually incompatible so that calls to both must not appear in the same program. The linker guards against this by giving an ”entry name clash - _sigint” error if it is attempted.
 
 #### See Also
-
 signal — catch or ignore interrupts
 
-### kill — Send a signal to a process
+### kill
+
+**Send a signal to a process**
 
 #### Synopsis
 
-```text
+```c
 #include <signal.h>
-```
 
-```text
 int kill (pid, sig)
 pid_t pid;
 int sig;
@@ -2643,14 +2445,15 @@ Other user-defined signals may, of course, be sent.
 Kill returns 0 from a successful call and -1 if the task does not exist, the effective user ids do not match, or the user is not the system manager.
 
 #### See Also
-
 intercept — set function for interrupt processing, signal — catch or ignore interrupts, OS-9 Shell command kill
 
-### lseek — position in file
+### lseek
+
+**position in file**
 
 #### Synopsis
 
-```text
+```c
 long lseek(int pn, long position, int type);
 ```
 
@@ -2673,16 +2476,15 @@ The argument ”position” must be a long integer. Constants should be explicit
 -1 is returned if ”pn” is a bad path number, or attempting to seek to a position before the beginning of a file.
 
 #### See Also
+[creat()](#creat), [open()](#open), standard library function fseek()
 
-```text
-creat(), open(), standard library function fseek()
-```
+### mkdir
 
-### mkdir — Create a directory
+**Create a directory**
 
 #### Synopsis
 
-```text
+```c
 #include <modes.h>
 mknod(char *fname, int desc);
 ```
@@ -2714,18 +2516,19 @@ The include file defines the possible values for ”desc” as follows:
 Zero is returned if the directory has been successfully made; -1 if the file already exists.
 
 #### See Also
+### 
 
-OS-9 command MakDir
+****
 
-modload— return a pointer to amodule structure
+### modload
+
+**return a pointer to amodule structure**
 
 #### Synopsis
 
-```text
+```c
 #include <module.h>
-```
 
-```text
 mod_exec *modlink(char *modname, int type, int language);
 mod_exec *modload(char *modname, int type, int language);
 ```
@@ -2748,18 +2551,19 @@ modlink will search themodule directory for amodule with the same name as ”mod
 -1 is returned on error.
 
 #### See Also
+### 
 
-munlink — unlink a module
+****
 
-munlink— unlink amodule
+### munlink
+
+**unlink amodule**
 
 #### Synopsis
 
-```text
+```c
 #include <module.h>
-```
 
-```text
 munlink(mod_exec *mod);
 ```
 
@@ -2774,16 +2578,15 @@ os9 F$UNLINK
 This call informs the system that the module pointed to by ”mod” is no longer required by the current process. Its link count is decremented, and the module is removed from the module directory if the link count reaches zero.
 
 #### See Also
-
-```text
 modlink(), modload — return a pointer to a module structure
-```
 
-### open — Open a file
+### open
+
+**Open a file**
 
 #### Synopsis
 
-```text
+```c
 int open (pathname, flags)
 char *pathname;
 int flags;
@@ -2804,14 +2607,15 @@ This call opens an existing file for reading if ”mode” is 1, writing if ”m
 -1 is returned if the file does not exist, if the pathname cannot be searched, if too many files are already open, or if the file permissions deny the requested mode.
 
 #### See Also
+close— close a file, [creat()](#creat), dup—duplicate an open path number, [read()](#read-readln), [Write](#write-writeln), Writeln — write to a file or device
 
-close— close a file, creat(), dup—duplicate an open path number, read(), Write,Writeln — write to a file or device
+### os9fork
 
-### os9fork — create a process
+**create a process**
 
 #### Synopsis
 
-```text
+```c
 int os9fork (name, argsz, args, type, lang, datsz)
 char *name, *args;
 size_t argsz, datsz;
@@ -2836,11 +2640,13 @@ Despite its name, os9fork does not work in the same way that the Unix fork() sys
 
 On success, the task ID number of the child process is returned; otherwise, EOF is returned and errno is set accordingly.
 
-### pause — halt and wait for interrupt
+### pause
+
+**halt and wait for interrupt**
 
 #### Synopsis
 
-```text
+```c
 pause(void);
 ```
 
@@ -2855,16 +2661,15 @@ os9 I$SLEEP (with a value of 0)
 Pause may be used to halt a task until an interrupt is received from ”kill”. Pause always returns -1.
 
 #### See Also
+[kill()](#kill), signal — catch or ignore interrupts, OS-9 shell command kill
 
-```text
-kill(), signal — catch or ignore interrupts, OS-9 shell command kill
-```
+### prerr
 
-### prerr — print error message
+**print error message**
 
 #### Synopsis
 
-```text
+```c
 prerr(int filnum, int errcode);
 ```
 
@@ -2878,11 +2683,13 @@ os9 F$PERR
 
 PRERR prints an error message on the output path as specified by ”filnum” which must be the path number of an open file. The message depends on ”errcode” which will normally be a standard OS-9 error code.
 
-### read, readln — read from a file
+### read, readln
+
+**read from a file**
 
 #### Synopsis
 
-```text
+```c
 read(int pn, char *buffer, int count);
 readln(int pn, char *buffer, int count);
 ```
@@ -2905,16 +2712,15 @@ readln causes ”line-editing” such as echoing to take place and returns once 
 Read and readln return the number of bytes actually read (0 at end-of-file) or -1 for physical i/o errors, a bad path number, or a ridicolous ”count”. NOTE that end-of-file is not considered an error, and no error indication is returned. Zero is returned on EOF.
 
 #### See Also
+[open()](#open), [creat()](#creat), dup — duplicate an open path number
 
-```text
-open(), creat(), dup — duplicate an open path number
-```
+### setpr
 
-### setpr — set process priority
+**set process priority**
 
 #### Synopsis
 
-```text
+```c
 setpr(int pid, int priority);
 ```
 
@@ -2932,15 +2738,15 @@ SETPR sets the process identified by ”pid” (process id) to have a priority o
 
 The call will return -1 if the process does not have the same user id as the caller.
 
-### setime, getime — set and get system time
+### setime, getime
+
+**set and get system time**
 
 #### Synopsis
 
-```text
+```c
 #include <time.h>
-```
 
-```text
 setime(struct sgtbuf *buffer);
 getime(struct sgtbuf *buffer);
 ```
@@ -2956,11 +2762,13 @@ os9 F$GTIME
 
 GETIME returns system time in buffer. SETIME sets system time from buffer.
 
-### setuid — set user id
+### setuid
+
+**set user id**
 
 #### Synopsis
 
-```text
+```c
 setuid(int uid);
 ```
 
@@ -2979,27 +2787,22 @@ This call may be used to set the user id for the current task. Setuid only works
 Zero is returned from a successful call, and -1 is returned on error.
 
 #### See Also
-
 getuid — return user id
 
-### setstat — set file status
+### setstat
+
+**set file status**
 
 #### Synopsis
 
-```text
+```c
 #include <sgstat.h>
 /* code 0 */
-```
 
-```text
 setstat(int code, int filenum, char *buffer);
-```
 
-```text
 /* code 2 */
-```
 
-```text
 setstat(int code, int filenum, long size);
 ```
 
@@ -3013,19 +2816,17 @@ os9 F$SETSTT
 
 For a detailed explanation of this call, see the OS-9 System Programmer’s Manual. ”Filenum” must be the path number of a currently open file. The only values for code at this time are 0 and 2. When ”code” is 0, ”buffer” should be the address of a 32 byte structure which is written to the option section of the path descriptor of the file. The header file contains definitions of various structures maintained by OS-9 for use by the programmer. When code is 2, ”size” should be a long integer specifying the new file size.
 
-### signal — catch or ignore interrupts
+### signal
+
+**catch or ignore interrupts**
 
 #### Synopsis
 
-```text
+```c
 #include <signal.h>
-```
 
-```text
 typedef int (*sighandler_t)(int);
-```
 
-```text
 sighandler_t signal(int interrupt, sighandler_t address);
 ```
 
@@ -3070,18 +2871,17 @@ In this case, as the function will be exiting before another signal is received,
 Please note that there is another method of trapping signals, namely ”intercept()” (q.v.). However, since ”signal()” and ”intercept()” are mutually incompatible, calls to both of them must not appear in the same program. The link-loader will preven the creation of an executable program in which both are called by aborting with an ”entry name clash” error for ”_sigint”.
 
 #### See Also
+intercept — set function for interrupt processing, [kill()](#kill), OS-9 Shell command kill
 
-intercept — set function for interrupt processing, kill(), OS-9 Shell command kill
+### tsleep
 
-### tsleep — put process to sleep
+**put process to sleep**
 
 #### Synopsis
 
-```text
+```c
 #include <signal.h>
-```
 
-```text
 unsigned tsleep (ticks)
 unsigned ticks;
 ```
@@ -3109,16 +2909,15 @@ Because it is not known when the call to tsleep was made, this call cannot be us
 The system clock must be running to perform a timed sleep; it is not required to perform an indefinite sleep, or to give up a time slice.
 
 #### See Also
+[kill()](#kill), wait — wait for child process to end, library function sleep()
 
-```text
-kill(), wait — wait for child process to end, library function sleep()
-```
+### Unlink
 
-### Unlink — remove directory entry
+**remove directory entry**
 
 #### Synopsis
 
-```text
+```c
 unlink(char *fname);
 ```
 
@@ -3137,24 +2936,21 @@ Unlink deletes the directory entry whose name is pointed to by ”fname”. If t
 Zero is returned from a successful call, -1 if the file does not exist, if its directory is writeprotected, or cannot be searched, if the file is a non-empty directory or a device.
 
 #### See Also
-
 OS-9 command Del
 
-### wait — wait for child process to end
+### wait
+
+**wait for child process to end**
 
 #### Synopsis
 
-```text
+```c
 #include <sys/types.h>
 #include <sys/wait.h>
-```
 
-```text
 OR
 #include <process.h>
-```
 
-```text
 pid_t wait (wstatus)
 int *wstatus;
 ```
@@ -3208,14 +3004,15 @@ should never be called.
 A wait call must be made for each child task the program spawns; until a terminated child process’s exit status has been collectedwith wait, it remains in the process table as a “zombie” (a process in the DEAD state). Toomany of these “unreaped” child processesmay even prevent new processes from being created. The values of OS-9 status codes are not necessarily compatible with those of other systems.
 
 #### See Also
+[exit](#exit-exit), _exit—Task termination, [os9fork()](#os9fork), intercept— set function for interrupt processing, signal — catch or ignore interrupts
 
-exit, _exit—Task termination, os9fork(), intercept— set function for interrupt processing, signal — catch or ignore interrupts
+### Write, Writeln
 
-### Write, Writeln — write to a file or device
+**write to a file or device**
 
 #### Synopsis
 
-```text
+```c
 write(int pn, char *buffer, int count);
 writeln(int pn, char *buffer, int count);
 ```
@@ -3236,20 +3033,17 @@ os9 I$WRITLN
 -1 is returned if ”pn” is a bad path number, of ”count” is ridiculous or on physical i/o error.
 
 #### See Also
+[creat()](#creat), [open()](#open)
 
-```text
-creat(), open()
-```
+### _os9
 
-### _os9 — system call interface from C programs
+**system call interface from C programs**
 
 #### Synopsis
 
-```text
+```c
 #include <os9.h>
-```
 
-```text
 int _os9 (code, regs)
 char code;
 struct registers *regs;
