@@ -540,31 +540,39 @@ Because the 6809 is an 8/16 bitmicroprocessor, the compiler can generate efficie
 
 The compiler can perform extensive evaluation of constant expressions provided they involve only constants of type char, int, and/or unsigned versions of those types. There is no constant expression evaluation at compile-time (except single constants and “casts” of them) where there are constants of type long, float, or double. Therefore, complex constant expressions involving these types are evaluated at run time by the compiled program. You should manually compute the value of constant expressions of these types if speed is essential.
 
-The optimizer pass The optimizer pass automatically occurs after the compilation pass. It analyzes the assembly source code text, removes redundant code, and searches for code sequences that can be replaced by shorter and faster equivalents. The optimizer tends to shorten object code by about 11%, with a significant increase in program execution speed. The optimizer is recommended for production versions of debugged programs. Because this pass takes additional time, the -O compiler option can be used to inhibit it during error-checking-only compilations.
+#### The optimizer pass
 
-The profiler The profiler is an optional method used to determine the frequency of execution of each function in a C program. It allows you to identify the most-frequently used functions where algorithmic or C source code programming improvements will yield the greatest gains.
+The optimizer pass automatically occurs after the compilation pass. It analyzes the assembly source code text, removes redundant code, and searches for code sequences that can be replaced by shorter and faster equivalents. The optimizer tends to shorten object code by about 11%, with a significant increase in program execution speed. The optimizer is recommended for production versions of debugged programs. Because this pass takes additional time, the -O compiler option can be used to inhibit it during error-checking-only compilations.
+
+#### The profiler
+
+The profiler is an optional method used to determine the frequency of execution of each function in a C program. It allows you to identify the most-frequently used functions where algorithmic or C source code programming improvements will yield the greatest gains.
 
 When the -P compiler option is selected, code is generated at the beginning of each function to call the profiler module (called _prof), which counts invocations of each function during program execution. When the program has terminated, the profiler automatically prints a list of all functions and the number of times each was called. The profiler slightly reduces program execution speed. See ”prof.c” source for more information.
 
-C compiler components and files Compilation of a C program by DCC requires that the following files be present in the current execution directory (usually /DD/CMDS):
+### C compiler components and files
 
-dcc Compiler executive. Runs other programs. dcpp Macro preprocessor. Performs token replacement. dcc68 Compiler proper. Generates assembly code. dco68 Assembly optimizer. Cleans up assembly to improve speed and code size. rma Assembler. Converts assembly to machine code, saves in object files.
+Compilation of a C program by DCC requires that the following files be present in the current execution directory (usually /DD/CMDS):
 
-rlink Linkage editor (linker). Links object files to form programs. In addition, a file called clib.l contains the standard library, math functions, and sys-
+| | |
+|-|-|
+| dcc | Compiler executive. Runs other programs. |
+| dcpp | Macro preprocessor. Performs token replacement. |
+| dcc68 | Compiler proper. Generates assembly code. |
+| dco68 | Assembly optimizer. Cleans up assembly to improve speed and code size. |
+| rma | Assembler. Converts assembly to machine code, saves in object files. |
+| rlink | Linkage editor (linker). Links object files to form programs. |
 
-tems library. The file cstart.r is the setup code for compiled programs. Both of these files
+In addition, a file called clib.l contains the standard library, math functions, and systems library. The file cstart.r is the setup code for compiled programs. Both of these files must be located in a directory named LIB on the default system drive².
 
-```text
-must be located in a directory named LIB on the default system drive².
-When specifying #includefiles for the pre-processor to read in, if you use angle brackets
-```
+²The system’s default mass storage device, specified in the OS-9 Init module and usually the disk drive the system was booted from.
 
-```text
-(< and >), instead of quotation marks ", the file will be sought starting at the DEFS directory
+When specifying #includefiles for the pre-processor to read in, if you use angle brackets (< and >), instead of quotation marks ", the file will be sought starting at the DEFS directory
 on the default system drive.
-```
 
-Temporary files During compilation, a number of temporary files are created. If your system has a RAMdisk mounted on /R or /R0, or if the directory /DD/TMP exists, then the compiler will place its temporary files in that location — otherwise, in the current data directory. It is important to ensure that enough space is available on the disk used for temporary files. As a rough guide, at least three times the number of blocks in the largest source file (and its included files) should be free.
+#### Temporary files
+
+During compilation, a number of temporary files are created. If your system has a RAMdisk mounted on /R or /R0, or if the directory /DD/TMP exists, then the compiler will place its temporary files in that location — otherwise, in the current data directory. It is important to ensure that enough space is available on the disk used for temporary files. As a rough guide, at least three times the number of blocks in the largest source file (and its included files) should be free.
 
 The special identifiers etext, edata, and end are predefined in the linkage editor and may be used to establish the addresses of the end of executable text, initialized data, and uninitialized data respectively.
 
@@ -574,38 +582,34 @@ The syntax of the command line which calls the compiler is:
 
 ```text
 dcc [options] file… [options]
-One file at a time can be compiled, or a number of files may be compiled together. The
 ```
 
-compiler manages the compilation up to four stages: pre-processor, compilation to assembler code, assembly to relocatable code, and linking to binary executable code (inOS-9memory module format).
+One file at a time can be compiled, or a number of files may be compiled together. The compiler manages the compilation up to four stages: pre-processor, compilation to assembler code, assembly to relocatable code, and linking to binary executable code (inOS-9memory module format).
 
 The compiler accepts three types of source files, provided each name on the command line has the relevant postfix as shown below. Any of the file types below may be mixed on the command line.
 
-Suffix Usage .c C source file .a assembly language source file .r relocatable module
+| Suffix | Usage |
+|-|-|
+| .c | C source file |
+| .a | assembly language source file |
+| .r | relocatable module |
+| (none) | executable binary (OS-9 memory module) |
 
-```text
-(none) executable binary (OS-9 memory module)
 **Table 2.1: File Name Suffix Conventions**
+
+There are two modes of operation: multiple source file and single source file. The compiler selects the mode by inspecting the command line. The usual mode is single source and is specified by having only one source file name on the command line. Of course, more than one source file may be compiled together by using the #include facility in the source code. In this mode, the compiler will use the name obtained by removing the postfix from the name supplied on the command line, and the output file (and the memory module produced) will have this name. For example:
+
 ```
-
-```text
-There are two modes of operation: multiple source file and single source file. The com-
-piler selects the mode by inspecting the command line. The usual mode is single source
-and is specified by having only one source file name on the command line. Of course, more
-than one source file may be compiled together by using the #include facility in the source
-```
-
-²The system’s default mass storage device, specified in the OS-9 Init module and usually the disk drive the system was booted from.
-
-code. In this mode, the compiler will use the name obtained by removing the postfix from the name supplied on the command line, and the output file (and the memory module produced) will have this name. For example:
-
 dcc prg.c
+```
 
-will leave an executable file called prg in the current execution directory. The multiple source mode is specified by having more than one source file name on the
+will leave an executable file called prg in the current execution directory.
 
-command line. In this mode, the object code output file will have the name output in the current execution directory, unless a name is given using the -f= option (see below). Also, in multiple source mode, the relocatable modules generated as intermediate files will be left in the same directories as their corresponding source files with the postfixes changed to .r. For example:
+The multiple source mode is specified by having more than one source file name on the command line. In this mode, the object code output file will have the name output in the current execution directory, unless a name is given using the -f= option (see below). Also, in multiple source mode, the relocatable modules generated as intermediate files will be left in the same directories as their corresponding source files with the postfixes changed to .r. For example:
 
+```
 dcc prg1.c /d0/fred/prg2.c
+```
 
 will leave an executable file called output in the current execution directory, one file called prg1.r in the current data directory, and prg2.r in the directory /d0/fred.
 
@@ -613,105 +617,117 @@ will leave an executable file called output in the current execution directory, 
 
 The compiler recognizes several command-line option flags which modify the compilation process where needed. All flags are recognized before compilation commences so the flags may be placed anywhere on the command line. Flags may be run together as in -ro, except where a flag is followed by something else; see -f= and -d for examples.
 
--a suppresses assembly, leaving the output as assembler code in a file whose name is postfix ”.a”.
+| | |
+|-|-|
+| -a | suppresses assembly, leaving the output as assembler code in a file whose name is postfix ”.a”. |
+| -e=\<number> | Set the edition number constant byte to the number given. This is an OS-9 convention for memory modules. |
+| -o | inhibits the assembly code optimizer pass. The optimizer will shorten object code by about 11% with a comparable increase in speed and is recommended for production versions of debugged programs. |
+| -p | invokes the profiler to generate function frequency statistics after program execution. |
+| -r | suppresses linking library modules into an executable program. Outputs are left in files with postfix .r. |
+| -M=\<size> | will instruct the linker to allocate size for data, stack, and parameter area. Memory size may be expressed in pages (an integer), or in kilobytes by appending k to an integer. For more details of the use of this option, see the Memory management section of this manual. |
+| -l=\<path> | specifies a library to be searched by the linker ahead of the standard library and system interface. |
+| -f=\<path> | overrides the above output file naming. The output will be put into a file at path. This flag does not make sense in multiple source mode if either the -a or -r flag is also present. The module will be called the last name in path. |
+| -c | will output the source code as comments inside the assembly code. |
+| -s | stops the generation of stack-checking code. -s should only be used with great care when the application is extremely time-critical and when the use of the stack by compilergenerated code is fully understood. |
+| -d\<sym>[=val] | is equivalent to #define sym val written in the source file. -d is useful where different versions of a program are maintained in one source file and differentiated by means of the #ifdef or #ifndef preprocessor directives. If no val is supplied, the symbol will be expanded as the value 1. If a val is supplied, the expansion will be the value of val. |
+ 
+### Example command lines
 
-```text
--e=<number> Set the edition number constant byte to the number given. This is an OS-9
-convention for memory modules.
-```
+`dcc prg.c` compiles the C source file prg.c into an executable program named prg in the current execution directory.
 
--o inhibits the assembly code optimizer pass. The optimizer will shorten object code by about 11% with a comparable increase in speed and is recommended for production versions of debugged programs.
+`dcc -a prg.c` compiles the C source file prg.c into assembly source file prg.a in the current working directory.
 
--p invokes the profiler to generate function frequency statistics after program execution.
+`dcc -r prg.c` compiles the C source file prg.c into relocatable module prg.r in the current working directory.
 
--r suppresses linking library modules into an executable program. Outputs are left in files with postfix .r.
+`dcc prg1.c prg2.c prg3.c` compiles the C source files prg1.c, prg2.c, and prg3.c into an executable program named output in the current execution directory. The current working directory will now contain the files prg1.r, prg2.r, and prg3.r.
 
--M=<size> will instruct the linker to allocate size for data, stack, and parameter area. Memory size may be expressed in pages (an integer), or in kilobytes by appending k to an integer. For more details of the use of this option, see the Memory management section of this manual.
+`dcc prg1.c prg2.a prg3.r` compiles the C source file prg1.c, assembles the assembly source file prg2.a, and links both with the relocatable module prg3.r into an executable program named output in the current execution directory. The currentworking directory will now contain the files prg1.r and prg2.r.
 
-```text
--l=<path> specifies a library to be searched by the linker ahead of the standard library and
-system interface.
-```
+`dcc -a prg1.c prg2.c` compiles the C source files prg1.c and prg2.c into assembly source, leaving the resulting files prg1.a and prg2.a in the current working directory.
 
--f=<path> overrides the above output file naming. The output will be put into a file at path. This flag does not make sense in multiple source mode if either the -a or -r flag is also present. The module will be called the last name in path.
-
--c will output the source code as comments inside the assembly code.
-
--s stops the generation of stack-checking code. -s should only be used with great care when the application is extremely time-critical and when the use of the stack by compilergenerated code is fully understood.
-
--d<sym>[=val] is equivalent to #define sym val written in the source file. -d is useful where different versions of a program are maintained in one source file and differentiated by means of the #ifdef or #ifndef preprocessor directives. If no val is supplied, the symbol will be expanded as the value 1. If a val is supplied, the expansion will be the value of val.
-
-Example command lines dcc prg.c compiles the C source file prg.c into an executable program named prg in the
-
-current execution directory.
-
-dcc -a prg.c compiles the C source file prg.c into assembly source file prg.a in the current working directory.
-
-dcc -r prg.c compiles the C source file prg.c into relocatable module prg.r in the current working directory.
-
-dcc prg1.c prg2.c prg3.c compiles the C source files prg1.c, prg2.c, and prg3.c into an executable program named output in the current execution directory. The current working directory will now contain the files prg1.r, prg2.r, and prg3.r.
-
-dcc prg1.c prg2.a prg3.r compiles the C source file prg1.c, assembles the assembly source file prg2.a, and links both with the relocatable module prg3.r into an executable program named output in the current execution directory. The currentworking directory will now contain the files prg1.r and prg2.r.
-
-dcc -a prg1.c prg2.c compiles the C source files prg1.c and prg2.c into assembly source, leaving the resulting files prg1.a and prg2.a in the current working directory.
-
-dcc -f=prg prg1.c prg2.c compiles the C source files prg1.c and prg2.c into relocatable modules prg1.r and prg2.r in the current working directory, then links them together into a program prg in the current execution directory.
+`dcc -f=prg prg1.c prg2.c` compiles the C source files prg1.c and prg2.c into relocatable modules prg1.r and prg2.r in the current working directory, then links them together into a program prg in the current execution directory.
 
 ## Chapter 3. Characteristics of compiled programs
 
-The object codemodule Thecompiler produces position-independent, reentrant 6809 code in a standardOS-9memory module format. The format of an executable program module is shown below. Detailed descriptions of each section of the module are given on following pages.
+### The object code module
+
+The compiler produces position-independent, reentrant 6809 code in a standard OS-9 memory module format. The format of an executable program module is shown below. Detailed descriptions of each section of the module are given on following pages.
 
 ```text
-Module Offset Section Size
-$00 Module header 8
-$09 Execution offset 2
-$0B Storage size 2
-$0D Module name
+Module Offset                               Section Size
+              -------------------------------
+     $00      |        Module header        |       8
+              -------------------------------
+     $09      |       Execution offset      |       2
+              -------------------------------
+     $0B      |        Storage size         |       2
+              -------------------------------
+     $0D      |         Module name         |
+              |       Executable code       |
+              |       String literals       |
+              -------------------------------
+              |    Initializing Data Size   |       2
+              -------------------------------
+              |      Initializing Data      |
+              -------------------------------
+              |  Data-Text Reference Count  |       2
+              -------------------------------
+              | Data-Text Reference Offsets |
+              -------------------------------
+              |  Data-Data Reference Count  |       2
+              -------------------------------
+              | Data-Data Reference Offsets |
+              -------------------------------
+              |       CRC Check Value       |       3
+              -------------------------------
 ```
-
-Executable code String literals
-
-Initializing Data Size 2 Initializing Data
-
-Data-Text Reference Count 2 Data-Text Reference Offsets Data-Data Reference Count 2 Data-Data Reference Offsets
-
-```text
-CRC Check Value 3
 **Figure 3.1: OS-9 C memory module format**
-```
 
-Module header This is a standard OS-9 memory module header, with the Type/Language byte set to $11 (Program + 6809 Object Code), and the Attribute/Revision byte set to $81 (Reentrant + 1).
+#### Module header
 
-Execution offset The execution offset is used by OS-9 to locate where to start execution of the program.
+This is a standard OS-9 memory module header, with the Type/Language byte set to $11 (Program + 6809 Object Code), and the Attribute/Revision byte set to $81 (Reentrant + 1).
 
-Storage size Storage size is the initial default allocation of memory for the program’s data, stack, and parameter area. For a full description of memory allocation, see the Memory management section located on page 27.
+#### Execution offset
 
-Module name Themodule name is used byOS-9 as a handle for the system’smodule directory. Themodule name is followed by the Edition byte encoded in cstart, the “main line” of a C program. If you wish your program to have a different edition number, you may override it using the -E= option to dcc.
+The execution offset is used by OS-9 to locate where to start execution of the program.
 
-Information Any strings preceded by the directive “info” in an assembly code file will be placed here. A major use of this facility is to place in the module the version number and/or a copyright notice. Note that the #asm preprocessor directive may be used in a C source file to enable the inclusion of this directive in the compiler-generated assembly code file.
+#### Storage size
 
-Executable code The machine code instructions of the program.
+Storage size is the initial default allocation of memory for the program’s data, stack, and parameter area. For a full description of memory allocation, see the Memory management section located on page 27.
 
-String literals Quoted strings in the C source are placed here. They are in the null-terminated form expected by the functions in the standard library.
+#### Module name
+The module name is used byOS-9 as a handle for the system’smodule directory. The module name is followed by the Edition byte encoded in cstart, the “main line” of a C program. If you wish your program to have a different edition number, you may override it using the -E= option to dcc.
 
-Note The definition of the C language assumes that strings are in the DATA area and are therefore subject to alteration without making the program non-reentrant. However, to avoid duplicating memory requirements (which would be necessary if they were in the data area), they are placed in the TEXT (executable) section of the module. Putting the strings in the executable section implies that no attempt should be made by a C program to alter string literals; instead, they should be copied first. The exception is the initialization of a global array of type char, like this:
+#### Information
 
-```text
+Any strings preceded by the directive “info” in an assembly code file will be placed here. A major use of this facility is to place in the module the version number and/or a copyright notice. Note that the #asm preprocessor directive may be used in a C source file to enable the inclusion of this directive in the compiler-generated assembly code file.
+
+#### Executable code
+
+The machine code instructions of the program.
+
+#### String literals
+
+Quoted strings in the C source are placed here. They are in the null-terminated form expected by the functions in the standard library.
+
+**Note** The definition of the C language assumes that strings are in the DATA area and are therefore subject to alteration without making the program non-reentrant. However, to avoid duplicating memory requirements (which would be necessary if they were in the data area), they are placed in the TEXT (executable) section of the module. Putting the strings in the executable section implies that no attempt should be made by a C program to alter string literals; instead, they should be copied first. The exception is the initialization of a global array of type char, like this:
+
+```c
 char message[] = "Hello, world!\n";
-This type of string will be found only in the array message in the data area and may be
 ```
+This type of string will be found only in the array message in the data area and may be altered.
 
-altered.
+#### Initializing Data and its Size
 
-Initializing Data and its Size If a C program contains initializers, the data for the initial values of the variables is placed in this section. The definition of C states that all uninitialized global and static variables have the value zero when the program starts running, so the startup routine of each C program first copies the data from the module into the data area and then clears the rest of the data memory to nulls.
+If a C program contains initializers, the data for the initial values of the variables is placed in this section. The definition of C states that all uninitialized global and static variables have the value zero when the program starts running, so the startup routine of each C program first copies the data from the module into the data area and then clears the rest of the data memory to nulls.
 
-Data References No absolute addresses are known at compile time under OS-9, so where there are pointer values in the initializing data, they must be adjusted at run time so that they reflect the absolute values at that time. The startup routine uses the two data reference tables to locate
+#### Data References
 
-the values that need alteration and adjusts them by the absolute values of the bases of the executable code and data respectively.
+No absolute addresses are known at compile time under OS-9, so where there are pointer values in the initializing data, they must be adjusted at run time so that they reflect the absolute values at that time. The startup routine uses the two data reference tables to locate the values that need alteration and adjusts them by the absolute values of the bases of the executable code and data respectively.
 
 For example, suppose there are the following statements in the program being compiled:
 
-```text
+```c
 char *p = "I'm a string!";
 char **q = &p;
 ```
@@ -720,70 +736,85 @@ These declarations tell the compiler that there is to be a char pointer variable
 
 The startup routine will first copy all the entries in the initializing data section into their allotted places in the DATA section. Then it will scan the data-text reference table for the offsets of values that need to have the addresses of the base of the TEXT section added to them. Among these will be the p which, after updating, will point to the string which is in the TEXT section. Similarly, after a scan of the data-data references, q will point to (contain the absolute address of) p.
 
-Memorymanagement The C compiler and its support programs have default conditions such that the average programmer need not be concerned with details of memory management. However, there are situations where advanced programmers may wish to tailor the storage allocation of a program for special situations. The following information explains in detail how a C program’s data area is allocated and used.
+### Memory management
 
-Typical C programmemorymap A storage area is allocated by OS-9 when the C program is executed. The memory layout may be seen in Figure 3.2. The memory layout on a Level 2 machine is similar, except there are no “low addresses” (the Y and DP registers are set to zero)
+The C compiler and its support programs have default conditions such that the average programmer need not be concerned with details of memory management. However, there are situations where advanced programmers may wish to tailor the storage allocation of a program for special situations. The following information explains in detail how a C program’s data area is allocated and used.
+
+#### Typical C program memory map
+
+A storage area is allocated by OS-9 when the C program is executed. The memory layout may be seen in Figure 3.2. The memory layout on a Level 2 machine is similar, except there are no “low addresses” (the Y and DP registers are set to zero)
 
 The overall size of this memory area is defined by the Storage size value stored in the program’s module header. When running the program, the user may override this size to grant the program additional memory using the OS-9 Shell, however a full explanation of this option is beyond the scope of this book.
 
-The parameter area is where the parameter string from the calling process (typically the Shell) is placed by the system. The initializing routine for C programs converts the param-
+The parameter area is where the parameter string from the calling process (typically the Shell) is placed by the system. The initializing routine for C programs converts the parameters into null-terminated strings and makes pointers to them available to main() via argc and argv.
 
 ```text
-high addresses
-sbrk() adds memory here → ↙ memend
-```
-
-```text
-parameters
-stack ⟵ S register
-```
-
-⇓ current stack reservation ↗ currently unused current top of memory ↘ memory
-
-⇑ ↖ ibrk() raises this requested memory uninitialized data ↖ end initialized data ↖ edata
-
-```text
-dpsiz ↕ direct page variables ↙ Y, DP registers
-low addresses
+                                  high addresses
+  sbrk() adds memory here → |                       | ↙ memend
+                            -------------------------
+                            |       parameters      |
+                            -------------------------
+                            |         stack         | ⟵ S register
+                            |           ⇓           |
+                            -------------------------
+current stack reservation ↗ |   currently unused    |
+    current top of memory ↘ |        memory         |
+                            -------------------------
+                            |           ⇑           | ↖ ibrk() raises this
+                            |    requested memory   |
+                            -------------------------
+                            |   uninitialized data  | ↖ end
+                            -------------------------
+                            |    initialized data   | ↖ edata
+                            -------------------------
+                    dpsiz ↕ | direct page variables | ↙ Y, DP registers
+                            -------------------------
+                                 low addresses
 ```
 
 **Figure 3.2: OS-9 Level 1 C Memory Layout**
 
-eters into null-terminated strings and makes pointers to them available to main() via argc and argv.
 
 The stack area is the currently reserved memory for exclusive use of the stack. As each C function is entered, a routine in the system interface is called to reserve enough stack space for the use of the function and additional 64 bytes. These 64 bytes are for the use of userwritten assembly code functions and/or the system interface and/or arithmetic routines. A record is kept of the lowest address so far granted for the stack. If the area requested would not bring this lower, then the C function is allowed to proceed. If the new lower limit would mean that the stack area would overlap the data area, the program stops with the message:
 
+```
 *** Stack Overflow ***
-
+```
 on the standard error output. Otherwise, the new lower limit is set, and the C function resumes as before.
 
 The direct page variables area is where variables reside that have been defined with the storage class direct in the C source code or in a vsect dp segment in assembly code source. Notice that the size of this area is always at least one byte (to ensure that no pointer to a variable can have the value NULL or 0) and that it is not necessarily 256 bytes.
 
-```text
-The uninitialized data area is where the remainder of the uninitialized program variables
-reside. These two areas are, in fact, cleared to all zeros by the program entry routine. The
-initialized data area is where the initialized variables of the program reside. There are two
-globally defined values which may be referred to: edata and end, which are the addresses
-of one byte higher than the initialized data and one byte higher than the uninitialized data
-respectively. Note that these are not variables; the values may be accessed from C by using
-the & operator, as in:
+The uninitialized data area is where the remainder of the uninitialized program variables reside. These two areas are, in fact, cleared to all zeros by the program entry routine. The initialized data area is where the initialized variables of the program reside. There are two globally defined values which may be referred to: edata and end, which are the addresses of one byte higher than the initialized data and one byte higher than the uninitialized data respectively. Note that these are not variables; the values may be accessed from C by using the & operator, as in:
+
+```c
 high = &end;
 low = &edata;
 ```
 
-or from assembler: leax end,y stx high,y
+or from assembler: 
+
+| | |
+|-|-|
+| leax | end,y |
+| stx | high,y |
 
 The Y register points to the base of the data area, and variables are addressed using Y-offset indexed instructions.
 
 When the program starts running, the remaining memory is assigned to the “free” area. A program may call ibrk() to request additional working memory (initialized to zeros) from the free memory area. Alternately, more memory can be dynamically obtained using sbrk(), which requests additional memory from the operating system and returns the new lower bound. If this fails becauseOS-9 refuses to grantmorememory for any reason, sbrk() will return −1 as an int.
 
-Compile-timememory allocation If not instructed otherwise, the linker will automatically allocate 1 kilobyte more than the total size of the program’s variables and strings. This size will normally be adequate to cover the parameter area, stack requirements, and standard library’s file buffers. The allocation size may be altered when using the compiler by using the -m option on the command line. The memory requirements may be stated in pages, for example:
+#### Compile-time memory allocation
 
+If not instructed otherwise, the linker will automatically allocate 1 kilobyte more than the total size of the program’s variables and strings. This size will normally be adequate to cover the parameter area, stack requirements, and standard library’s file buffers. The allocation size may be altered when using the compiler by using the -m option on the command line. The memory requirements may be stated in pages, for example:
+
+```
 dcc prg.c -m=2
+```
 
 allocates 512 bytes extra, or in kilobytes, for example:
 
+```
 dcc prg.c -m=10k
+```
 
 The linker will ignore the request if the size is less than 256 bytes. The following rules can serve as a rough guide to estimate howmuchmemory to specify:
 
@@ -809,73 +840,69 @@ The floating point formats used by C and Basic09 are not directly compatible. Si
 
 Multi-dimensional arrays are stored by Basic09 in a different manner than in C. Multidimensional arrays are stored by Basic09 in a column-wisemanner; C stores them row-wise. Consider the following example:
 
-```text
-Basic09 matrix In the Basic09 declaration DIM array(5,3):INTEGER, the elements in
-consecutive memory locations (read left to right, line by line) are stored as:
-```
-
-(1, 1) (2, 1) (3, 1) (4, 1) (5, 1) (1, 2) (2, 2) (3, 2) (4, 2) (5, 2) (1, 3) (2, 3) (3, 3) (4, 3) (5, 3)
+**Basic09 matrix** In the Basic09 declaration DIM array(5,3):INTEGER, the elements in consecutive memory locations (read left to right, line by line) are stored as:
 
 ```text
-C matrix For the C declaration int array[5][3], the elements in consecutive memory
-locations for this matrix are stored as:
+(1, 1) (2, 1) (3, 1) (4, 1) (5, 1)
+(1, 2) (2, 2) (3, 2) (4, 2) (5, 2)
+(1, 3) (2, 3) (3, 3) (4, 3) (5, 3)
 ```
 
-(1, 1) (1, 2) (1, 3) (2, 1) (2, 2) (2, 3) (3, 1) (3, 2) (3, 3) (4, 1) (4, 2) (4, 3) (5, 1) (5, 2) (5, 3)
+**C matrix** For the C declaration int array[5][3], the elements in consecutive memory locations for this matrix are stored as:
 
 ```text
-Therefore, to access Basic09 matrix elements in C, the subscripts must be transposed.
-To access element array(4,2) in Basic09, use array[2][4] in C.
+(1, 1) (1, 2) (1, 3)
+(2, 1) (2, 2) (2, 3)
+(3, 1) (3, 2) (3, 3)
+(4, 1) (4, 2) (4, 3)
+(5, 1) (5, 2) (5, 3)
 ```
+
+Therefore, to access Basic09 matrix elements in C, the subscripts must be transposed. To access element `array(4,2)` in Basic09, use `array[2][4]` in C.
 
 The details on interfacing Basic09 to C are perhaps best described by example. The remainder of this chapter is a mini-tutorial demonstrating the process, starting with simple examples and working up to more complex ones.
 
 ### Example 1 – Simple Integer Arithmetic
 
-```text
-This first example illustrates a simple case. Write a C function to add an integer value to
-three integer variables:
+This first example illustrates a simple case. Write a C function to add an integer value to three integer variables:
+
+```c
 addints(cnt,value,s1,arg1,s2,arg2,s2,arg3,s4)
 int *value,*arg1,*arg2,*arg3;
 {
-```
-
-```text
-*arg1 += *value;
-*arg2 += *value;
-*arg3 += *value;
-```
-
+    *arg1 += *value;
+    *arg2 += *value;
+    *arg3 += *value;
 }
-
-```text
-That’s the C function. The name of the function is addints. The name is information for C
-and rlink; Basic09 will not know anything about the name.
 ```
+
+That’s the C function. The name of the function is addints. The name is information for C and rlink; Basic09 will not know anything about the name.
 
 The Basic09 Reference manual describes how Basic09 passes parameters to machine language modules. Since Basic09 and C pass parameters in a similar fashion, it is easy to access Basic09 values from C. The first parameter on the Basic09 stack is a two-byte count of the number of following parameter pairs; each pair consists of an address, and the size of the pointed-to value. For most C functions, the parameter count and pair size is not used. The address, however, is the useful piece of information. The address is always declared in the C function to be a “pointer to …” type, because Basic09 always passes arguments by reference¹, even for constant values. The arguments cnt, s1, s2, s3, and s4 are just placeholders to indicate the presence of the parameter count and argument sizes on the stack. If you wish to check that the passed-in arguments agree with the function’s definition, you may check that cnt contains the value 4.
 
-The line int *value,*arg1,*arg2,*arg3; declares the arguments (in this case, all of them are “pointers to int”), so the compiler will generate the correct code to access the Basic09 values. The remaining lines increment each argument by the passed value. Notice
-
 ¹that is, through a pointer
 
-that a simple arithmetic operation is performed here (addition), so C will not have to call a library function to do the operation.
+The line `int *value,*arg1,*arg2,*arg3;` declares the arguments (in this case, all of them are “pointers to int”), so the compiler will generate the correct code to access the Basic09 values. The remaining lines increment each argument by the passed value. Notice that a simple arithmetic operation is performed here (addition), so C will not have to call a library function to do the operation.
 
-To compile this function, the following C compiler command line is used: dcc bt1.c -rs The -r option causes the compiler to leave bt1.r as output, ready to be linked. The -s
+To compile this function, the following C compiler command line is used:
 
-option suppresses the call to the stack-checking function. Since we will be making amodule for Basic09, cstart.r will not be used. Therefore, no initialized data, static data, or stack checking is allowed. More on this later.
+```
+dcc bt1.c -rs
+```
+
+The -r option causes the compiler to leave bt1.r as output, ready to be linked. The -s option suppresses the call to the stack-checking function. Since we will be making amodule for Basic09, cstart.r will not be used. Therefore, no initialized data, static data, or stack checking is allowed. More on this later.
 
 The bt1.r file must now be converted into a loadable module that Basic09 can link to by using a special linking technique as follows:
 
 ```text
 rlink bt1.r -b=addints -o=addints
-This command tells the linker to read bt1.r as input. The option-b=addints tells the
 ```
 
-linker to make the output file a module that Basic09 can link to and that the function addints is to be the entry point in the module. You may give many input files to rlink in this mode. It resolves references in the normal fashion. The name given to the -b= option indicates which of the functions is to be entered directly by the Basic09 RUN command. The option -b=addints says what the name of the output file is to be, in this case addints. This name should be the name used in the Basic09 RUN command to call the C procedure. The name given in the -o= option must be the name of the procedure to RUN, while the -b= option is information for the linker, so that it can fill in the correct module entry point offset.
+This command tells the linker to read bt1.r as input. The option-b=addints tells the linker to make the output file a module that Basic09 can link to and that the function addints is to be the entry point in the module. You may give many input files to rlink in this mode. It resolves references in the normal fashion. The name given to the -b= option indicates which of the functions is to be entered directly by the Basic09 RUN command. The option -b=addints says what the name of the output file is to be, in this case addints. This name should be the name used in the Basic09 RUN command to call the C procedure. The name given in the -o= option must be the name of the procedure to RUN, while the -b= option is information for the linker, so that it can fill in the correct module entry point offset.
 
-```text
 Enter the following Basic09 program:
+
+```basic
 PROCEDURE btest
 DIM i,j,k:INTEGER
 i=1
@@ -886,181 +913,146 @@ PRINT i,j,k
 END
 ```
 
-```text
 When this procedure is RUN, it should print:
-5 136 -1029
+
+```text
+5    136    -1029
 ```
 
 indicating that our C function worked!
 
 ### Example 2 – More Complex Integer Arithmetic
 
-The next example shows how static memory can be used. Take the C function from the previous example and modify it to add the number of times it has been entered to the increment: static int entcnt;
+The next example shows how static memory can be used. Take the C function from the previous example and modify it to add the number of times it has been entered to the increment:
 
-```text
+```c
+static int entcnt;
 addints(cnt,cmem,cmemsiz,value,s1,arg1,s2,arg2,s2,arg3,s4)
 char *cmem;
 int *value,*arg1,*arg2,*arg3;
 {
 #asm
-```
-
-```text
-ldy 6,s base of static area
+    ldy 6,s base of static area
 #endasm
-```
 
-int j = *value + entcnt++;
+    int j = *value + entcnt++;
 
-```text
-*arg1 += j;
-*arg2 += j;
-*arg3 += j;
-```
-
+    *arg1 += j;
+    *arg2 += j;
+    *arg3 += j;
 }
-
-```text
-This example differs from the first in a number of ways. The line static int entcnt
-; defines an integer value named entcnt global to bt2.c. The parameter cmem and the
-line char *cmem; indicate a character array. The array will be used in the C function for
-global/static storage.
 ```
 
-C accesses non-auto and non-register variables indexed off the Y register. Normally, cstart.r takes care of setting this up. However, since cstart.r will not be used for this Basic09-callable function, we have to take measures to make sure the Y register points to a valid and sufficiently large area of memory. The line ldy 6,s is assembly language code embedded in the C source, which loads the Y register with the first parameter passed by Basic09. If the first parameter in the Basic09 RUN statement is an array, and the ”ldy 6,s” is placed immediately after the { opening the function body, the offset will always be ”6,s”. Note the line beginning ”int j = ...”. This line uses an initializer which, in this case, is allowed because j is of class ”auto”. No storage classes other than ”auto” and ”register” may be initialized in Basic09-callable C functions.
+This example differs from the first in a number of ways. The line `static int entcnt;` defines an integer value named `entcnt` global to `bt2.c`. The parameter `cmem` and the line `char *cmem;` indicate a character array. The array will be used in the C function for global/static storage.
+
+C accesses non-auto and non-register variables indexed off the Y register. Normally, cstart.r takes care of setting this up. However, since cstart.r will not be used for this Basic09-callable function, we have to take measures to make sure the Y register points to a valid and sufficiently large area of memory. The line `ldy 6,s` is assembly language code embedded in the C source, which loads the Y register with the first parameter passed by Basic09. If the first parameter in the Basic09 RUN statement is an array, and the `ldy 6,s` is placed immediately after the `{` opening the function body, the offset will always be `6,s`. Note the line beginning `int j = ...`. This line uses an initializer which, in this case, is allowed because j is of class ”auto”. No storage classes other than 'auto' and 'register' may be initialized in Basic09-callable C functions.
 
 To compile this function, the following C compiler command line is used:
 
+```
 dcc bt2.c -rs
-
-```text
-Again, the -r option leaves bt2.r as output and the -s option suppresses stack checking.
-Normally, the linker considers it to be an error if the ”-b=” option appears and the final
 ```
 
-linked module requires a data memory allocation. In our case here, we require a data memory allocation and we will provide the code to make sure everything is set up correctly. The ”-t” linker option causes the linker to print the total data memory requirement so we can allow for it rather than complaining about it. Our linker command line is:
+Again, the -r option leaves bt2.r as output and the -s option suppresses stack checking. Normally, the linker considers it to be an error if the ”-b=” option appears and the final linked module requires a data memory allocation. In our case here, we require a data memory allocation and we will provide the code to make sure everything is set up correctly. The ”-t” linker option causes the linker to print the total data memory requirement so we can allow for it rather than complaining about it. Our linker command line is:
 
+```
 rlink bt2.r -o=addints -b=addints -r
+```
 
 The linker will respond with Basic09 static data size is 2 bytes”. We must make sure cmem points to at least 2 bytes of memory. The memory should be zeroed to conform to C specifications.
 
-```text
 Enter the following Basic09 program:
+```basic
 PROCEDURE btest
 DIM i,j,k,n;INTEGER
 DIM cmem(10):INTEGER
 FOR i=1 TO 10
-```
-
-```text
-cmem(i)=0
+    cmem(i)=0
 NEXT i
 FOR n=1 TO 5
-```
-
-```text
-i=1
-j=132
-k=-1033
-RUN addints(cmem,4,i,j,k)
-PRINT i,j,k
-```
-
-```text
+    i=1
+    j=132
+    k=-1033
+    RUN addints(cmem,4,i,j,k)
+    PRINT i,j,k
 NEXT n
 END
 ```
 
 This program is similar to the previous example. Our area for data memory is a 10integer array (20 bytes) which is way more than the 2 bytes for this example. It is better to err on the generous side. Cmem is an integer array for convenience in initializing it to zero (per C data memory specifications). When the program is run, it calls addints 5 times with the same data values. Because addints add the number of times it was called to the value, the i,j,k values should be 4+number of times called. When run, the program prints:
 
-5 136 -1029 6 137 -1028 7 138 -1027 8 139 -1026 9 140 -1025
+```
+5     136     -1029
+6     137     -1028
+7     138     -1027
+8     139     -1026
+9     140     -1025
+```
 
 Works again!
 
 ### Example 3 – Simple String Manipulation
 
-This example shows how to access Basic09 strings through C functions. For this example, write the C version of SUBSTR. /* Find substring from BASIC09 string:
+This example shows how to access Basic09 strings through C functions. For this example, write the C version of SUBSTR.
 
-RUN findstr(A$,B$,findpos) returns in fndpos the position in A$ that B$ was found or 0 if not found. A$ and B$ must be strings, fndpos must be
-
-```text
-INTEGER.
+```c
+/* Find substring from BASIC09 string:
+        RUN findstr(A$,B$,findpos) returns in fndpos the position in A$ that B$ was found or 0 if not found. A$ and B$ must be strings, fndpos must be INTEGER.
 */
 findstr(cnt,string,strcnt,srchstr,srchcnt,result);
 char *string,*srchstr;
 int strcnt, srchcnt, *result;
 {
-```
-
-```text
-*result = finder(string,strcnt,srchstr,srchcnt);
+    *result = finder(string,strcnt,srchstr,srchcnt);
 }
-```
 
-```text
 static finder(str,strlen,pat,patlen)
 char *str,*pat;
 int strlen,patlen;
 {
-```
-
-```text
-int i;
-for(i=1;strlen-- > 0 && *str!=0xff; ++i)
-```
-
-```text
-if(smatch(str++,pat,patlen))
-return i;
-```
-
+    int i;
+    for(i=1;strlen-- > 0 && *str!=0xff; ++i)
+        if(smatch(str++,pat,patlen))
+            return i;
 }
 
-```text
 static smatch(str,pat,patlen)
 register char *str,*pat;
 int patlen;
 {
-```
-
-```text
-while(patlen-- > 0 && *pat != 0xff)
-if(*str++ != *pat++)
-```
-
-```text
-return 0;
-return 1;
-```
-
-```text
+    while(patlen-- > 0 && *pat != 0xff)
+        if(*str++ != *pat++)
+            return 0;
+    return 1;
 }
+```
 **Listing 4.1: bt3.c**
+
+Compile this program:
+
+```
+dcc bt3.c -rs
 ```
 
-Compile this program: dcc bt3.c -rs
-
-```text
 And link it:
+
+```
 rlink bt3.r -o=findstr -b=findstr
 ```
 
-```text
 The Basic09 test program is:
+
+```basic
 PROCEDURE btest
 DIM a,b:STRING[20]
 DIM matchpos:INTEGER
 LOOP
-```
-
-```text
-INPUT "String ",a
-INPUT "Match ",b
-RUN findstr(a,b,matchpos)
-PRINT "Matched at position ",matchpos
-```
-
+    INPUT "String ",a
+    INPUT "Match ",b
+    RUN findstr(a,b,matchpos)
+    PRINT "Matched at position ",matchpos
 ENDLOOP
+```
 
 When this program is run, it should print the position where the matched string was found in the source string.
 
@@ -1068,75 +1060,46 @@ When this program is run, it should print the position where the matched string 
 
 The next example programs demonstrate how one might implement a quicksort written in C to sort some Basic09 data.
 
-```text
 C integer quicksort program:
+```c
 #define swap(a,b) { int t; t=a; a=b; b=t; }
-```
 
-```text
 /* qsort to be called by BASIC09:
 dim d(100):INTEGER any size INTEGER array
 run cqsort(d,100) calling qsort.
-```
-
 */
 
-```text
 qsort(argcnt,iarray,iasize,icount,icsiz)
 int argcnt, /* BASIC09 argument count */
-```
-
-```text
-iarray[], /* Pointer to BASIC09 integer array */
-iasize, /* and it's size */
-*icount, /* Pointer to BASIC09 (sort count) */
-icsiz; /* Size of integer */
-```
-
-```text
+    iarray[], /* Pointer to BASIC09 integer array */
+    iasize, /* and it's size */
+    *icount, /* Pointer to BASIC09 (sort count) */
+    icsiz; /* Size of integer */
 {
-sort(iarray,0,*icount); /* initial qsort partition */
-```
-
+    sort(iarray,0,*icount); /* initial qsort partition */
 }
 
-```text
 /* standard quicksort algorithm from Horowitz-Sahni */
 static sort(a,m,n)
 register int *a,m,n;
 {
-```
+    register i,j,x;
 
-register i,j,x;
-
-```text
-if (m < n) {
-i = m;
-j = n + 1;
-x = a[m];
-```
-
-```text
-for(;;) {
-do i += 1; while (a[i] < x); /* left partition */
-do j -= 1; while (a[j] > x); /* right partition */
-if(i < j)
-```
-
-```text
-swap(a[i],a[j]) /* swap */
-else break;
-```
-
-```text
-}
-swap(a[m],a[j]);
-sort(a,m,j-1); /* sort left */
-sort(a,j+1,n); /* sort right */
-```
-
-```text
-}
+    if (m < n) {
+        i = m;
+        j = n + 1;
+        x = a[m];
+        for(;;) {
+            do i += 1; while (a[i] < x); /* left partition */
+            do j -= 1; while (a[j] > x); /* right partition */
+            if(i < j)
+                swap(a[i],a[j]) /* swap */
+            else break;
+        }
+        swap(a[m],a[j]);
+        sort(a,m,j-1); /* sort left */
+        sort(a,j+1,n); /* sort right */
+    }
 }
 ```
 
@@ -1144,16 +1107,13 @@ sort(a,j+1,n); /* sort right */
 
 The Basic09 program is:
 
-```text
+```basic
 PROCEDURE sorter
 DIM i,n,d(1000):INTEGER
 n=1000
 i=RND(-(PI))
 FOR i=1 TO n
-```
-
-```text
-d(i):=INT(RND(1000))
+    d(i):=INT(RND(1000))
 NEXT i
 PRINT "Before:"
 RUN prin(1,n,d)
@@ -1161,109 +1121,74 @@ RUN qsortb(d,n)
 PRINT "After:"
 RUN prin(1,n,d)
 END
-```
 
-```text
 PROCEDURE prin
 PARAM n,m,d(1000):INTEGER
 DIM i:INTEGER
 FOR i=n TO m
-```
-
-```text
-PRINT d(i); " ";
+    PRINT d(i); " ";
 NEXT i
 PRINT
 END
 ```
 
-```text
 C string quicksort program:
+
+```c
 /* qsort to be called by BASIC09:
-```
 
-dim cmemory:STRING[10] This should be at least as large as the linker says the data size should be.
+   dim cmemory:STRING[10] This should be at least as large as the linker says the data size should be.
 
-dim d(100):INTERGER Any size INTEGER array.
+   dim d(100):INTERGER Any size INTEGER array.
 
-run cqsort(cmemory,d,100) calling qsort. Note that the procedure name run in the linked OS-9 subroutine module. The module name need not be the name of the C function.
-
+   run cqsort(cmemory,d,100) calling qsort. Note that the procedure name run in the linked OS-9 subroutine module. The module name need not be the name of the C function.
 */
 
 int maxstr; /* string maximum length */
 
-```text
 static strbcmp(str1,str2) /* basic09 string compare */
 register char *str1,*str2;
 {
-```
+    int maxlen;
 
-int maxlen;
-
-```text
-for (maxlen = maxstr; *str1 == *str2 ;++str1)
-if (maxlen-- >0 || *str2++ == 0xff)
-```
-
-```text
-return 0;
-return (*str1 - *str2);
-```
-
+    for (maxlen = maxstr; *str1 == *str2 ;++str1)
+        if (maxlen-- >0 || *str2++ == 0xff)
+            return 0;
+    return (*str1 - *str2);
 }
 
-```text
-cssort(argcnt,stor,storsiz,iaarray,iasize,elemlen,elsiz,
-icount,icsiz)
-```
+cssort(argcnt,stor,storsiz,iaarray,iasize,elemlen,elsiz,icount,icsiz)
 
-```text
 int argcnt; /* BASIC09 argument count */
 char *stor; /* Pointer to string (C data storage) */
 char iarray[]; /* Pointer to BASIC09 integer array */
 int iasize, /* and it's size */
-```
-
-*elemlen, /* Pointer integer value (string length) */ elsiz, /* Size of integer */ *icount, /* Pointer to integer (sort count) */ icsiz; /* Size of integer */
-
-```text
+    *elemlen, /* Pointer integer value (string length) */
+    elsiz, /* Size of integer */
+    *icount, /* Pointer to integer (sort count) */
+    icsiz; /* Size of integer */
 {
-/* The following assembly code loads Y with the first
-```
+/* The following assembly code loads Y with the first arg provided by BASIC09. This code MUST be the first code in the function after the declarations. This code assumes the address of the data area is the first parameter in the BASIC09 RUN command. */
 
-arg provided by BASIC09. This code MUST be the first code in the function after the declarations. This code assumes the address of the data area is the first parameter in the BASIC09 RUN command. */
-
-```text
 #asm
-ldy 6,s get addr for C storage
-```
-
+    ldy 6,s get addr for C storage
 #endasm
 
-```text
-/* Use the C library qsort function to do the sort. Our
-own BASIC09 string compare function will compare the strings.
-```
-
+/* Use the C library qsort function to do the sort. Our own BASIC09 string compare function will compare the strings.
 */
 
-```text
-qsort(iarray,*icount,maxstr=*elemlen,strbcmp);
+    qsort(iarray,*icount,maxstr=*elemlen,strbcmp);
 }
-```
 
-```text
 /* define stuff cstart.r normally defines */
 #asm
 _stkcheck:
-```
+        rts     dummy stack check function
 
-rts dummy stack check function
-
-vsect errno: rmb 2 C function system error number _flacc: rmb 8 C library float/long accumulator
-
-```text
-endsect
+        vsect
+errno:  rmb 2   C function system error number
+_flacc: rmb 8   C library float/long accumulator
+        endsect
 #endasm
 ```
 
@@ -1271,39 +1196,29 @@ endsect
 
 The Basic09 calling programs: (words file contains strings to sort)
 
-```text
+```basic
 PROCEDURE ssorter
 DIM a(200):STRING[20]
 DIM cmemory:STRING[20]
 DIM i,n:INTEGER
 DIM path:INTEGER
 OPEN #path,"words":READ
-```
 
-```text
 n=100
 FOR i=1 TO n
-```
-
-```text
-INPUT #path,a(i)
+    INPUT #path,a(i)
 NEXT i
 CLOSE #path
 RUN prin(a,n)
 RUN cssort(cmemory,a,20,n)
 RUN prin(a,n)
 END
-```
 
-```text
 PROCEDURE prin
 PARAM a(100):STRING[20]; n:INTEGER
 DIM i:INTEGER
 FOR i=1 TO n
-```
-
-```text
-PRINT i; " "; a(i)
+    PRINT i; " "; a(i)
 NEXT i
 PRINT i
 END
@@ -1311,237 +1226,249 @@ END
 
 ### Example 5 – Floating Point
 
-```text
 The next example shows how to access Basic09 reals from C functions:
+
+```c
 flmult(cnt,cmemory,cmemsiz,realarg,realsize)
 int cnt; /* number of arguments */
 char *cmemory; /* pointer to some memory for C use */
 double *realarg; /* pointer to real */
 {
 #asm
-```
-
-```text
-ldy 6,s get static memory address
+    ldy 6,s get static memory address
 #endasm
-```
 
-double number;
+    double number;
 
-```text
-getbreal(&number,realarg); /* get the BASIC09 real */
-number *= 2.; /* number times two*/
-putbreal(realarg,&number); /* give back to BASIC09 */
-```
+    getbreal(&number,realarg); /* get the BASIC09 real */
+    number *= 2.; /* number times two*/
+    putbreal(realarg,&number); /* give back to BASIC09 */
 
 }
 
-```text
-/* getreal(creal,breal)
-get a 5-byte real from BASIC09 format to C format */
-```
+/* getreal(creal,breal) get a 5-byte real from BASIC09 format to C format */
 
-```text
 getbreal(creal,breal)
 double *creal,*breal;
 {
-```
+    register char *cr,*br; /* setup some char pointers */
 
-register char *cr,*br; /* setup some char pointers */
-
-```text
-cr = creal;
-br = breal;
-```
+    cr = creal;
+    br = breal;
 
 #asm
 
-* At this point U reg contains address of C double * 0,s contains address of BASIC09 real
+* At this point U reg contains address of C double
+* 0,s contains address of BASIC09 real
+    ldx 0,s     get address of B real
 
-ldx 0,s get address of B real
+    clra        clear the C double
+    clrb
+    std 0,u
+    std 2,u
+    std 4,u
+    stb 6,u
+    ldd 0,x
+    beq g3      BASIC09 real is zero
 
-clra clear the C double clrb std 0,u std 2,u std 4,u stb 6,u ldd 0,x beq g3 BASIC09 real is zero
-
-ldd 1,x get hi B mantissa and a #$7f clear place for sign std 0,u put hi C matissa ldd 3,x get lo B mantissa andb #$fe mask off sign std 2,u put lo C mantissa lda 4,x get B sign byte lsra shift out sign bcc g1 lda 0,u get C sign byte ora #$80 tun on sign sta 0,u put C sign byte
-
-g1 lda 0,x get B exponent suba #128 excess 128 sta 7,u put C exponent
-
-```text
-g3 clra clear carry
+    ldd 1,x     get hi B mantissa
+    and a #$7f  clear place for sign
+    std 0,u     put hi C matissa
+    ldd 3,x     get lo B mantissa
+    andb #$fe   mask off sign
+    std 2,u     put lo C mantissa
+    lda 4,x     get B sign byte
+    lsra        shift out sign
+    bcc g1
+    lda 0,u     get C sign byte
+    ora #$80    turn on sign
+    sta 0,u     put C sign byte
+g1  lda 0,x     get B exponent
+    suba #128   excess 128
+    sta 7,u     put C exponent
+g3  clra        clear carry
 #endasm
-```
 
 }
 
-```text
-/* putbreal(breal,creal)
-put C format double into a 5-byte real from BASIC09 */
-```
+/*  putbreal(breal,creal)
+    put C format double into a 5-byte real from BASIC09 */
 
-```text
 putbreal(breal,creal)
 double *breal,*creal;
 {
-```
+    register char *cr,*br; /* setup some pointers */
 
-register char *cr,*br; /* setup some pointers */
+    cr = creal;
+    br = breal;
 
-```text
-cr = creal;
-br = breal;
-```
+#asm
+* At this point U reg contains address of C double
+* 0,s contains address of BASIC09 real
+    ldx 0,s     get address of B real
 
-#asm * At this point U reg contains address of C double * 0,s contains address of BASIC09 real
+    lda 7,u     get C exponent
+    bne p0      not zero?
+    clra        clear the BASIC09
+    clrb        real
+    std 0,x
+    std 2,x
+    std 4,x
+    bra p3      and exit
 
-ldx 0,s get address of B real
-
-lda 7,u get C exponent bne p0 not zero? clra clear the BASIC09 clrb real std 0,x std 2,x std 4,x bra p3 and exit
-
-p0 ldd 0,u get hi C mantissa ora #$80 this bit always on for normalized real std 1,x put hi B mantissa ldd 2,u get lo C mantissa std 3,x put lo B mantissa incb round mantissa bne p1 inc 3,x bne p1 inc 2,x bne p1 inc 1,x
-
-p1 andb #$fe turn off sign stb 4,x put B sign byte lda 0,u get C sign byte lsla shift out sign bcc p2 bra if positive orb #$01 turn on sign stb 4,x put B sign byte
-
-p2 lda 7,u get C exponent adda #128 less 128 sta 0,x put B exponent
-
-```text
-p3 clra clear carry
+p0  ldd 0,u     get hi C mantissa
+    ora #$80    this bit always on for normalized real
+    std 1,x     put hi B mantissa
+    ldd 2,u     get lo C mantissa
+    std 3,x     put lo B mantissa
+    incb        round mantissa
+    bne p1
+    inc 3,x
+    bne p1
+    inc 2,x
+    bne p1
+    inc 1,x
+p1  andb #$fe   turn off sign
+    stb 4,x     put B sign byte
+    lda 0,u     get C sign byte
+    lsla        shift out sign
+    bcc p2      bra if positive
+    orb #$01    turn on sign
+    stb 4,x     put B sign byte
+p2  lda 7,u     get C exponent
+    adda #128   less 128
+    sta 0,x     put B exponent
+p3  clra        clear carry
 #endasm
 }
+
+/* replace cstart.r definitions for BASIC09 */
+#asm
+_stkcheck:
+_stkchec:
+        rts
+
+        vsect
+_flacc: rmb 8
+ errno: rmb 2
+        endsect
+#endasm
 ```
-
-/* replace cstart.r definitions for BASIC09 */ #asm _stkcheck: _stkchec: rts
-
-vsect _flacc: rmb 8 errno: rmb 2 endsect #endasm
 
 **Listing 4.4: flmult.c**
 
 Basic09 calling program:
 
-```text
+```basic
 PROCEDURE btest
 DIM a:REAL
 DIM i:INTEGER
 DIM cmemory:STRING[32]
 a=1.
 FOR i=1 TO 10
-RUN flmult(cmemory,a)
-PRINT a
-```
-
-```text
+    RUN flmult(cmemory,a)
+    PRINT a
 NEXT i
 END
 ```
 
-```text
 ### Example 6 – Matrix Elements
+
 The last program is an example of accessing Basic09 matrix elements. The C program:
+
+```c
 matmult(cnt,cmemory,cmemsiz,matxaddr,matxsize,scalar,scalsize)
 char *cmemory; /* pointer to some memory for C use */
 int matxaddr[5][3]; /* pointer a double dim integer array */
 int *scalar; /* pointer to integer */
 {
 #asm
-ldy 6,s get static memory address
+    ldy 6,s     get static memory address
 #endasm
-```
 
-int i,j;
+    int i,j;
 
-```text
-for(i=0; i<5; ++i)
-for(j=1; j<3; ++j)
-```
-
-```text
-matxaddr[j][i] *= *scalar; /* multiply by value */
+    for(i=0; i<5; ++i)
+        for(j=1; j<3; ++j)
+            matxaddr[j][i] *= *scalar; /* multiply by value */
 }
 #asm
 _stkcheck:
 _stkchec:
-rts
+    rts
+
+    vsect
+_flacc: rmb 8
+ errno: rmb 2
+ endsect
+#endasm
 ```
 
-vsect _flacc: rmb 8 errno: rmb 2 endsect #endasm
-
-```text
 Basic09 calling program:
+
+```basic
 PROCEDURE btest
 DIM im(5,3):INTEGER
 DIM i,j:INTEGER
 DIM cmem:STRING[32]
 FOR i=1 TO 5
-```
-
-```text
-FOR j=1 TO 3
-READ im(i,j)
-```
-
-```text
-NEXT j
+    FOR j=1 TO 3
+        READ im(i,j)
+    NEXT j
 NEXT i
 DATA 11,13,7,3,4,0,5,7,2,8,15,0,0,14,4
 FOR i=1 TO 5
-```
-
-```text
-PRINT im(i,1),im(i,2),im(i,3)
+    PRINT im(i,1),im(i,2),im(i,3)
 NEXT i
 PRINT
 RUN matmult(cmem,im,64)
 FOR i=1 TO 5
-```
-
-```text
-PRINT im(i,1),im(i,2),im(i,3)
+    PRINT im(i,1),im(i,2),im(i,3)
 NEXT i
 END
 ```
 
 ## Chapter 5. RMA Quick Reference
 
-This appendix gives a summary of the operation of the RelocatingMacro Assembler (RMA). This appendix and the example assembly source files supplied with the C compiler should provide the basic information on how to use the “Relocating Macro Assembler” to create Relocatable Object Format files (ROF). It is further assumed that you are familiar with the 6809 instruction set and mnemonics. See the Relocating Macro Assembler manual for a more detailed description. The main function of this appendix is to enable the reader to understand the output produced by RMA, not to fully document it.
+This appendix gives a summary of the operation of the Relocating Macro Assembler (RMA). This appendix and the example assembly source files supplied with the C compiler should provide the basic information on how to use the “Relocating Macro Assembler” to create Relocatable Object Format files (ROF). It is further assumed that you are familiar with the 6809 instruction set and mnemonics. See the Relocating Macro Assembler manual for a more detailed description. The main function of this appendix is to enable the reader to understand the output produced by RMA, not to fully document it.
 
 The Relocating Macro Assembler allows programs to be compiled separately and then linked together, and it also allows macros to be defined within programs.
 
-```text
-Differences between the Relocating Macro Assembler (RMA) and the Microware Inter-
-active Assembler (MIA, often called ASM):
-```
+Differences between the Relocating Macro Assembler (RMA) and the Microware Interactive Assembler (MIA, often called ASM):
 
-RMA does not have an interactive mode. Only a disk file is allowed as input.
-
-RMAoutput is anROFfile. TheROFfilemust be processed by the linker, rlink, to produce an executable OS-9 memory module. The layout of a ROF file is described later.
-
-RMA has a number of new directives to control the placement of code and data in the executable module. Since RMA does not produce memory modules, the MIA directives mod and emod are not present. Instead, new directives psect and vsect control the allocation of code and data areas by the linker.
-
-RMA has no equivalent to the MIA setdp directive. Data (and DP) allocation is handled by the linker.
+- RMA does not have an interactive mode. Only a disk file is allowed as input.
+- RMA output is an ROF file. The ROF file must be processed by the linker, rlink, to produce an executable OS-9 memory module. The layout of a ROF file is described later.
+- RMA has a number of new directives to control the placement of code and data in the executable module. Since RMA does not produce memory modules, the MIA directives mod and emod are not present. Instead, new directives psect and vsect control the allocation of code and data areas by the linker.
+- RMA has no equivalent to the MIA setdp directive. Data (and DP) allocation is handled by the linker.
 
 ### Symbolic Names
 
 A symbolic name is valid if it consists of from one to nine uppercase or lowercase characters, decimal digits or the characters $, _, ., or @. RMA does not fold lowercase letters to uppercase. The names Hi.you and HI.YOU are distinct names.
 
-Label field If a symbolic name in the label field of a source statement is followed by a : (colon), the name will be known globally (by all modules linked together). If no colon appears, the name will be known only in the PSECT in which it was defined. PSECT will be described later.
+### Label field
 
-Undefined names If a symbolic name is used in an expression without first being defined, RMA assumes the name is defined external to the PSECT. RMA will record information about the reference, so the linker can adjust the operand accordingly. External names cannot appear in operand expressions for assembler directives.
+If a symbolic name in the label field of a source statement is followed by a : (colon), the name will be known globally (by all modules linked together). If no colon appears, the name will be known only in the PSECT in which it was defined. PSECT will be described later.
 
-**Listing format**
+### Undefined names
+
+If a symbolic name is used in an expression without first being defined, RMA assumes the name is defined external to the PSECT. RMA will record information about the reference, so the linker can adjust the operand accordingly. External names cannot appear in operand expressions for assembler directives.
+
+### Listing format
 
 ```text
-00098 0032 59 + rolb
-00117 0045=17ffb8 label lbsr _dmove Comment
-^ ^ ^^ ^ ^ ^ ^ ^
-| | || | | | | Start of comment
-| | || | | | Start of operand
-| | || | | Start of mnemonic
-| | || | Start of label
-| | || A "+" indicates a line generated by a macro
-| | || expansion.
-| | |Start of object code bytes.
-| | An "=" here indicates that the operand contains an
-| | external reference.
-| Location counter value
+00098 0032 59       +       rolb
+00117 0045=17ffb8     label lbsr    _dmove  Comment
+^     ^   ^^        ^ ^     ^       ^       ^
+|     |   ||        | |     |       |       Start of comment
+|     |   ||        | |     |       Start of operand
+|     |   ||        | |     Start of mnemonic
+|     |   ||        | Start of label
+|     |   ||        A "+" indicates a line generated by a macro
+|     |   ||        expansion.
+|     |   |Start of object code bytes.
+|     |   An "=" here indicates that the operand contains an
+|     |   external reference.
+|     Location counter value
 Line number.
 ```
 
@@ -1549,13 +1476,11 @@ Line number.
 
 The RMA supports three types of section:
 
-A PSECT, or program section, describes a relatively complete program unit; whether a complete program or a subroutine, a single PSECT contains the program code and any data internal to that program unit.
+**A PSECT**, or program section, describes a relatively complete program unit; whether a complete program or a subroutine, a single PSECT contains the program code and any data internal to that program unit.
 
-A VSECT, or variable section, is declared within a PSECT and written to the ROF object defined by that PSECT, describes the data local to the containing program section. When bundled into a program module, all linked VSECTs are given storage in the program’s data area. If a VSECT’s variable data must have initial values other than
+**A VSECT**, or variable section, is declared within a PSECT and written to the ROF object defined by that PSECT, describes the data local to the containing program section. When bundled into a program module, all linked VSECTs are given storage in the program’s data area. If a VSECT’s variable data must have initial values other than zero, that initial data must be copied into its final location from somewhere in the program module, so it takes up memory twice.
 
-zero, that initial data must be copied into its final location from somewhere in the program module, so it takes up memory twice.
-
-A CSECT, or constant section, declares a series of zero or more symbolic names along with corresponding values. CSECTs never generate storage in the program module, they only provide symbolic names for values.
+**A CSECT**, or constant section, declares a series of zero or more symbolic names along with corresponding values. CSECTs never generate storage in the program module, they only provide symbolic names for values.
 
 Section Location Counters Each section contains the following location counters:
 
@@ -1565,99 +1490,134 @@ VSECT initialized direct page location counter non-initialized direct page locat
 
 CSECT base offset counter
 
-Section Directives RMA supports three types of sections. The psect directive indicates the beginning of a new ROF object; it initializes the instruction and data location counters, and assembles code into the ROF object code area. The vsect directive causes RMA to change to the data location counters and place any generated code into the appropriate ROF data area. The csect directive initializes a base value for assigning offsets to symbols. The end of these sections is indicated by using the endsect directive. Also, if you wish, endsect may be shortened to ends.
+#### Section Directives
+
+RMA supports three types of sections. The psect directive indicates the beginning of a new ROF object; it initializes the instruction and data location counters, and assembles code into the ROF object code area. The vsect directive causes RMA to change to the data location counters and place any generated code into the appropriate ROF data area. The csect directive initializes a base value for assigning offsets to symbols. The end of these sections is indicated by using the endsect directive. Also, if you wish, endsect may be shortened to ends.
 
 The source statements placed in a particular section cause the linker to perform a function appropriate for the statement. Therefore, the mnemonics allowed within a section are restricted as follows:
 
-• These mnemonics are allowed inside or outside any section: nam opt ttl pag spc use fail rept endr ifeq ifne iflt ifle ifge ifgt ifp1 endc equ set macro endm csect endsect
+- These mnemonics are allowed inside or outside any section: `nam opt ttl pag spc use fail rept endr ifeq ifne iflt ifle ifge ifgt ifp1 endc equ set macro endm csect endsect`
+- Within a CSECT: `rmb`
+- Within a PSECT: any 6809 instruction mnemonic `fcc fdb fcs fcb rzb vsect endsect os9 end`
+- Within a VSECT: `rmb fcc fdb fcs fcb rzb endsect`
 
-• Within a CSECT: rmb
-
-• Within a PSECT: any 6809 instruction mnemonic fcc fdb fcs fcb rzb vsect endsect os9 end
-
-• Within a VSECT: rmb fcc fdb fcs fcb rzb endsect
-
-PSECT Directive
+#### PSECT Directive
 
 The main difference between PSECT and MOD is that MOD sets up information for OS-9 and PSECT sets up information for the linker, rlink.
 
-PSECT { name,typelang,attrrev,edition,stacksize,entrypoint }
+`PSECT { name,typelang,attrrev,edition,stacksize,entrypoint }`
 
-name Up to 20 bytes (any printable character except space or comma); a name to be used by the linker to identify this PSECT. This name need not be distinct from all other PSECTs linked together, but it helps to identify PSECTs the linker has a problem with if the names are different.
-
-typelang byte expression for the executable module type/language byte. If this PSECT is not a “mainline” (a module that has been designed to be forked to) module, this byte must be zero.
-
-attrrev byte expression for executable module attribute/revision byte. edition byte expression for executable module edition byte. stacksize word expression estimating the amount of stack storage required by this
-
-psect. The linker totals this value in all PSECTs to appear in the executable module and adds this value to any data storage requirement for the entire program.
-
-entrypoint word expression entrypoint offset for this PSECT. If the PSECT is not a mainline odule, this should be set to zero.
+| | |
+|-|-|
+| name | Up to 20 bytes (any printable character except space or comma); a name to be used by the linker to identify this PSECT. This name need not be distinct from all other PSECTs linked together, but it helps to identify PSECTs the linker has a problem with if the names are different. |
+| typelang | byte expression for the executable module type/language byte. If this PSECT is not a “mainline” (a module that has been designed to be forked to) module, this byte must be zero. |
+| attrrev | byte expression for executable module attribute/revision byte.
+| edition | byte expression for executable module edition byte. |
+| stacksize | word expression estimating the amount of stack storage required by this psect. The linker totals this value in all PSECTs to appear in the executable module and adds this value to any data storage requirement for the entire program. |
+| entrypoint | word expression entrypoint offset for this PSECT. If the PSECT is not a mainline odule, this should be set to zero. |
 
 PSECT must have either no operand list or an operand list containing a name and five expressions. If no operand list is provided, the PSECT name defaults to ”program” and all other expressions to zero. The can only be one PSECT per assembly language file.
 
 The PSECT directive initializes all counter orgs andmarks the start of the programmodule. NoVSECTdata reservations or object codemay appear before or after the PSECT/ENDSECT block.
 
-Example: psect myprog,Prgrm+Objct,Reent+1,Edit,0,progent psect another_prog,0,0,0,0,0
+Example: 
 
-VSECT Directive
-
-```text
-VSECT {DP}
-The VSECT directive causes RMA to change to the data location counters. If DP ap-
+```asm
+psect myprog,Prgrm+Objct,Reent+1,Edit,0,progent
+psect another_prog,0,0,0,0,0
 ```
 
-pears after VSECT, the direct page counters are used, otherwise the non-direct page data is used. The RMB directive within this section reserves the specified number of bytes in the appropiate uninitialized data section. The fcc, fdb, fcs, fcb and rzb (reserve zeroed bytes) directives place data into the appropiate initialized data section. If an operand for fdb or fcb contains an external reference, this information is placed in the external reference part of
+#### VSECT Directive
 
-the ROF to be adjusted at link or execution time. ENDSECT marks the end of the VSECT block. Any number of VSECT blocks can appear within a PSECT. Note, however, that the data location counters maintain their values between one VSECT block and the next. Since the linker handles the actual data allocation, there is no facility provided to adjust the data location counters.
+`VSECT {DP}`
 
-CSECT Directive
+The VSECT directive causes RMA to change to the data location counters. If DP appears after VSECT, the direct page counters are used, otherwise the non-direct page data is used. The RMB directive within this section reserves the specified number of bytes in the appropiate uninitialized data section. The fcc, fdb, fcs, fcb and rzb (reserve zeroed bytes) directives place data into the appropiate initialized data section. If an operand for fdb or fcb contains an external reference, this information is placed in the external reference part of the ROF to be adjusted at link or execution time. ENDSECT marks the end of the VSECT block. Any number of VSECT blocks can appear within a PSECT. Note, however, that the data location counters maintain their values between one VSECT block and the next. Since the linker handles the actual data allocation, there is no facility provided to adjust the data location counters.
 
-```text
-CSECT {expression}
-TheCSECTdirective provides ameans for assigning consecutive offsets to labels without
-```
+#### CSECT Directive
 
-resorting to EQUs. If the expression is present, the CSECT base counter is set to that value, otherwise it is set to zero.
+`CSECT {expression}`
 
-RZB statement
+The CSECT directive provides ameans for assigning consecutive offsets to labels without resorting to EQUs. If the expression is present, the CSECT base counter is set to that value, otherwise it is set to zero.
 
-RZB expression The reserve zeroed bytes pseudo-instruction generates sequences of zero bytes in the
+#### RZB statement
 
-code or initialized data sections, the number of which is specified by the expression.
+`RZB expression`
+
+The reserve zeroed bytes pseudo-instruction generates sequences of zero bytes in the code or initialized data sections, the number of which is specified by the expression.
 
 ### Comparison Between ASM and the RMA
 
-The following two program examples simply fork a Basic09. The purpose of the examples are to show some of the differences in the new relocating assembler. The differences are apparent. * this program forks a basic09
+The following two program examples simply fork a Basic09. The purpose of the examples are to show some of the differences in the new relocating assembler. The differences are apparent. 
 
-ifp1 use ..../defs/os9defs.a endc
+```asm
+* this program forks a basic09
 
-Prgrm equ $10 Objct equ $01
+        ifp1
+        use ..../defs/os9defs.a
+        endc
 
-stk equ 200 psect rmatest,$11,$81,0,stk,entry
+Prgrm   equ     $10
+Objct   equ     $01
 
-name fcs /basic09/ prm fcb $D prmsize equ *-prm
+stk     equ 200
+        psect   rmatest,$11,$81,0,stk,entry
 
-entry leax name,pcr leau prm,pcr
+name    fcs     /basic09/
+prm     fcb     $D
+prmsize equ     *-prm
 
-ldy #prmsize lda #Prgrm+Objct clrb os9 F$Fork os9 F$Wait os9 F$Exit endsect
+entry   leax    name,pcr
+        leau    prm,pcr
+        ldy     #prmsize
+        lda     #Prgrm+Objct
+        clrb
+        os9     F$Fork
+        os9     F$Wait
+        os9     F$Exit
+        endsect
+```
 
-Macro Interactive Assembler Source
+#### Macro Interactive Assembler Source
 
-ifp1 use defsfile endc
+```asm
+        ifp1
+        use defsfile
+        endc
 
-mod siz,prnam,type,revs,start,size prnam fcs /testshell/ type set Prgm+Objct revs set ReEnt+1
+        mod     siz,prnam,type,revs,start,size
+prnam   fcs     /testshell/
+type    set     Prgm+Objct
+revs    set     ReEnt+1
 
-rmb 250 rmb 200
+        rmb     250
+        rmb     200
+name    fcs     /basic09/
+prm     fcb     $D
+prmsize equ     *-prm
+size    equ     .
+start   equ     *
+        leax    name,pcr
+        leau    prm,pcr
+        ldy     #prmsize
+        lda     #Prgrm+Objct
+        clrb
+        os9     F$Fork
+        os9     F$Wait
+        os9     F$Exit
+        emod
+siz     equ     .
+```
 
-name fcs /basic09/ prm fcb $D prmsize equ *-prm size equ . start equ *
+### Introduction to Macros
 
-leax name,pcr leau prm,pcr ldy #prmsize lda #Prgrm+Objct clrb os9 F$Fork os9 F$Wait os9 F$Exit emod
+In programming applications it is frequently necessary to use a repeated sequence or pattern of instructions in many different places in a program. For example, suppose a group of program statements creates a file a number of times throughout the program. The code might look like the following statements:
 
-siz equ .
-
-Introduction toMacros In programming applications it is frequently necessary to use a repeated sequence or pattern of instructions in many different places in a program. For example, suppose a group of
-
-program statements creates a file a number of times throughout the program. The code might look like the following statements: leax name,pcr lda #$02 ldb #$03 os9 I$Create
+```asm
+leax    name,pcr
+lda     #$02
+ldb     #$03
+os9     I$Create
+```
 
 The sequence must be replicated each time that a new file is created. A macro assembler eliminates the need for coding duplicate statement patterns by allowing the programmer to define macro instructions that are equivalent to longer code sequences.
 
@@ -1665,368 +1625,347 @@ When a macro is called, it is the same as calling a subroutine to perform a defi
 
 ### Operations
 
-Macro Definition A macro definition consists of three sections: label MACRO * header: assigns the name 'label' to the macro
+#### Macro Definition 
 
-```text
-... * body: contains the macro statements
-ENDM * terminator: ends the macro
+A macro definition consists of three sections:
+
+```asm
+label   MACRO   * header: assigns the name 'label' to the macro
+        ...     * body: contains the macro statements
+        ENDM    * terminator: ends the macro
 ```
 
 A macro can have up to nine arguments (\1 to \9) in the operand fields. Arguments may be used to refer to any symbol, register, etc. that are useful to modify in a snippet of assembly code.
 
-The following macro could represent the file creation pattern: CREATE MACRO
+The following macro could represent the file creation pattern: 
 
-leax \1,pcr lda #$\2 ldb #$\3 os9 I$Create ENDM
-
-Calls can bemade to create files with different names, accessmodes, and attributes as follows: CREATE name2,02,03 CREATE name3,01,02
-
-The above macro calls will produce the following inline code: leax name2,pcr lda #$02
-
-```text
-ldb #$03
-os9 I$Create
+```asm
+CREATE  MACRO
+        leax \1,pcr
+        lda #$\2
+        ldb #$\3
+        os9 I$Create
+        ENDM
 ```
 
-```text
-leax name3,pcr
-lda #$01
-ldb #$02
-os9 I$Create
+Calls can bemade to create files with different names, accessmodes, and attributes as follows:
+
+```asm
+CREATE  name2,02,03
+CREATE  name3,01,02
 ```
 
-```text
-If an argument has multiple parts — for example if 0,s is to be passed to the macro
-called frud — it must be passed in double quotes. For example:
+The above macro calls will produce the following inline code: 
+
+```asm
+    leax    name2,pcr
+    lda     #$02
+    ldb     #$03
+    os9     I$Create
+
+    leax    name3,pcr
+    lda     #$01
+    ldb     #$02
+    os9     I$Create
 ```
 
-frud "0,s","2,s"
+If an argument has multiple parts — for example if 0,s is to be passed to the macro called frud — it must be passed in double quotes. For example:
+
+`frud "0,s","2,s"`
 
 If frud looks like the following macro:
 
-frud MACRO \@ leau \1
-
-ldd \2 beq \@ ENDM
+```asm
+frud    MACRO
+\@      leau    \1
+        ldd     \2 
+        beq     \@ 
+        ENDM
+```
 
 The previous call to frud would expand the macro as follows:
 
-@xxx leau 0,s ldd 2,s beq @xxx
+```asm
+@xxx    leau    0,s
+        ldd     2,s
+        beq     @xxx
+```
 
-Where \@ is a label, and xxx would be replaced by a three digit number. An argument may be declared empty by leaving it blank when called. For example, if a
+Where \@ is a label, and xxx would be replaced by a three digit number.
 
-macro instruction is defined to be ldd \1ZZ\2, then calling the macro with the arguments AA,BB will cause the assembler to expand the instruction to ldd AAZZBB, and calling the same macro with the argument list ,BB will expand it to ldd ZZBB – the \1 part is empty.
+An argument may be declared empty by leaving it blank when called. For example, if a macro instruction is defined to be ldd \1ZZ\2, then calling the macro with the arguments AA,BB will cause the assembler to expand the instruction to ldd AAZZBB, and calling the same macro with the argument list ,BB will expand it to ldd ZZBB – the \1 part is empty.
 
-NestedMacro Calls Macro calls may be nested — that is, the body of a macro definition may itself contain a call to another macro. For example, the macro prepw could be defined as follows:
+#### Nested Macro Calls
 
-prepw MACRO lda \1 getw ENDM
+Macro calls may be nested — that is, the body of a macro definition may itself contain a call to another macro. For example, the macro prepw could be defined as follows:
+
+```asm
+prepw   MACRO
+        lda     \1
+        getw
+        ENDM
+```
 
 where getw is a macro call. The code for getw will be substituted in-line at expansion time. However, take note that the definition of a new macro within another is not permitted. Macro calls may be nested up to eight levels deep.
 
-Labels Sometimes it is necessary to use labels within a macro. Labels are specified by \@. Each time the macro is called, a unique label will be generated to avoid multiple definition errors. Within the expanded code, \@ will be replaced with a symbol of the form @xxx, where xxx is a decimal number between 000 and 999.
+#### Labels
+
+Sometimes it is necessary to use labels within a macro. Labels are specified by \@. Each time the macro is called, a unique label will be generated to avoid multiple definition errors. Within the expanded code, \@ will be replaced with a symbol of the form @xxx, where xxx is a decimal number between 000 and 999.
 
 More than one label may be specified in a macro by the addition of an extra character(s). For example, if two different labels are required in a macro, they can be specified by \@A and \@B. The first time the macro is expanded, the labels would be @001A and @001B, and for the second expansion they would be @002A and @002B. The extra characters may be appended before the \ or after the @.
 
-Additional Pseudo-Instructions \n will return the number of arguments passed to the macro.
+#### Additional Pseudo-Instructions
 
-\L<num> will return the length of the <num>th argument that is specified by <num>.
-
-FAIL Causes an error to be generated.
-
-REPT <num> will repeat an instruction or group of instructions <num> times. ENDR terminates REPT.
-
-Appendices
+| | |
+|-|-|
+| \n | will return the number of arguments passed to the macro. |
+| \L<num> | will return the length of the <num>th argument that is specified by <num>. |
+| FAIL | Causes an error to be generated. |
+| REPT <num> | will repeat an instruction or group of instructions <num> times. ENDR terminates REPT. |
 
 ## Appendix A. Compiler Error Messages
 
-Below is a list of the errormessages that theC compiler generates, and, if applicable, probable causes and K & R Appendix A section number (in parenthesis) to see for more specific information.
+Below is a list of the error messages that the C compiler generates, and, if applicable, probable causes and K & R Appendix A section number (in parenthesis) to see for more specific information.
 
-already a local variable Variable has already been declared at the current block level. (Section C.8.1, Section C.9.2)
+**already a local variable** Variable has already been declared at the current block level. (Section C.8.1, Section C.9.2)
 
-```text
-argument : <text> Error from preprocessor. Self-explanatory. The most common cause of
+**argument : \<text>** Error from preprocessor. Self-explanatory. The most common cause of
 this error is not being able to find an #included file.
-```
 
-argument error Function argument declared as type struct, union or a function. Pointers to such types, however are allowed. (Section C.10.1)
+**argument error** Function argument declared as type struct, union or a function. Pointers to such types, however are allowed. (Section C.10.1)
 
-argument storage Function arguments may only be declared as storage class register. (Section C.10.1)
+**argument storage** Function arguments may only be declared as storage class register. (Section C.10.1)
 
-bad character A character not in the C character set (probably a control character) was encountered in the source file.
+**bad character** A character not in the C character set (probably a control character) was encountered in the source file.
 
-both must be integral >> and << operands cannot be float or double. (Section C.7.5)
+**both must be integral** >> and << operands cannot be float or double. (Section C.7.5)
 
-```text
-break error The break statement is allowed only inside a while, do, for, or switch block.
-(Section C.9.8)
-```
+**break error** The break statement is allowed only inside a while, do, for, or switch block. (Section C.9.8)
 
-can’t take address & operator not allowed in a register variable. Operand must otherwise be an lvalue. (Section C.7.2)
+**can’t take address** & operator not allowed in a register variable. Operand must otherwise be an lvalue. (Section C.7.2)
 
-cannot cast Type result of cast cannot be a function or an array. (Section C.7.2, Section C.8.7)
+**cannot cast** Type result of cast cannot be a function or an array. (Section C.7.2, Section C.8.7)
 
-cannot evaluate size Could not determine size from declaration or initializer. (Section C.8.6, Section C.14.3)
+**cannot evaluate size** Could not determine size from declaration or initializer. (Section C.8.6, Section C.14.3)
 
-cannot initialize Storage class or type does not allow variable to be initialized. (Section C.8.6)
+**cannot initialize** Storage class or type does not allow variable to be initialized. (Section C.8.6)
 
-compiler trouble Compiler detected something it couldn’t handle. Try compiling the program again. If this error still occurs, contact the developers.
+**compiler trouble** Compiler detected something it couldn’t handle. Try compiling the program again. If this error still occurs, contact the developers.
 
-condition needed while, do, for, switch, and if statements require a condition expression. (Section C.9.3)
+**condition needed** while, do, for, switch, and if statements require a condition expression. (Section C.9.3)
 
-constant expression required Initializer expressions for static or extern variables cannot reference variables. They may, however, refer to the address of a previously declared variable. This installation allows no initializer expressions unless all operands are of type int or char (Section C.8.6)
+**constant expression required** Initializer expressions for static or extern variables cannot reference variables. They may, however, refer to the address of a previously declared variable. This installation allows no initializer expressions unless all operands are of type int or char (Section C.8.6)
 
-```text
-constant overflow Input numeric constant was too large for the implied or explicit type.
-(Section C.2.6, [PDP-11])
-```
+**constant overflow** Input numeric constant was too large for the implied or explicit type. (Section C.2.6, [PDP-11])
 
-constant required Variables are not allowed for array dimensions or cases. (Section C.8.3, Section C.8.7, Section C.9.7)
+**constant required** Variables are not allowed for array dimensions or cases. (Section C.8.3, Section C.8.7, Section C.9.7)
 
-```text
-continue error The continue statement is allowed only inside a while, do, or for block.
-(Section C.9.9)
-```
+**continue error** The continue statement is allowed only inside a while, do, or for block. (Section C.9.9)
 
-declaration mismatch This declaration conflicts with a previous one. This is typically caused by declaring a function to return a non-integer type after a reference has been made to the function. Depending on the line structure of the declaration block, this error may be reported on the line following the erroneous declaration. (Section C.11, Section C.11.1, Section C.11.2)
+**declaration mismatch** This declaration conflicts with a previous one. This is typically caused by declaring a function to return a non-integer type after a reference has been made to the function. Depending on the line structure of the declaration block, this error may be reported on the line following the erroneous declaration. (Section C.11, Section C.11.1, Section C.11.2)
 
-divide by zero Divide by zero occurred when evaluating a constant expression.
+**divide by zero** Divide by zero occurred when evaluating a constant expression.
 
-```text
-? expected ? is any character that was expected to appear here. Missing semicolons or
-braces cause this error.
-```
+**? expected** ? is any character that was expected to appear here. Missing semicolons or braces cause this error.
 
-expression missing An expression is required here.
+**expression missing** An expression is required here.
 
-function header missing Statement or expression encountered outside a function. Typically caused by mismatched braces. (Section C.10.1)
+**function header missing** Statement or expression encountered outside a function. Typically caused by mismatched braces. (Section C.10.1)
 
-function type error A function cannot be declared as returning an array, function, struct, or union. (Section C.8.4, Section C.10.1)
+**function type error** A function cannot be declared as returning an array, function, struct, or union. (Section C.8.4, Section C.10.1)
 
-function unfinished End-of-file encountered before the end of function definition. (Section C.10.1)
+**function unfinished** End-of-file encountered before the end of function definition. (Section C.10.1)
 
-identifier missing Identifier name required here but none was found.
+**identifier missing** Identifier name required here but none was found.
 
-illegal declaration Declarations are allowed only at the beginning of a block. (Section C.9.2)
+**illegal declaration** Declarations are allowed only at the beginning of a block. (Section C.9.2)
 
-label required Label name required on goto statement. (Section C.9.11)
+**label required** Label name required on goto statement. (Section C.9.11)
 
-label undefined goto to a label not defined in the current function. (Section C.9.12)
+**label undefined** goto to a label not defined in the current function. (Section C.9.12)
 
-lvalue required Left side of assignment must be able to be “stored into”. Array names, functions, structs, etc. are not lvalues. (Section C.7.1)
+**lvalue required** Left side of assignment must be able to be “stored into”. Array names, functions, structs, etc. are not lvalues. (Section C.7.1)
 
-multiple defaults Only one default statement is allowed in a switch block. (SectionC.9.7)
+**multiple defaults** Only one default statement is allowed in a switch block. (SectionC.9.7)
 
-multiple definition Identifier name was declared more than once at the same block level (Section C.9.2, Section C.11.1)
+**multiple definition** Identifier name was declared more than once at the same block level (Section C.9.2, Section C.11.1)
 
-must be integral Type of object required here must be type int, char, or a pointer type.
+**must be integral** Type of object required here must be type int, char, or a pointer type.
 
-name clash struct/unionmember and tag namesmust bemutually distinct. (Section C.8.5)
+**name clash** struct/unionmember and tag namesmust bemutually distinct. (Section C.8.5)
 
-name in cast Identifier name found in a cast. Only types are allowed. (Section C.7.2, Section C.8.7)
+**name in cast** Identifier name found in a cast. Only types are allowed. (Section C.7.2, Section C.8.7)
 
-named twice Names in a function parameter list may appear only once. (Section C.10.1)
+**named twice** Names in a function parameter list may appear only once. (Section C.10.1)
 
-no ’if ’ for ’else’ An else statement was encountered with no matching if. This is typically caused by extra or missing braces and/or semicolons. (Section C.9.3)
+**no ’if ’ for ’else’** An else statement was encountered with no matching if. This is typically caused by extra or missing braces and/or semicolons. (Section C.9.3)
 
-no switch statement A case statement may appear only within a switch block. (Section C.9.7)
+**no switch statement** A case statement may appear only within a switch block. (Section C.9.7)
 
-not a function Primary in expression is not type “function returning ….” If this is really a function call, the function name was declared differently elsewhere. (Section C.7.1)
+**not a function** Primary in expression is not type “function returning ….” If this is really a function call, the function name was declared differently elsewhere. (Section C.7.1)
 
-not an argument Name does not appear in the function parameter list. (Section C.10.1)
+**not an argument** Name does not appear in the function parameter list. (Section C.10.1)
 
-operand expected Unary operators require one operand, binary operators two. This is typically caused by misplaced parenthesis, casts or operators. (Section C.7.1)
+**operand expected** Unary operators require one operand, binary operators two. This is typically caused by misplaced parenthesis, casts or operators. (Section C.7.1)
 
-out of memory Compiler dynamic memory overflow. The compiler requires dynamic memory for symbol table entries, block-level declarations and code generation. Three major factors affect this memory usage. Permanent declarations — those appearing on the outer block level (used in #include files) — must be reserved from dynamic memory for the duration of the compilation of the file. Each { causes the compiler to perform a block-level recursion which may involve “pushing down” previous declarations which consume memory. auto class initializers require saving expression trees until past the declarations, whichmay be verymemory-expensive if they exist. Avoiding excessive declarations, both permanent and inside compound statement blocks, conserves memory. If this error occurs on an auto initializer, try initializing the value in the code body.
+**out of memory** Compiler dynamic memory overflow. The compiler requires dynamic memory for symbol table entries, block-level declarations and code generation. Three major factors affect this memory usage. Permanent declarations — those appearing on the outer block level (used in #include files) — must be reserved from dynamic memory for the duration of the compilation of the file. Each { causes the compiler to perform a block-level recursion which may involve “pushing down” previous declarations which consume memory. auto class initializers require saving expression trees until past the declarations, whichmay be verymemory-expensive if they exist. Avoiding excessive declarations, both permanent and inside compound statement blocks, conserves memory. If this error occurs on an auto initializer, try initializing the value in the code body.
 
-pointer mismatch Pointers refer to different types. Use a case if required. (Section C.7.1)
+**pointer mismatch** Pointers refer to different types. Use a case if required. (Section C.7.1)
 
-```text
-pointer or integer required A pointer (of any type) or integer is required to the left of the
--> operator. (Section C.7.1)
-```
+**pointer or integer required** A pointer (of any type) or integer is required to the left of the -> operator. (Section C.7.1)
 
-pointer required Pointer operand required with unary * operator. (Section C.7.1)
+**pointer required** Pointer operand required with unary * operator. (Section C.7.1)
 
-primary expected Primary expression required here. (Section C.7.1)
+**primary expected** Primary expression required here. (Section C.7.1)
 
-should be NULL Second and third expression of ?: conditional operator cannot be pointers to different types. If both are pointers, they must be of the same type or one of the two must be NULL. (Section C.7.13)
+**should be NULL** Second and third expression of ?: conditional operator cannot be pointers to different types. If both are pointers, they must be of the same type or one of the two must be NULL. (Section C.7.13)
 
-*** Stack Overflow *** Compiler stack has overflowed. The most common cause is very deep block-level nesting, or hundreds of switch cases.
+**Stack Overflow** Compiler stack has overflowed. The most common cause is very deep block-level nesting, or hundreds of switch cases.
 
-storage error register and auto storage classes may only be used within functions. (Section C.8.1)
+**storage error** register and auto storage classes may only be used within functions. (Section C.8.1)
 
-```text
-struct member mismatch Identical member names in two different structures must have
-the same type and offset in both. (Section C.8.5)
-```
+**struct member mismatch** Identical member names in two different structures must have the same type and offset in both. (Section C.8.5)
 
-```text
-struct member required Identifier used with . and -> operators must be a structure mem-
-ber name. (Section C.7.1)
-```
+**struct member required** Identifier used with . and -> operators must be a structure member name. (Section C.7.1)
 
-struct syntax Brace, comma, etc. is missing in a struct declaration. (Section C.8.5)
+**struct syntax** Brace, comma, etc. is missing in a struct declaration. (Section C.8.5)
 
-struct or union inappropiate struct or union cannot be used in the context.
+**struct or union inappropiate** struct or union cannot be used in the context.
 
-syntax error Expression, declaration or statement is incorrectly formed.
+**syntax error** Expression, declaration or statement is incorrectly formed.
 
-third expression missing ? must be followed by a : with expression. This error may be caused by unmatched parentheses or other errors in the expression. (Section C.7.13)
+**third expression missing** ? must be followed by a : with expression. This error may be caused by unmatched parentheses or other errors in the expression. (Section C.7.13)
 
-too long Too many characters provided in a string used to initialize a character array. (Section C.8.6)
+**too long** Too many characters provided in a string used to initialize a character array. (Section C.8.6)
 
-too many brackets Unmatched or unexpected brackets encountered processing an initializer. (Section C.8.6)
+**too many brackets** Unmatched or unexpected brackets encountered processing an initializer. (Section C.8.6)
 
-too many elements Moredata items supplied for aggregate level in initializer thanmembers of the aggregate. (Section C.8.6)
+**too many elements** Moredata items supplied for aggregate level in initializer thanmembers of the aggregate. (Section C.8.6)
 
-type error Compiler type matching error. Should never happen.
+**type error** Compiler type matching error. Should never happen.
 
-type mismatch Types and/or operators in expression do not correspond. (6)
+**type mismatch** Types and/or operators in expression do not correspond. (6)
 
-typedef - not a variable typedef type name cannot be used in this manner. (Section C.8.8)
+**typedef - not a variable** typedef type name cannot be used in this manner. (Section C.8.8)
 
-undeclared variable no declaration exists at any block level for this identifier.
+**undeclared variable** no declaration exists at any block level for this identifier.
 
-undefined structure Union or struct declaration refers to an undefined structure name. (Section C.8.5)
+**undefined structure** Union or struct declaration refers to an undefined structure name. (Section C.8.5)
 
-unions not allowed Cannot initialize union members. (Section C.8.6)
+**unions not allowed** Cannot initialize union members. (Section C.8.6)
 
-unterminated character constant Unmatched ' character delimiter. (Section C.2.4)
+**unterminated character constant** Unmatched ' character delimiter. (Section C.2.4)
 
-unterminated string Unmatched " string delimiter. (Section C.2.5)
+**unterminated string** Unmatched " string delimiter. (Section C.2.5)
 
-while expected No while found for do statement. (Section C.9.5)
+**while expected** No while found for do statement. (Section C.9.5)
 
 ## Appendix B. Compiler Command Lines
 
 This chapter describes the command lines and options for the individual compiler phases. Each phase of the compilermay be executed separately. The following information describes the options available to each phase.
 
-```text
-dcc (Compiler executive)
-dcc [options] file… [options]
-```
+### dcc (Compiler executive)
+
+`dcc [options] file… [options]`
 
 Recognized file suffixes:
 
-.c C source file
-
-.a Assembly language source file
-
-.r Relocatable module format file
+| | |
+|-|-|
+| .c | C source file |
+| .a | Assembly language source file |
+| .r | Relocatable module format file |
 
 Recognized options:
 
--2 Optimize code for (Nitr)OS-9 Level 2. Beware, attempting to run a program compiled using this option is extremely likely to fail, and may even crash the computer!
+| | |
+|-|-|
+| -2 | Optimize code for (Nitr)OS-9 Level 2. Beware, attempting to run a program compiled using this option is extremely likely to fail, and may even crash the computer! |
+| -a | Stop after generating initial assembly (does not optimize or assemble). Leaves output in .a file. |
+| -b=path | Use an alternate “cstart” (program entry point, also known as a mainline) file. |
+| -c | Includes original C source and comments as comments in assembly output. |
+| -dNAME | Is equivalent to #define NAME 1 in the source. |
+| -dNAME=STRING | Is equivalent to #define NAME STRING in the source. |
+| -enum | Edition number num is supplied to dcpp for inclusion in module psects and/or rlink to serve as the edition number of the linked module. |
+| -f=path | Override other output naming. Module name (in object module) is the last name in the path list. |
+| -l=path | Add path as a library for linker to search before the standard library. |
+| -lg | Link with cgfx.l (Tandy Color Computer 3 graphics library) |
+| -ll | Link with lexlib.l, the Lex helper library. |
+| -ls | Link with sys.l, a library that includes definitions for OS-9 system calls, constants, and I$GetStt/I$SetStt codes. |
+| -M | Requests a linkage map from the linker if an executable module is produced. |
+| -m=size | Size in pages (if followed by K, in kilobytes) of additional memory the linker should allocate to object module. |
+| -O | Stop after optimizing assembly code (does not assemble). Leaves output in .a file. |
+| -o | Inhibits assembly code optimizer pass. |
+| -p | Adds profiling calls to C compiler output. |
+| -P | Adds profiling calls to C compiler output, and replaces profiler with debugging version of same by linking with dbg.ldebugging library. |
+| -r | Inhibits the linking step, leaving the output in an .r file. |
+| -S | Requests a symbol table from the linker if an executable module is produced. |
+| -s | Suppress generation of stack-checking code. |
+| -T[=path] | If path given, use path for temporary files. If no path given, disable using a temporary directory for intermediate files. |
+| -dNAME | Is equivalent to #define NAME 1 in the preprocessor. -dNAME=STRING is equivalent to #define NAME STRING. |
+| -n=name | output module name. name is used to override the -f default output name. |
+| -q | Quiet mode. Suppress echo of file names. Standard error sent to c.errors |
 
--a Stop after generating initial assembly (does not optimize or assemble). Leaves output in .a file.
+### dcpp (C macro preprocessor)
 
-```text
--b=path Use an alternate “cstart” (program entry point, also known as a
-mainline) file.
-```
-
--c Includes original C source and comments as comments in assembly output.
-
-```text
--dNAME Is equivalent to #define NAME 1 in the source.
--dNAME=STRING Is equivalent to #define NAME STRING in the source.
--enum Edition number num is supplied to dcpp for inclusion in module psects
-```
-
-```text
-and/or rlink to serve as the edition number of the linked module.
--f=path Override other output naming. Module name (in object module) is the
-```
-
-last name in the path list. -l=path Add path as a library for linker to search before the standard library. -lg Link with cgfx.l (Tandy Color Computer 3 graphics library)
-
--ll Link with lexlib.l, the Lex helper library. -ls Link with sys.l, a library that includes definitions for OS-9 system calls,
-
-constants, and I$GetStt/I$SetStt codes. -M Requests a linkage map from the linker if an executable module is
-
-```text
-produced.
--m=size Size in pages (if followed by K, in kilobytes) of additional memory the
-```
-
-linker should allocate to object module. -O Stop after optimizing assembly code (does not assemble). Leaves output
-
-in .a file. -o Inhibits assembly code optimizer pass. -p Adds profiling calls to C compiler output. -P Adds profiling calls to C compiler output, and replaces profiler with
-
-debugging version of same by linking with dbg.ldebugging library. -r Inhibits the linking step, leaving the output in an .r file. -S Requests a symbol table from the linker if an executable module is
-
-produced. -s Suppress generation of stack-checking code. -T[=path] If path given, use path for temporary files. If no path given, disable
-
-using a temporary directory for intermediate files.
-
-```text
--dNAME Is equivalent to #define NAME 1 in the preprocessor. -dNAME=STRING is
-equivalent to #define NAME STRING.
-```
-
-```text
--n=name output module name. name is used to override the -f default output
-name.
-```
-
--q Quiet mode. Suppress echo of file names. Standard error sent to c.errors
-
-```text
-dcpp (Cmacro preprocessor)
-dcpp [options] path [options]
-```
+`dcpp [options] path [options]`
 
 path is read as input. dcpp causes dco68 to generate psect directive with last element of path list and _c as the psect name. If path is /d0/myprog.c, psect name ismyprog_c. Output is always to stdout.
 
 Recognized options:
 
--a Act as an assembly language preprocessor instead of feeding the C compiler. No special commands intended for the compiler will be output; warnings are emitted as assembly comments; errors are emitted as ␣fail errortext lines. All preprocessor directives work otherwise.
+| | |
+|-|-|
+| -a | Act as an assembly language preprocessor instead of feeding the C compiler. No special commands intended for the compiler will be output; warnings are emitted as assembly comments; errors are emitted as ␣fail errortext lines. All preprocessor directives work otherwise. |
+| -l | Cause dcc68 to copy source lines to assembly output as comments. |
+| -E=n | |
+| -e=n | Use n as psect edition number. |
+| -Dname | Same as described above for dcc. |
 
-```text
--l Cause dcc68 to copy source lines to assembly output as comments.
--E=n
-```
+### dcc68 (Compiler)
 
-```text
--e=n Use n as psect edition number.
--Dname Same as described above for dcc.
-```
+`dcc68 [options] [file] [options]`
 
-```text
-dcc68 (Compiler)
-dcc68 [options] [file] [options]
-```
-
-```text
-If file is not supplied, dco68 will read stdin. Input text need not be dcpp output, but
-no preprocessor directives are recognized (#include, #define, macros etc.). Output assembly
-code is normally to stdout. Error message output is always written to stderr.
-```
+If file is not supplied, dco68 will read stdin. Input text need not be dcpp output, but no preprocessor directives are recognized (#include, #define, macros etc.). Output assembly code is normally to stdout. Error message output is always written to stderr.
 
 Recognized options:
 
--s Suppress generation of stack checking code. -p Generate profile code. -o=path Write assembly output to path.
+| | |
+|-|-|
+| -s | Suppress generation of stack checking code. |
+| -p | Generate profile code. |
+| -o=path | Write assembly output to path. |
 
-```text
-dco68 (Assembly code optimizer)
-dco68 [inpath] [outpath]
-```
+### dco68 (Assembly code optimizer)
+
+`dco68 [inpath] [outpath]`
 
 dco68 reads stdin and writes stdout. inpath must be present if outpath is given. Since c.opt rearranges and changes code, comments and assembler directives may be rearranged.
 
-```text
-rma (Assembler)
-rma file [options]
-```
+### rma (Assembler)
+
+`rma file [options]`
 
 rma reads file as assembly language input. Errors are written to stderr. Options are turned on with one ’-’ and negated with ’--’. To turn listing on use -l. To turn listing off use --l. To turn conditionals off, use --c.
 
 Recognized options:
 
--o=path Write relocatable output to path. Must be a disk file. -l Write listing to stdout. (default off) -c List conditional assembly lines. (default on) -f Formfeed for top of form. (default off) -g List all code bytes generated. (default off) -x Suppress macro expansion listing. (default on) -e Print errors. (default on) -s Print symbol table. (default off) -dn Set lines per page to n. (default 66). -wn Set line width to n. (default 80).
+| | |
+|-|-|
+| -o=path | Write relocatable output to path. Must be a disk file. |
+| -l | Write listing to stdout. (default off) |
+| -c | List conditional assembly lines. (default on) |
+| -f | Formfeed for top of form. (default off) |
+| -g | List all code bytes generated. (default off) |
+| -x | Suppress macro expansion listing. (default on) |
+| -e | Print errors. (default on) |
+| -s | Print symbol table. (default off) |
+| -dn | Set lines per page to n. (default 66). |
+| -wn | Set line width to n. (default 80). |
 
-```text
-rlink (Linker)
-rlink [options] mainline subn... [options]
-```
+### rlink (Linker)
+
+`rlink [options] mainline subn... [options]`
 
 rlink turns rma output into executable form. All input files must contain relocatable object format (ROF) files. mainline specifies the base module from which to resolve external references. A mainline module is indicated by setting the type/lang value in the psect directive to non-zero. No other ROF may contain a mainline psect. The mainline and all subroutine files will appear in the final linked object module whether actually referenced or not.
 
@@ -2034,37 +1973,18 @@ For the C Compiler, cstart.r is the mainline module. It is the mainline module�
 
 Recognized options:
 
-```text
--o=path Linker object output file. Must be a disk file. The last element in path is
-used as the module name unless overridden by -n.
-```
-
-```text
--n=name Use name as object file name.
--l=path Use path as library file. A library file consists of one or more merged
-```
-
-assembly ROF files. Each psect in the file is checked to see if it resolves any unresolved references. If so, the module is included on the final output module, otherwise it is skipped. No mainline psects are allowed in a library file. Library files are searched on the order given on the command line.
-
-```text
--E=n n is used for the edition number in the final output module. 1 is used if
--e=n -e is not present.
-```
-
-size indicates the number of pages (kbytes if size is followed by a K) of additional memory, rlink will allocate to the data area of the final object
-
--M=size module. If no additional memory is given, rlink add up the total data stack requirements found in the psect of the modules in the input modules.
-
--m Prints linkage map indicating base addresses of the psects in the final object module.
-
-```text
--s Prints final addresses assigned to symbols in the final object module.
--b=ept Link C functions to be callable by Basic09. ept is the name of the
-```
-
-function to be transferred to when Basic09 executes the RUN command.
-
--t Allows static data to appear in a Basic09 callable module. It is assumed the C function called and the calling Basic09 program have provided a sufficiently large static storage data area pointed to by the Y register.
+| | |
+|-|-|
+| -o=path | Linker object output file. Must be a disk file. The last element in path is used as the module name unless overridden by -n. |
+| -n=name | Use name as object file name. |
+| -l=path | Use path as library file. A library file consists of one or more merged assembly ROF files. Each psect in the file is checked to see if it resolves any unresolved references. If so, the module is included on the final output module, otherwise it is skipped. No mainline psects are allowed in a library file. Library files are searched on the order given on the command line. |
+| -E=n | n is used for the edition number in the final output module. 1 is used if -e is not present. |
+| -e=n | |
+| -M=size | size indicates the number of pages (kbytes if size is followed by a K) of additional memory, rlink will allocate to the data area of the final object module. If no additional memory is given, rlink add up the total data stack requirements found in the psect of the modules in the input modules. |
+| -m | Prints linkage map indicating base addresses of the psects in the final object module. |
+| -s | Prints final addresses assigned to symbols in the final object module. |
+| -b=ept | Link C functions to be callable by Basic09. ept is the name of the function to be transferred to when Basic09 executes the RUN command. |
+| -t | Allows static data to appear in a Basic09 callable module. It is assumed the C function called and the calling Basic09 program have provided a sufficiently large static storage data area pointed to by the Y register. |
 
 ## Appendix C. C Language Reference Manual
 
@@ -2076,72 +1996,73 @@ This manual describes the C language on the DEC PDP-11, the DEC VAX-11, and the 
 
 There are six classes of tokens - identifiers, keywords, constants, strings, operators, and other separators. Blanks, tabs, newlines, and comments (collectively, “white space”) as described below are ignored except as they serve to separate tokens. Some white space is required to separate otherwise adjacent identifiers, keywords, and constants.
 
-```text
-If the input stream has been parsed into tokens up to a given character, the next token is
-taken to include the longest string of characters which could possibly constitute a token.
-```
+If the input stream has been parsed into tokens up to a given character, the next token is taken to include the longest string of characters which could possibly constitute a token.
 
 #### C.2.1 Comments
 
-```text
-Thecharacters /* introduce a commentwhich terminateswith the characters */. Comments
-do not nest.
-```
+The characters /* introduce a comment which terminates with the characters */. Comments do not nest.
 
 #### C.2.2 Identifiers (Names)
 
 An identifier is a sequence of letters and digits. The first character must be a letter. The underscore (_) counts as a letter. Uppercase and lowercase letters are different. Although there is no limit on the length of a name, only initial characters are significant: at least eight characters of a non-external name, and perhaps fewer for external names. Moreover, some implementationsmay collapse case distinctions for external names. The external name sizes include:
 
-PDP-11 7 characters, 2 cases VAX-11 >100 characters, 2 cases 6809 8 characters, 2 cases
+| | |
+|-|-|
+| PDP-11 | 7 characters, 2 cases |
+| VAX-11 | >100 characters, 2 cases |
+| 6809 | 8 characters, 2 cases |
 
 #### C.2.3 Keywords
 
 The following identifiers are reserved for use as keywords and may not be used otherwise:
 
-```text
-int auto continue
-char extern if
-float register else
-```
+| | | |
+|-|-|-|
+| int | auto | continue |
+| char | extern | if |
+| float | register | else |
+| double | typedef | for |
+| struct | static | do |
+| union | goto | while |
+| long | return | switch |
+| short | sizeof | case |
+| unsigned | break | default |
 
-```text
-double typedef for
-struct static do
-union goto while
-long return switch
-short sizeof case
-```
-
-```text
-unsigned break default
-Some implementations also reserve the words direct, fortran and asm
-```
+Some implementations also reserve the words `direct`, `fortran` and `asm`
 
 #### C.2.4 Constants
 
 There are several kinds of constants. Each has a type; an introduction to types is given under What’s in a name?. Hardware characteristics that affect sizes are summarized in Hardware Characteristics.
 
-Integer Constants
+**Integer Constants**
 
-An integer constant consisting of a sequence of digits is taken to be octal if it begins with 0 (digit zero). An octal constant consists of the digits 0 through 7 only. A sequence of digits preceded by 0x or 0X (digit zero) is taken to be a hexadecimal integer. Thehexadecimal digits include a or A through f or F with values 10 through 15. Otherwise, the integer constant is taken to be decimal. A decimal constant whose value exceeds the largest signed machine integer is taken to be long; an octal or hex constant which exceeds the largest unsigned machine integer is likewise taken to be long.
+An integer constant consisting of a sequence of digits is taken to be octal if it begins with 0 (digit zero). An octal constant consists of the digits 0 through 7 only. A sequence of digits preceded by 0x or 0X (digit zero) is taken to be a hexadecimal integer. The hexadecimal digits include a or A through f or F with values 10 through 15. Otherwise, the integer constant is taken to be decimal. A decimal constant whose value exceeds the largest signed machine integer is taken to be long; an octal or hex constant which exceeds the largest unsigned machine integer is likewise taken to be long.
 
-Explicit Long Constants
+**Explicit Long Constants**
 
 A decimal, octal, or hexadecimal integer constant immediately followed by l (letter ell) or L is a long constant. As discussed below, on some machines integer and long values may be considered identical.
 
-Character Constants
+**Character Constants**
 
-Acharacter constant is a character enclosed in single quotes, as in ’x’. The value of a character constant is the numerical value of the character in the machine’s character set.
+A character constant is a character enclosed in single quotes, as in ’x’. The value of a character constant is the numerical value of the character in the machine’s character set.
 
 Certain nongraphic characters, the single quote (') and the backslash (\), may be represented according to the following table of escape sequences:
 
-newline NL (LF) \n horizontal tab HT \t
-
-vertical tab VT \v backspace BS \b carriage return CR \r form feed FF \f backslash \ \\ single quote ’ \' bit pattern ddd \ddd
+| | | |
+|-|-|-|
+| newline | NL (LF) | \n  |
+| horizontal tab | HT | \t |
+| vertical tab | VT | \v |
+| backspace | BS | \b |
+| carriage return | CR | \r |
+| form feed | FF | \f |
+| backslash  | \ | \\ |
+| single quote  | ’ | \' |
+| bit pattern | ddd |\ddd |
 
 The escape \ddd consists of the backslash followed by 1, 2, or 3 octal digits which are taken to specify the value of the desired character. A special case of this construction is \0 (not followed by a digit), which indicates the character NUL (a character with the value zero). If the character following a backslash is not one of those specified, the behavior is undefined. A new-line character is illegal in a character constant. The type of a character constant is int.
 
-Floating Constants
+**Floating Constants**
 
 A floating constant consists of an integer part, a decimal point, a fraction part, an e or E, and an optionally signed integer exponent. The integer and fraction parts both consist of a sequence of digits. Either the integer part or the fraction part (not both) may be missing. Either the decimal point or the e and the exponent (not both)may bemissing. Every floating constant is taken to be double-precision.
 
@@ -2153,33 +2074,27 @@ A backslash \ immediately followed by a newline are both ignored. All strings, e
 
 #### C.2.6 Hardware Characteristics
 
-FigureC.1 on the next page summarizes certain hardware properties that vary frommachine to machine.
+Figure C.1 on the next page summarizes certain hardware properties that vary frommachine to machine.
 
 ### C.3 Syntax Notation
 
 Syntactic categories are indicated by italic type, and literal words and characters in bold typewriter type. Alternative categories are listed on separate lines. An optional terminal or nonterminal symbol is indicated by the subscript “opt,” so that
 
-DEC PDP-11 DEC VAX-11 6809 character set (ASCII) (ASCII) (ASCII)
-
-```text
-char 8 bits 8 bits 8 bits
-int 16 32 16
-```
-
-```text
-short 16 16 16
-long 32 32 32
-float 32 32 32
-double 64 64 64
-```
-
-float range 10±38 10±38 10±38
-
-double range 10±38 10±38 10±38
+| Type | DEC PDP-11 | DEC VAX-11 | 6809 |
+|-:|-|-|-|
+| *character set* | *(ASCII)* | *(ASCII)* | *(ASCII)* |
+| **char** | 8 bits | 8 bits | 8 bits |
+| **int** | 16 | 32 | 16 |
+| **short** | 16 | 16 | 16 |
+| **long** | 32 | 32 | 32 |
+| **float** | 32 | 32 | 32 |
+| **double** | 64 | 64 | 64 |
+| **float** range | 10±38 | 10±38 | 10±38 |
+| **double** range | 10±38 | 10±38 | 10±38 |
 
 **Figure C.1: Hardware Comparison**
 
-{ expressionopt }
+{ expression<sub>opt</sub> }
 
 indicates an optional expression enclosed in braces. The syntax is summarized in Syntax Summary.
 
@@ -2189,9 +2104,9 @@ C bases the interpretation of an identifier upon two attributes of the identifie
 
 There are four declarable storage classes: automatic, static, external, and register. Automatic variables are local to each invocation of a block (see Compound Statement (Block)) and are discarded upon exit from the block. Static variables are local to a block but retain their values upon reentry to a block even after control has left the block. External variables exist and retain their values throughout the execution of the entire program and may be used for communication between functions, even separately compiled functions. Register variables are (if possible) stored in the fast registers of the machine; like automatic variables, they are local to each block and disappear on exit from the block.
 
-C supports several fundamental types of objects: Objects declared as characters (char) are large enough to store any member of the im-
+C supports several fundamental types of objects:
 
-plementation’s character set, and if a genuine character from that character set is stored in a char variable, its value is equivalent to the integer code for that character. Other quantities may be stored into character variables, but the implementation is machine dependent.
+Objects declared as characters (char) are large enough to store any member of the implementation’s character set, and if a genuine character from that character set is stored in a char variable, its value is equivalent to the integer code for that character. Other quantities may be stored into character variables, but the implementation is machine dependent.
 
 Up to three sizes of integer, declared short int, int, and long int, are available. Longer integers provide no less storage than shorter ones, but the implementation may make either short integers or long integers, or both, equivalent to plain integers. “Plain” integers have the natural size suggested by the host machine architecture. The other sizes are provided to meet special needs.
 
@@ -2203,15 +2118,11 @@ Because objects of the foregoing types can usefully be interpreted as numbers, t
 
 Besides the fundamental arithmetic types, there is a conceptually infinite class of derived types constructed from the fundamental types in the following ways:
 
-• arrays of objects of most types
-
-• functions which return objects of a given type
-
-• pointers to objects of a given type
-
-• structures containing a sequence of objects of various types
-
-• unions capable of containing any one of several objects of various types.
+- arrays of objects of most types
+- functions which return objects of a given type
+- pointers to objects of a given type
+- structures containing a sequence of objects of various types
+- unions capable of containing any one of several objects of various types.
 
 In general these methods of constructing objects can be applied recursively.
 
@@ -2243,12 +2154,7 @@ Conversions of integral values to floating type are well behaved. Some loss of a
 
 #### C.6.4 Pointers and Integers
 
-```text
-An expression of integral type may be added to or subtracted from a pointer; in such a case,
-the first is converted as specified in the discussion of the addition operator. Two pointers to
-objects of the same type may be subtracted; in this case, the result is converted to an integer
-as specified in the discussion of the subtraction operator.
-```
+An expression of integral type may be added to or subtracted from a pointer; in such a case, the first is converted as specified in the discussion of the addition operator. Two pointers to objects of the same type may be subtracted; in this case, the result is converted to an integer as specified in the discussion of the subtraction operator.
 
 #### C.6.5 Unsigned
 
@@ -2258,24 +2164,15 @@ When an unsigned short integer is converted to long, the value of the result is 
 
 #### C.6.6 Arithmetic Conversions
 
-Agreatmany operators cause conversions and yield result types in a similarway. This pattern will be called the “usual arithmetic conversions.”
+A great many operators cause conversions and yield result types in a similarway. This pattern will be called the “usual arithmetic conversions.”
 
-a. First, any operands of type char or short are converted to int, and any operands of type unsigned char or unsigned short are converted to unsigned int.
-
-b. Then, if either operand is double, the other is converted to double and that is the type of the result.
-
-```text
-c. Otherwise, if either operand is unsigned long, the other is converted to unsigned
-long and that is the type of the result.
-```
-
-d. Otherwise, if either operand is long, the other is converted to long and that is the type of the result.
-
-e. Otherwise, if one operand is long, and the other is unsigned int, they are both converted to unsigned long and that is the type of the result.
-
-f. Otherwise, if either operand is unsigned, the other is converted to unsigned and that is the type of the result.
-
-g. Otherwise, both operands must be int, and that is the type of the result.
+1. First, any operands of type char or short are converted to int, and any operands of type unsigned char or unsigned short are converted to unsigned int.
+2. Then, if either operand is double, the other is converted to double and that is the type of the result.
+3. Otherwise, if either operand is unsigned long, the other is converted to unsigned long and that is the type of the result.
+4. Otherwise, if either operand is long, the other is converted to long and that is the type of the result.
+5. Otherwise, if one operand is long, and the other is unsigned int, they are both converted to unsigned long and that is the type of the result.
+6. Otherwise, if either operand is unsigned, the other is converted to unsigned and that is the type of the result.
+7. Otherwise, both operands must be int, and that is the type of the result.
 
 ### C.7 Expressions
 
@@ -2289,9 +2186,20 @@ The handling of overflow and divide check in expression evaluation is undefined.
 
 Primary expressions involving ., ->, subscripting, and function calls group left to right.
 
-primary−expression: identifier constant string ( expression ) primary−expression [ expression ] primary−expression ( expression−listopt ) primary−expression . identifier primary−expression -> identifier
+```
+primary−expression:
+        identifier
+        constant
+        string
+        ( expression )
+        primary−expression [ expression ]
+        primary−expression ( expression−listopt ) primary−expression . identifier
+        primary−expression -> identifier
 
-expression−list: expression expression−list , expression
+expression−list: 
+        expression 
+        expression−list , expression
+```
 
 An identifier is a primary expression provided it has been suitably declared as discussed below. Its type is specified by its declaration. If the type of the identifier is “array of …”, then the value of the identifier expression is a pointer to the first object in the array; and the type of the expression is “pointer to …”. Moreover, an array identifier is not an lvalue expression. Likewise, an identifier which is declared “function returning …”, when used except in the function-name position of a call, is converted to “pointer to function returning …”.
 
@@ -2301,9 +2209,7 @@ A string is a primary expression. Its type is originally “array of char”, bu
 
 A parenthesized expression is a primary expression whose type and value are identical to those of the unadorned expression. The presence of parentheses does not affect whether the expression is an lvalue.
 
-A primary expression followed by an expression in square brackets is a primary expression. The intuitive meaning is that of a subscript. Usually, the primary expression has type “pointer to ...”, the subscript expression is int, and the type of the result is “...”. The expression E1[E2] is identical (by definition) to *((E1)+E2)). All the clues needed to understand
-
-this notation are contained in this subpart, together with the discussions on Unary Operators and Additive Operators regarding identifiers, * and + respectively. The implications are summarized under “Arrays, Pointers, and Subscripting” under Types Revisited.
+A primary expression followed by an expression in square brackets is a primary expression. The intuitive meaning is that of a subscript. Usually, the primary expression has type “pointer to ...”, the subscript expression is int, and the type of the result is “...”. The expression E1[E2] is identical (by definition) to *((E1)+E2)). All the clues needed to understand this notation are contained in this subpart, together with the discussions on Unary Operators and Additive Operators regarding identifiers, * and + respectively. The implications are summarized under “Arrays, Pointers, and Subscripting” under Types Revisited.
 
 A function call is a primary expression followed by parentheses containing a possibly empty, comma-separated list of expressions which constitute the actual arguments to the function. The primary expression must be of type “function returning ...,” and the result of the function call is of type “...”. As indicated below, a hitherto unseen identifier followed immediately by a left parenthesis is contextually declared to represent a function returning an integer; thus in the most common case, integer-valued functions need not be declared.
 
@@ -2319,9 +2225,21 @@ A primary expression followed by an arrow (built from and >) followed by an iden
 
 Expressions with unary operators group right to left.
 
-unary−expression: * expression & lvalue - expression ! expression ~ expression
-
-++ lvalue -- lvalue lvalue ++ lvalue -- ( type−name ) expression sizeof expression sizeof ( type−name )
+```
+unary−expression: 
+        * expression 
+        & lvalue 
+        - expression 
+        ! expression 
+        ~ expression
+        ++ lvalue 
+        -- lvalue 
+        lvalue ++ 
+        lvalue -- 
+        ( type−name ) expression 
+        sizeof expression 
+        sizeof ( type−name )
+```
 
 The unary * operator means indirection; the expression must be a pointer, and the result is an lvalue referring to the object to which the expression points. If the type of the expression is “pointer to …,” the type of the result is “…”.
 
@@ -2335,17 +2253,15 @@ The ~ operator yields the one’s complement of its operand. The usual arithmeti
 
 The object referred to by the lvalue operand of prefix ++ is incremented. The value is the new value of the operand, but is not an lvalue. The expression ++x is equivalent to x=x+1. See the discussions on Additive Operators and Assignment Operators for information on conversions.
 
-The lvalue operand of prefix -- is decremented analogously to the prefix ++ operator. When postfix ++ is applied to an lvalue, the result is the value of the object referred to
+The lvalue operand of prefix -- is decremented analogously to the prefix ++ operator. 
 
-by the lvalue. After the result is noted, the object is incremented in the same manner as for the prefix ++ operator. The type of the result is the same as the type of the lvalue expression.
+When postfix ++ is applied to an lvalue, the result is the value of the object referred to by the lvalue. After the result is noted, the object is incremented in the same manner as for the prefix ++ operator. The type of the result is the same as the type of the lvalue expression.
 
 When postfix -- is applied to an lvalue, the result is the value of the object referred to by the lvalue. After the result is noted, the object is decremented in the manner as for the prefix -- operator. The type of the result is the same as the type of the lvalue expression.
 
 An expression preceded by the parenthesized name of a data type causes conversion of the value of the expression to the named type. This construction is called a cast. Type names are described in Section C.8.7.
 
-The sizeof operator yields the size in bytes of its operand. (A byte is undefined by the language except in terms of the value of sizeof. However, in all existing implementations, a byte is the space required to hold a char.) When applied to an array, the result is the total number of bytes in the array. The size is determined from the declarations of the objects in the expression. This expression is semantically an unsigned constant and may be used
-
-anywhere a constant is required. Itsmajor use is in communicationwith routines like storage allocators and I/O systems.
+The sizeof operator yields the size in bytes of its operand. (A byte is undefined by the language except in terms of the value of sizeof. However, in all existing implementations, a byte is the space required to hold a char.) When applied to an array, the result is the total number of bytes in the array. The size is determined from the declarations of the objects in the expression. This expression is semantically an unsigned constant and may be used anywhere a constant is required. Itsmajor use is in communication with routines like storage allocators and I/O systems.
 
 The sizeof operator may also be applied to a parenthesized type name. In that case it yields the size in bytes of an object of the indicated type.
 
@@ -2353,21 +2269,30 @@ The construction sizeof(type) is taken to be a unit, so the expression sizeof(ty
 
 #### C.7.3 Multiplicative Operators
 
-The multiplicative operators *, /, and % group left to right. The usual arithmetic conversions are performed. multiplicative−expression:
+The multiplicative operators *, /, and % group left to right. The usual arithmetic conversions are performed. 
 
-expression * expression expression / expression expression % expression
+```
+multiplicative−expression:
+        expression * expression
+        expression / expression
+        expression % expression
+```
 
-Thebinary * operator indicatesmultiplication. The * operator is associative, and expressions with several multiplications at the same level may be rearranged by the compiler. The binary / operator indicates division.
+The binary * operator indicates multiplication. The * operator is associative, and expressions with several multiplications at the same level may be rearranged by the compiler. The binary / operator indicates division.
 
 The binary % operator yields the remainder from the division of the first expression by the second. The operands must be integral.
 
-When positive integers are divided, truncation is toward 0; but the form of truncation is machine-dependent if either operand is negative. On all machines covered by this manual, the remainder has the same sign as the dividend. It is always true that (a/b)*b + a%b is equal to a (if b is not 0).
+When positive integers are divided, truncation is toward 0; but the form of truncation is machine-dependent if either operand is negative. On all machines covered by this manual, the remainder has the same sign as the dividend. It is always true that `(a/b)*b + a%b` is equal to `a (if b is not 0)`.
 
 #### C.7.4 Additive Operators
 
-The additive operators + and - group left to right. The usual arithmetic conversions are performed. There are some additional type possibilities for each operator. additive−expression:
+The additive operators + and - group left to right. The usual arithmetic conversions are performed. There are some additional type possibilities for each operator. 
 
-expression + expression expression - expression
+```
+additive−expression:
+        expression + expression
+        expression - expression
+```
 
 The result of the + operator is the sum of the operands. A pointer to an object in an array and a value of any integral type may be added. The latter is in all cases converted to an address offset by multiplying it by the length of the object to which the pointer points. The result is a pointer of the same type as the original pointer which points to another object in the same array, appropriately offset from the original object. Thus if P is a pointer to an object in an array, the expression P+1 is a pointer to the next object in the array. No further type combinations are allowed for pointers.
 
@@ -2379,58 +2304,75 @@ If two pointers to objects of the same type are subtracted, the result is conver
 
 #### C.7.5 Shift Operators
 
-The shift operators < < and > > group left to right. Both perform the usual arithmetic conversions on their operands, each of whichmust be integral. Then the right operand is converted to int; the type of the result is that of the left operand. The result is undefined if the right operand is negative or greater than or equal to the length of the object in bits. On the VAX a negative right operand is interpreted as reversing the direction of the shift. shift−expression:
+The shift operators < < and > > group left to right. Both perform the usual arithmetic conversions on their operands, each of whichmust be integral. Then the right operand is converted to int; the type of the result is that of the left operand. The result is undefined if the right operand is negative or greater than or equal to the length of the object in bits. On the VAX a negative right operand is interpreted as reversing the direction of the shift. 
 
-expression << expression expression >> expression
+```
+shift−expression:
+        expression << expression
+        expression >> expression
+```
 
 The value of E1 < < E2 is E1 (interpreted as a bit pattern) left-shifted E2 bits. Vacated bits are 0 filled. The value of E1 > > E2 is E1 right-shifted E2 bit positions. The right shift is guaranteed to be logical (0 fill) if E1 is unsigned; otherwise, it may be arithmetic.
 
 #### C.7.6 Relational Operators
 
-The relational operators group left to right. relational−expression:
+The relational operators group left to right. 
 
-```text
-expression < expression
-expression > expression
-expression <= expression
-expression >= expression
+```
+relational−expression:
+        expression < expression
+        expression > expression
+        expression <= expression
+        expression >= expression
 ```
 
 The operators < (less than), > (greater than), <= (less than or equal to), and >= (greater than or equal to) all yield 0 if the specified relation is false and 1 if it is true. The type of the result is int. The usual arithmetic conversions are performed. Two pointers may be compared; the result depends on the relative locations in the address space of the pointed-to objects. Pointer comparison is portable only when the pointers point to objects in the same array.
 
 #### C.7.7 Equality Operators
 
-equality−expression: expression == expression expression != expression
-
-```text
-The == (equal to) and the != (not equal to) operators are exactly analogous to the relational
-operators except for their lower precedence. (Thus a < b == c < d is 1 whenever a < b
-and c < d have the same truth value).
 ```
+equality−expression:
+        expression == expression
+        expression != expression
+```
+
+The == (equal to) and the != (not equal to) operators are exactly analogous to the relational operators except for their lower precedence. (Thus a < b == c < d is 1 whenever a < b and c < d have the same truth value).
 
 A pointer may be compared to an integer only if the integer is the constant 0. A pointer to which 0 has been assigned is guaranteed not to point to any object and will appear to be equal to 0. In conventional usage, such a pointer is considered to be null.
 
 #### C.7.8 Bitwise ANDOperator
 
-and−expression: expression & expression
+```
+and−expression: 
+        expression & expression
+```
 
 The & operator is associative, and expressions involving &may be rearranged. Theusual arithmetic conversions are performed. The result is the bitwise AND function of the operands. The operator applies only to integral operands.
 
 #### C.7.9 Bitwise Exclusive OR Operator
 
-exclusive−or−expression: expression ^ expression
+```
+exclusive−or−expression: 
+        expression ^ expression
+```
 
 The ^ operator is associative, and expressions involving ^ may be rearranged. The usual arithmetic conversions are performed; the result is the bitwise exclusive OR function of the operands. The operator applies only to integral operands.
 
 #### C.7.10 Bitwise Inclusive OR Operator
 
-inclusive−or−expression: expression | expression
+```
+inclusive−or−expression: 
+        expression | expression
+```
 
 The | operator is associative, and expressions involving | may be rearranged. The usual arithmetic conversions are performed; the result is the bitwise inclusive OR function of its operands. The operator applies only to integral operands.
 
 #### C.7.11 Logical ANDOperator
 
-logical−and−expression: expression && expression
+```
+logical−and−expression: 
+        expression && expression
+```
 
 The && operator groups left to right. It returns 1 if both its operands evaluate to nonzero, 0 otherwise. Unlike &, && guarantees left to right evaluation; moreover, the second operand is not evaluated if the first operand is 0.
 
@@ -2438,7 +2380,10 @@ The operands need not have the same type, but each must have one of the fundamen
 
 #### C.7.12 Logical OR Operator
 
-logical−or−expression: expression || expression
+```
+logical−or−expression: 
+        expression || expression
+```
 
 The || operator groups left to right. It returns 1 if either of its operands evaluates to nonzero, 0 otherwise. Unlike |, || guarantees left to right evaluation; moreover, the second operand is not evaluated if the value of the first operand is nonzero.
 
@@ -2446,72 +2391,79 @@ The operands need not have the same type, but each must have one of the fundamen
 
 #### C.7.13 Conditional Operator
 
+```
 logical−or−expression:
+        expression ? expression : expression
+```
 
-expression ? expression : expression Conditional expressions group right to left. The first expression is evaluated; and if it is nonzero, the result is the value of the second expression, otherwise that of third expression. If possible, the usual arithmetic conversions are performed to bring the second and third expressions to a common type. If both are structures or unions of the same type, the result has the type of the structure or union. If both pointers are of the same type, the result has the common type. Otherwise, one must be a pointer and the other the constant 0, and the result has the type of the pointer. Only one of the second and third expressions is evaluated.
+Conditional expressions group right to left. The first expression is evaluated; and if it is nonzero, the result is the value of the second expression, otherwise that of third expression. If possible, the usual arithmetic conversions are performed to bring the second and third expressions to a common type. If both are structures or unions of the same type, the result has the type of the structure or union. If both pointers are of the same type, the result has the common type. Otherwise, one must be a pointer and the other the constant 0, and the result has the type of the pointer. Only one of the second and third expressions is evaluated.
 
 #### C.7.14 Assignment Operators
 
-There are a number of assignment operators, all of which group right to left. All require an lvalue as their left operand, and the type of an assignment expression is that of its left operand. The value is the value stored in the left operand after the assignment has taken place. The two parts of a compound assignment operator are separate tokens. assignment−expression:
+There are a number of assignment operators, all of which group right to left. All require an lvalue as their left operand, and the type of an assignment expression is that of its left operand. The value is the value stored in the left operand after the assignment has taken place. The two parts of a compound assignment operator are separate tokens. 
 
-```text
-expression = expression
-expression += expression
-expression -= expression
-expression *= expression
-expression /= expression
-expression %= expression
-expression >>= expression
-expression <<= expression
-expression &= expression
-expression ^= expression
-expression |= expression
+```
+assignment−expression:
+        expression = expression
+        expression += expression
+        expression -= expression
+        expression *= expression
+        expression /= expression
+        expression %= expression
+        expression >>= expression
+        expression <<= expression
+        expression &= expression
+        expression ^= expression
+        expression |= expression
 ```
 
-In the simple assignment with =, the value of the expression replaces that of the object referred to by the lvalue. If both operands have arithmetic type, the right operand is converted to the type of the left preparatory to the assignment. Second, both operands may be structures or unions of the same type. Finally, if the left operand is a pointer, the right operand
+In the simple assignment with =, the value of the expression replaces that of the object referred to by the lvalue. If both operands have arithmetic type, the right operand is converted to the type of the left preparatory to the assignment. Second, both operands may be structures or unions of the same type. Finally, if the left operand is a pointer, the right operand must in general be a pointer of the same type. However, the constant 0 may be assigned to a pointer; it is guaranteed that this value will produce a null pointer distinguishable from a pointer to any object.
 
-must in general be a pointer of the same type. However, the constant 0 may be assigned to a pointer; it is guaranteed that this value will produce a null pointer distinguishable from a pointer to any object.
-
-```text
-The behavior of an expression of the form E1 op= E2may be inferred by taking it as equiv-
-alent to E1 = E1 op (E2); however, E1 is evaluated only once. In += and -=, the left operand
-may be a pointer; in which case, the (integral) right operand is converted as explained in
-Section C.7.4. All right operands and all non-pointer left operands must have arithmetic
-type.
-```
+The behavior of an expression of the form E1 op= E2may be inferred by taking it as equivalent to E1 = E1 op (E2); however, E1 is evaluated only once. In += and -=, the left operand may be a pointer; in which case, the (integral) right operand is converted as explained in Section C.7.4. All right operands and all non-pointer left operands must have arithmetic type.
 
 #### C.7.15 CommaOperator
 
+```
 comma−expression:
+        expression , expression
+```
 
-expression , expression A pair of expressions separated by a comma is evaluated left to right, and the value of the left expression is discarded. The type and value of the result are the type and value of the right operand. This operator groups left to right. In contexts where comma is given a special meaning, e.g., in lists of actual arguments to functions (see Section C.7.1) and lists of initializers (see Section C.8.6), the comma operator as described in this subpart can only appear in parentheses. For example, f(a, (t=3, t+2), c)
+A pair of expressions separated by a comma is evaluated left to right, and the value of the left expression is discarded. The type and value of the result are the type and value of the right operand. This operator groups left to right. In contexts where comma is given a special meaning, e.g., in lists of actual arguments to functions (see Section C.7.1) and lists of initializers (see Section C.8.6), the comma operator as described in this subpart can only appear in parentheses. For example, 
+
+`f(a, (t=3, t+2), c)`
 
 has three arguments, the second of which has the value 5.
 
 ### C.8 Declarations
 
-Declarations are used to specify the interpretation which C gives to each identifier; they do not necessarily reserve storage associated with the identifier. Declarations have the form declaration:
+Declarations are used to specify the interpretation which C gives to each identifier; they do not necessarily reserve storage associated with the identifier. Declarations have the form 
 
-decl−specifiers declarator−listopt ; The declarators in the declarator-list contain the identifiers being declared. The declspecifiers consist of a sequence of type and storage class specifiers. decl−specifiers:
+```
+declaration:
+        decl−specifiers declarator−list<sub>opt</sub> ; 
+```
 
-type−specifier decl−specifiersopt sc−specifier decl−specifiersopt
+The declarators in the declarator-list contain the identifiers being declared. The declspecifiers consist of a sequence of type and storage class specifiers.
+
+```
+decl−specifiers:
+        type−specifier decl−specifiers<sub>opt</sub> 
+        sc−specifier decl−specifiers<sub>opt</sub>
+```
 
 The list must be self-consistent in a way described below.
 
 #### C.8.1 Storage Class Specifiers
 
-```text
 The sc-specifiers are:
-sc−specifier:
+
 ```
-
-auto
-
-```text
-static
-extern
-register
-typedef
+sc−specifier:
+        auto
+        static
+        extern
+        register
+        typedef
 ```
 
 The typedef specifier does not reserve storage and is called a “storage class specifier” only for syntactic convenience. See Section C.8.8 for more information. The meanings of the various storage classes were discussed in Section C.4.
@@ -2526,40 +2478,37 @@ Atmost, one sc-specifiermay be given in a declaration. If the sc-specifier ismis
 
 The type-specifiers are
 
-```text
+```
 type−specifier:
-char
-short
-int
-long
-unsigned
-float
-double
-struct−or−union−specifier
-typedef−name
+        char
+        short
+        int
+        long
+        unsigned
+        float
+        double
+        struct−or−union−specifier
+        typedef−name
 ```
 
-```text
-At most one of the words long or short may be specified in conjunction with int; the
-meaning is the same as if int were not mentioned. The word long may be specified in
-conjunction with float; the meaning is the same as double. The word unsigned may be
-specified alone, or in conjunction with int or any of its short or long varieties, or with char.
-```
+At most one of the words long or short may be specified in conjunction with int; the meaning is the same as if int were not mentioned. The word long may be specified in conjunction with float; the meaning is the same as double. The word unsigned may be specified alone, or in conjunction with int or any of its short or long varieties, or with char.
 
 Otherwise, at most on type-specifier may be given in a declaration. In particular, adjectival use of long, short, or unsigned is not permitted with typedef names. If the typespecifier is missing from a declaration, it is taken to be int.
 
-```text
-Specifiers for structures and unions are discussed in Section C.8.5. Declarations with
-typedef names are discussed in Section C.8.8.
-```
+Specifiers for structures and unions are discussed in Section C.8.5. Declarations with typedef names are discussed in Section C.8.8.
 
 #### C.8.3 Declarators
 
-The declarator-list appearing in a declaration is a comma-separated sequence of declarators, each of which may have an initializer. declarator−list:
+The declarator-list appearing in a declaration is a comma-separated sequence of declarators, each of which may have an initializer. 
 
-init−declarator init−declarator , declarator−list
+```
+declarator−list:
+        init−declarator
+        init−declarator , declarator−list
 
-init−declarator: declarator initializeropt
+init−declarator: 
+        declarator initializer<sub>opt</sub>
+```
 
 Initializers are discussed in Section C.8.6. The specifiers in the declaration indicate the type and storage class of the objects to which the declarators refer. Declarators have the syntax:
 
@@ -2575,28 +2524,27 @@ Each declarator contains exactly one identifier; it is this identifier that is d
 
 A declarator in parentheses is identical to the unadorned declarator, but the binding of complex declarators may be altered by parentheses. See the examples below.
 
-Now imagine a declaration T D1
+Now imagine a declaration 
+
+`T D1`
 
 where T is a type-specifier (like int, etc.) and D1 is a declarator. Suppose this declaration makes the identifier have type “… T,” where the “…” is empty if D1 is just a plain identifier (so that the type of x in int x is just int). Then if D1 has the form
 
-*D
+`*D`
 
-```text
 the type of the contained identifier is “… pointer to T &.”
+
 If D1 has the form
-```
 
-D()
+`D()`
 
-```text
 then the contained identifier has the type “… function returning T.” If D1 has the form
-D[constant-expression]
-```
 
-```text
+`D[constant-expression]`
+
 or
-D[]
-```
+
+`D[]`
 
 then the contained identifier has type “… array of T.” In the first case, the constant expression is an expression whose value is determinable at compile time , whose type is int, and whose value is positive. (Constant expressions are defined precisely in Section C.15) When several “array of ” specifications are adjacent, a multidimensional array is created; the constant expressions which specify the bounds of the arrays may be missing only for the first member of the sequence. This elision is useful when the array is external and the actual definition, which allocates storage, is given elsewhere. The first constant expression may also be omitted when the declarator is followed by initialization. In this case the size is calculated from the number of initial elements supplied.
 
@@ -2604,70 +2552,61 @@ An arraymay be constructed fromone of the basic types, fromapointer, froma struc
 
 Not all the possibilities allowed by the syntax above are actually permitted. The restrictions are as follows: functions may not return arrays or functions although they may return pointers; there are no arrays of functions although there may be arrays of pointers to functions. Likewise, a structure or unionmay not contain a function; but itmay contain a pointer to a function.
 
-```text
 As an example, the declaration
-int i, *ip, f(), *fip(), (*pfi)();
-```
+
+`int i, *ip, f(), *fip(), (*pfi)();`
 
 declares an integer i, a pointer ip to an integer, a function f returning an integer, a function fip returning a pointer to an integer, and a pointer pfi to a function which returns an integer. It is especially useful to compare the last two. The binding of *fip() is *(fip()). The declaration suggests, and the same construction in an expression requires, the calling of a function fip. Using indirection through the (pointer) result to yield an integer. In the declarator (*pfi)(), the extra parentheses are necessary, as they are also in an expression, to indicate that indirection through a pointer to a function yields a function, which is then called; it returns an integer.
 
-```text
 As another example,
-float fa[17], *afp[17];
-```
+
+`float fa[17], *afp[17];`
 
 declares an array of float numbers and an array of pointers to float numbers. Finally,
 
-static int x3d[3][5][7];
+`static int x3d[3][5][7];`
 
-```text
-declares a static 3-dimensional array of integers, with rank 3 × 5 × 7. In complete detail, x3d
-is an array of three items; each item is an array of five arrays; each of the latter arrays is an
-array of seven integers. Any of the expressions x3d, x3d[i], x3d[i][j], x3d[i][j][k]may
-reasonably appear in an expression. The first three have type “array” and the last has type
-int.
-```
+declares a static 3-dimensional array of integers, with rank 3 × 5 × 7. In complete detail, x3d is an array of three items; each item is an array of five arrays; each of the latter arrays is an array of seven integers. Any of the expressions x3d, x3d[i], x3d[i][j], x3d[i][j][k] may reasonably appear in an expression. The first three have type “array” and the last has type int.
 
 #### C.8.5 Structure and Union Declarations
 
-A structure is an object consisting of a sequence of named members. Each member may have any type. A union is an object which may, at a given time, contain any one of several members. Structure and union specifiers have the same form. struct−or−union−specifier:
+A structure is an object consisting of a sequence of named members. Each member may have any type. A union is an object which may, at a given time, contain any one of several members. Structure and union specifiers have the same form.
 
-```text
-struct−or−union { struct−decl−list }
-struct−or−union identifier { struct−decl−list }
-struct−or−union identifier
+
 ```
+struct−or−union−specifier:
+        struct−or−union { struct−decl−list }
+        struct−or−union identifier { struct−decl−list }
+        struct−or−union identifier
 
-```text
 struct−or−union:
-struct
-union
+        struct
+        union
 ```
 
-```text
 The struct-decl-list is a sequence of declarations for the members of the structure or union:
+
+```
 struct−decl−list:
-```
+        struct−declaration
+        struct−declaration struct−decl−list
 
-```text
-struct−declaration
-struct−declaration struct−decl−list
-```
-
-```text
 struct−declaration:
-type−specifier struct−declarator−list ;
-```
+        type−specifier struct−declarator−list ;
 
-```text
 struct−declarator−list:
-struct−declarator
-struct−declarator , struct−declarator−list
+        struct−declarator
+        struct−declarator , struct−declarator−list
 ```
 
-In the usual case, a struct-declarator is just a declarator for amember of a structure or union. A structure member may also consist of a specified number of bits. Such a member is also called a field; its length, a non-negative constant expression, is set off from the field name by a colon. struct−declarator:
+In the usual case, a struct-declarator is just a declarator for amember of a structure or union. A structure member may also consist of a specified number of bits. Such a member is also called a field; its length, a non-negative constant expression, is set off from the field name by a colon. 
 
-declarator declarator : constant−expression : constant−expression
+```
+struct−declarator:
+        declarator
+        declarator : constant−expression
+        : constant−expression
+```
 
 Within a structure, the objects declared have addresses which increase as the declarations are read left to right. Each non-field member of a structure begins on an addressing boundary appropriate to its type; therefore, theremay be unnamed holes in a structure. Fieldmembers are packed into machine integers; they do not straddle words. A field which does not fit into the space remaining in a word is put into the next word. No field may be wider than a word.
 
@@ -2681,14 +2620,14 @@ A union may be thought of as a structure all of whose members begin at offset 0 
 
 A structure or union specifier of the second form, that is, one of
 
-```text
+```c
 struct identifier { struct−decl−list }
 union identifier { struct−decl−list }
 ```
 
 declares the identifier to be the structure tag (or union tag) of the structure specified by the list. A subsequent declaration may then use the third form of specifier, one of
 
-```text
+```c
 struct identifier
 union identifier
 ```
@@ -2699,39 +2638,45 @@ The third form of a structure or union specifier may be used prior to a declarat
 
 The names of members and tags do not conflict with each other or with ordinary variables. A particular name may not be used twice in the same structure, but the same name may be used in several different structures in the same scope.
 
-A simple but important example of a structure declaration is the following binary tree structure: struct tnode {
+A simple but important example of a structure declaration is the following binary tree structure: 
 
-```text
-char tword[20];
-int count;
-struct tnode *left;
-struct tnode *right;
+```c
+struct tnode {
+    char tword[20];
+    int count;
+    struct tnode *left;
+    struct tnode *right;
+};
 ```
 
-};
+which contains an array of 20 characters, an integer, and two pointers to similar structures. Once this declaration has been given, the declaration 
 
-which contains an array of 20 characters, an integer, and two pointers to similar structures. Once this declaration has been given, the declaration struct tnode s, *sp;
+```c
+struct tnode s, *sp;
+```
 
 declares s to be a structure of the given sort and sp to be a pointer to a structure of the given sort. With these declarations, the expression sp->count refers to the count field of the structure to which sp points; s.left refers to the left subtree pointer of the structure s; and s.right->tword[0] refers to the first character of the tword member of the right subtree of s.
 
 #### C.8.6 Initialization
 
-A declarator may specify an initial value for the identifier being declared. The initializer is preceded by = and consists of an expression or a list of values nested in braces. initializer:
+A declarator may specify an initial value for the identifier being declared. The initializer is preceded by = and consists of an expression or a list of values nested in braces. 
 
-```text
-= expression
-= { initializer−list }
-= { initializer−list , }
 ```
+initializer:
+        = expression
+        = { initializer−list }
+        = { initializer−list , }
 
-initializer−list: expression initializer−list , initializer−list { initializer−list } { initializer−list , }
+initializer−list: 
+        expression
+        initializer−list , initializer−list
+        { initializer−list }
+        { initializer−list , }
+```
 
 All the expressions in an initializer for a static or external variable must be constant expressions, which are described in Section C.15, or expressions which reduce to the address of a previously declared variable, possibly offset by a constant expression. Automatic or register variables may be initialized by arbitrary expressions involving constants and previously declared variables and functions.
 
-```text
-Static and external variables that are not initialized are guaranteed to start off as zero.
-Automatic and register variables that are not initialized are guaranteed to start off as garbage.
-```
+Static and external variables that are not initialized are guaranteed to start off as zero. Automatic and register variables that are not initialized are guaranteed to start off as garbage.
 
 When an initializer applies to a scalar (a pointer or an object of arithmetic type), it consists of a single expression, perhaps in braces. The initial value of the object is taken from the expression; the same conversions as for assignment are performed.
 
@@ -2741,69 +2686,71 @@ Braces may in some cases be omitted. If the initializer begins with a left brace
 
 A final abbreviation allows a char array to be initialized by a string. In this case successive characters of the string initialize the members of the array.
 
-```text
 For example,
+
+```c
 int x[] = { 1, 3, 5 };
 ```
 
-declares and initializes x as a one-dimensional array which has three members, since no size was specified and there are three initializers. float y[4][3] = {
+declares and initializes x as a one-dimensional array which has three members, since no size was specified and there are three initializers. 
 
-```text
-{ 1, 3, 5 },
-{ 2, 4, 6 },
-{ 3, 5, 7 },
-```
-
-};
-
-```text
-is a completely-bracketed initialization: 1, 3, and 5 initialize the first row of the array y[0],
-namely y[0][0], y[0][1], and y[0][2]. Likewise, the next two lines initialize y[1] and
-y[2]. The initializer ends early and therefore y[3] is initialized with 0. Precisely, the same
-effect could have been achieved by
+```c
 float y[4][3] = {
-```
-
-```text
-1, 3, 5, 2, 4, 6, 3, 5, 7
+    { 1, 3, 5 },
+    { 2, 4, 6 },
+    { 3, 5, 7 },
 };
 ```
 
-```text
-The initializer for y begins with a left brace but that for y[0] does not; therefore, three el-
-ements from the list are used. Likewise, the next three are taken successively for y[1] and
-y[2]. Also,
-```
+is a completely-bracketed initialization: 1, 3, and 5 initialize the first row of the array y[0], namely y[0][0], y[0][1], and y[0][2]. Likewise, the next two lines initialize y[1] and y[2]. The initializer ends early and therefore y[3] is initialized with 0. Precisely, the same effect could have been achieved by
 
-```text
+```c
 float y[4][3] = {
-{ 1 }, { 2 }, { 3 }, { 4 }
+    1, 3, 5, 2, 4, 6, 3, 5, 7
+};
 ```
 
+The initializer for y begins with a left brace but that for y[0] does not; therefore, three elements from the list are used. Likewise, the next three are taken successively for y[1] and y[2]. Also,
+
+```c
+float y[4][3] = {
+    { 1 }, { 2 }, { 3 }, { 4 }
 };
+```
 
-initializes the first column of y (regarded as a two-dimensional array) and leaves the rest 0. Finally,
+initializes the first column of y (regarded as a two-dimensional array) and leaves the rest 0.
 
-```text
+Finally,
+
+```c
 char msg[] = "Syntax error on line %s\n";
-shows a character array whose members are initialized with a string.
 ```
+
+shows a character array whose members are initialized with a string.
 
 #### C.8.7 Type Names
 
-In two contexts (to specify type conversions explicitly bymeans of a cast and as an argument of sizeof), it is desired to supply the name of a data type. This is accomplished using a “type name”, which in essence is a declaration for an object of that type which omits the name of the object. type−name:
+In two contexts (to specify type conversions explicitly bymeans of a cast and as an argument of sizeof), it is desired to supply the name of a data type. This is accomplished using a “type name”, which in essence is a declaration for an object of that type which omits the name of the object.
 
-type−specifier abstract−declarator
+```
+type−name:
+        type−specifier abstract−declarator
 
-abstract−declarator: empty ( abstract−declarator ) * abstract−declarator abstract−declarator () abstract−declarator [ constant−expressionopt ]
+abstract−declarator:
+        empty 
+        ( abstract−declarator ) 
+        * abstract−declarator 
+        abstract−declarator () 
+        abstract−declarator [ constant−expression<sub>opt</sub> ]
+```
 
-To avoid ambiguity, in the construction ( abstract−declarator )
+To avoid ambiguity, in the construction 
 
-```text
-the abstract-declarator is required to be non-empty. Under this restriction, it is possible to
-identify uniquely the location in the abstract-declarator where the identifier would appear
-if the construction were a declarator in a declaration. The named type is then the same as
-the type of the hypothetical identifier. For example,
+`( abstract−declarator )`
+
+the abstract-declarator is required to be non-empty. Under this restriction, it is possible to identify uniquely the location in the abstract-declarator where the identifier would appear if the construction were a declarator in a declaration. The named type is then the same as the type of the hypothetical identifier. For example,
+
+```c
 int
 int *
 int *[3]
@@ -2817,21 +2764,29 @@ name respectively the types “integer,” “pointer to integer,” “array of
 
 #### C.8.8 Typedef
 
-Declarations whose “storage class” is typedef do not define storage but instead define identifiers which can be used later as if they were type keywords naming fundamental or derived types. typedef−name:
+Declarations whose “storage class” is typedef do not define storage but instead define identifiers which can be used later as if they were type keywords naming fundamental or derived types. 
 
-identifier Within the scope of a declaration involving typedef, each identifier appearing as part of any declarator therein becomes syntactically equivalent to the type keyword naming the type associated with the identifier in the way described in Section C.8.4. For example, after typedef int MILES, *KLICKSP; typedef struct { double re, im; } complex;
+```
+typedef−name:
+        identifier
+```
 
-```text
+Within the scope of a declaration involving typedef, each identifier appearing as part of any declarator therein becomes syntactically equivalent to the type keyword naming the type associated with the identifier in the way described in Section C.8.4. For example, after 
+
+```c
+typedef int MILES, *KLICKSP;
+typedef struct { double re, im; } complex;
+```
+
 the constructions
+
+```c
 MILES distance;
 extern KLICKSP metricp;
 complex z, *zp;
 ```
 
-```text
-are all legal declarations; the type of distance is int, that of metricp is “pointer to int, ”
-and that of z is the specified structure. The zp is a pointer to such a structure.
-```
+are all legal declarations; the type of distance is int, that of metricp is “pointer to int, ” and that of z is the specified structure. The zp is a pointer to such a structure.
 
 The typedef does not introduce brand-new types, only synonyms for types which could be specified in another way. Thus in the example above distance is considered to have exactly the same type as any other int object.
 
@@ -2843,34 +2798,38 @@ Except as indicated, statements are executed in sequence.
 
 Most statements are expression statements, which have the form
 
-```text
-expression ;
-Usually expression statements are assignments or function calls.
 ```
+        expression ;
+```
+
+Usually expression statements are assignments or function calls.
 
 #### C.9.2 Compound Statement (Block)
 
-So that several statements can be used where one is expected, the compound statement (also, and equivalently, called a “block”) is provided: compound−statement:
+So that several statements can be used where one is expected, the compound statement (also, and equivalently, called a “block”) is provided: 
 
-{ declaration−listopt statement−listopt }
-
-declaration−list: declaration
-
-declaration declaration−list
-
-statement−list: statement statement statement−list
-
-```text
-If any of the identifiers in the declaration-list were previously declared, the outer declaration
-is pushed down for the duration of the block, after which it resumes its force.
 ```
+compound−statement:
+        { declaration−listopt statement−listopt }
+
+declaration−list: 
+        declaration
+        declaration declaration−list
+
+statement−list: 
+        statement 
+        statement statement−list
+```
+
+If any of the identifiers in the declaration-list were previously declared, the outer declaration is pushed down for the duration of the block, after which it resumes its force.
 
 Any initializations of auto or register variables are performed each time the block is entered at the top. It is currently possible (but a bad practice) to transfer into a block; in that case the initializations are not performed. Initializations of static variables are performed only once when the program begins execution. Inside a block, extern declarations do not reserve storage so initialization is not permitted.
 
 #### C.9.3 Conditional Statement
 
-```text
 The two forms of the conditional statement are
+
+```c
 if ( expression ) statement
 if ( expression ) statement else statement
 ```
@@ -2879,8 +2838,9 @@ In both cases, the expression is evaluated; and if it is nonzero, the first subs
 
 #### C.9.4 While Statement
 
-```text
 The while statement has the form
+
+```c
 while ( expression ) statement
 ```
 
@@ -2888,8 +2848,9 @@ The substatement is executed repeatedly so long as the value of the expression r
 
 #### C.9.5 Do Statement
 
-```text
 The do statement has the form
+
+```c
 do statement while ( expression ) ;
 ```
 
@@ -2897,43 +2858,46 @@ The substatement is executed repeatedly until the value of the expression become
 
 #### C.9.6 For Statement
 
-```text
 The for statement has the form:
-for ( exp−1opt ; exp−2opt ; exp−3opt ) statement
+
+```c
+for ( exp−1<sub>opt</sub> ; exp−2<sub>opt</sub> ; exp−3<sub>opt</sub> ) statement
 ```
 
 Except for the behavior of continue, this statement is equivalent to
 
-```text
+```c
 exp−1;
 while ( exp−2 )
 {
-```
-
-```text
-statement
-exp−3 ;
-```
-
-```text
+    statement
+    exp−3 ;
 }
-Thus the first expression specifies initialization for the loop; the second specifies a test, made
-before each iteration, such that the loop is exited when the expression becomes 0. The third
-expression often specifies an incrementing that is performed after each iteration.
 ```
+
+Thus the first expression specifies initialization for the loop; the second specifies a test, made before each iteration, such that the loop is exited when the expression becomes 0. The third expression often specifies an incrementing that is performed after each iteration.
 
 Any or all of the expressions may be dropped. A missing exp-2 makes the implied while clause equivalent to while(1); other missing expressions are simply dropped from the expansion above.
 
 #### C.9.7 Switch Statement
 
-The switch statement causes control to be transferred to one of several statements depending on the value of an expression. It has the form switch ( expression ) statement
+The switch statement causes control to be transferred to one of several statements depending on the value of an expression. It has the form 
 
-The usual arithmetic conversion is performed on the expression, but the result must be int. The statement is typically compound. Any statement within the statement may be labeled with one or more case prefixes as follows: case constant−expression :
+```c
+switch ( expression ) statement
+```
+
+The usual arithmetic conversion is performed on the expression, but the result must be int. The statement is typically compound. Any statement within the statement may be labeled with one or more case prefixes as follows: 
+
+```c
+case constant−expression :
+```
 
 where the constant expression must be int. No two of the case constants in the same switch may have the same value. Constant expressions are precisely defined in Section C.15.
 
-```text
-There may also be at most one statement prefix of the form
+There may also be at most one statement prefix of the form 
+
+```c
 default :
 ```
 
@@ -2947,42 +2911,46 @@ Usually, the statement that is the subject of a switch is compound. Declarations
 
 The statement
 
+```c
 break ;
-
-```text
-causes termination of the smallest enclosing while, do, for, or switch statement; control
-passes to the statement following the terminated statement.
 ```
+
+causes termination of the smallest enclosing while, do, for, or switch statement; control passes to the statement following the terminated statement.
 
 #### C.9.9 Continue Statement
 
-```text
 The statement
+
+```c
 continue ;
 ```
 
-```text
-causes control to pass to the loop-continuation portion of the smallest enclosing while, do,
-or for statement; that is, to the end of the loop. More precisely, in each of the statements
+causes control to pass to the loop-continuation portion of the smallest enclosing while, do, or for statement; that is, to the end of the loop. More precisely, in each of the statements
+
+```c
+while (...) {
+    statement ;
+    contin: ;
+}
+
+do {
+    statement ;
+    contin: ;
+} while (...);
+
+for (...) {
+    statement ;
+    contin: ;
+}
 ```
 
-```text
-while (...) { do { for (...) {
-statement ; statement ; statement ;
-contin: ; contin: ; contin: ;
-```
-
-} } while (...); }
-
-```text
-a continue is equivalent to goto contin. (Following the contin: is a null statement,
-see Null Statement)
-```
+a continue is equivalent to goto contin. (Following the contin: is a null statement, (see Null Statement)
 
 #### C.9.10 Return Statement
 
-```text
 A function returns to its caller bymeans of the return statement which has one of the forms
+
+```c
 return ;
 return expression ;
 ```
@@ -2991,8 +2959,9 @@ In the first case, the returned value is undefined. In the second case, the valu
 
 #### C.9.11 Goto Statement
 
-```text
 Control may be transferred unconditionally by means of the statement
+
+```c
 goto identifier ;
 ```
 
@@ -3000,21 +2969,23 @@ The identifier must be a label (see Labeled Statement) located in the current fu
 
 #### C.9.12 Labeled Statement
 
-Any statement may be preceded by label prefixes of the form identifier :
+Any statement may be preceded by label prefixes of the form 
+
+```c
+identifier :
+```
 
 which serve to declare the identifier as a label. The only use of a label is as a target of a goto. The scope of a label is the current function, excluding any subblocks in which the same identifier has been redeclared. See Scope Rules.
 
 #### C.9.13 Null Statement
 
-```text
 The null statement has the form
+
+```c
 ;
 ```
 
-```text
-A null statement is useful to carry a label just before the } of a compound statement or to
-supply a null body to a looping statement such as while.
-```
+A null statement is useful to carry a label just before the } of a compound statement or to supply a null body to a looping statement such as while.
 
 ### C.10 External Definitions
 
@@ -3022,57 +2993,61 @@ A C program consists of a sequence of external definitions. An external definiti
 
 #### C.10.1 External Function Definitions
 
-Function definitions have the form function−definition:
+Function definitions have the form 
 
-```text
-decl−specifiersopt function−declarator function−body
-The only sc-specifiers allowed among the decl-specifiers are extern or static; see Sec-
+```
+function−definition:
+    decl−specifiers<sub>opt</sub> function−declarator function−body
 ```
 
-tion C.11.2 for the distinction between them. A function declarator is similar to a declarator for a “function returning …” except that it lists the formal parameters of the function being defined. function−declarator:
+The only sc-specifiers allowed among the decl-specifiers are extern or static; see Section C.11.2 for the distinction between them. A function declarator is similar to a declarator for a “function returning …” except that it lists the formal parameters of the function being defined. 
 
-declarator ( parameter−listopt )
+```
+function−declarator:
+        declarator ( parameter−listopt )
 
-parameter−list: identifier identifier , parameter−list
+parameter−list: 
+        identifier 
+        identifier , parameter−list
+```
 
-The function-body has the form function−body:
+The function-body has the form 
 
-declaration−listopt compound−statement The identifiers in the parameter list, and only those identifiers, may be declared in the
+```
+function−body:
+        declaration−list<sub>opt</sub> compound−statement
+```
 
-declaration list. Any identifiers whose type is not given are taken to be int. The only storage class which may be specified is register; if it is specified, the corresponding actual parameter will be copied, if possible, into a register at the outset of the function.
+The identifiers in the parameter list, and only those identifiers, may be declared in the declaration list. Any identifiers whose type is not given are taken to be int. The only storage class which may be specified is register; if it is specified, the corresponding actual parameter will be copied, if possible, into a register at the outset of the function.
 
 A simple example of a complete function definition is
 
-```text
+```c
 int max(a, b, c)
 int a, b, c;
 {
-```
+    int m;
 
-int m;
-
-```text
-m = (a > b) ? a : b;
-return((m > c) ? m : c);
-```
-
+    m = (a > b) ? a : b;
+    return((m > c) ? m : c);
 }
-
-```text
-Here int is the type-specifier; max(a, b, c) is the function-declarator; int a, b, c;
-is the declaration-list for the formal parameters; { ... } is the block giving the code for
-the statement.
 ```
+
+Here `int` is the type-specifier; `max(a, b, c)` is the function-declarator; `int a, b, c;` is the declaration-list for the formal parameters; `{ ... }` is the block giving the code for
+the statement.
 
 The C program converts all float actual parameters to double, so formal parameters declared float have their declaration adjusted to read double. All char and short formal parameter declarations are similarly adjusted to read int. Also, since a reference to an array in any context (in particular as an actual parameter) is taken to mean a pointer to the first element of the array, declarations of formal parameters declared “array of ...” are adjusted to read “pointer to ....”
 
 #### C.10.2 External Data Definitions
 
-An external data definition has the form data−definition:
+An external data definition has the form
 
-declaration The storage class of such data may be extern (which is the default) or static but not
+```
+data−definition:
+    declaration
+```
 
-auto or register.
+The storage class of such data may be extern (which is the default) or static but not auto or register.
 
 ### C.11 Scope Rules
 
@@ -3090,18 +3065,14 @@ In all cases, however, if an identifier is explicitly declared at the head of a 
 
 Remember also (see Section C.8.5) that identifiers associated with ordinary variables, and those associated with structure and union members form two disjoint classes which do not conflict. Members and tags follow the same scope rules as other identifiers. typedef names are in the same class as ordinary identifiers. They may be redeclared in inner blocks, but an explicit type must be given in the inner declaration:
 
-```text
+```c
 typedef float distance;
 ...
 {
-```
-
-```text
-auto int distance;
-...
-```
-
+    auto int distance;
+    ...
 }
+```
 
 The int must be present in the second declaration, or it would be taken to be a declaration with no declarators and type distance.
 
@@ -3117,100 +3088,105 @@ Identifiers declared static at the top level in external definitions are not vis
 
 ### C.12 Compiler Control Lines
 
-```text
-The C compiler contains a preprocessor capable of macro substitution, conditional compila-
-tion, and inclusion of named files. Lines beginning with # communicate with this preproces-
-sor. There may be any number of blanks and horizontal tabs between the # and the directive.
-These lines have syntax independent of the rest of the language; they may appear anywhere
-and have effect which lasts (independent of scope) until the end of the source program file.
-```
+The C compiler contains a preprocessor capable of macro substitution, conditional compilation, and inclusion of named files. Lines beginning with # communicate with this preprocessor. There may be any number of blanks and horizontal tabs between the # and the directive. These lines have syntax independent of the rest of the language; they may appear anywhere and have effect which lasts (independent of scope) until the end of the source program file.
 
 #### C.12.1 Token Replacement
 
-```text
 A compiler-control line of the form
+
+```c
 #define identifier token-stringop t
 ```
 
-causes the preprocessor to replace subsequent instances of the identifierwith the given string of tokens. Semicolons in or at the end of the token-string are part of that string. A line of the form #define identifier(identifier, ... ) token-stringop t
+causes the preprocessor to replace subsequent instances of the identifierwith the given string of tokens. Semicolons in or at the end of the token-string are part of that string. A line of the form 
 
-where there is no space between the first identifier and the (, is a macro definition with arguments. There may be zero or more formal parameters. Subsequent instances of the first identifier followed by a (, a sequence of tokens delimited by commas, and a ) are replaced by the token string in the definition. Each occurrence of an identifier mentioned in the formal parameter list of the definition is replaced by the corresponding token string from the call. The actual arguments in the call are token strings separated by commas; however, commas in quoted strings or protected by parentheses do not separate arguments. The number of formal and actual parametersmust be the same. Strings and character constants in the tokenstring are scanned for formal parameters, but strings and character constants in the rest of the program are not scanned for defined identifiers to replacement.
+```c
+#define identifier(identifier, ... ) token-stringop t
+```
+
+where there is no space between the first identifier and the `(`, is a macro definition with arguments. There may be zero or more formal parameters. Subsequent instances of the first identifier followed by a `(`, a sequence of tokens delimited by commas, and a `)` are replaced by the token string in the definition. Each occurrence of an identifier mentioned in the formal parameter list of the definition is replaced by the corresponding token string from the call. The actual arguments in the call are token strings separated by commas; however, commas in quoted strings or protected by parentheses do not separate arguments. The number of formal and actual parametersmust be the same. Strings and character constants in the tokenstring are scanned for formal parameters, but strings and character constants in the rest of the program are not scanned for defined identifiers to replacement.
 
 In both forms the replacement string is rescanned for more defined identifiers. In both forms a long definition may be continued on another line by writing \ at the end of the line to be continued.
 
-```text
 This facility is most valuable for definition of “manifest constants,” as in
+
+```c
 #define TABSIZE 100
-```
 
-```text
 int table[TABSIZE];
+```
+
 A control line of the form
-```
 
+```c
 #undef identifier
-
-```text
-causes the identifier’s preprocessor definition (if any) to be forgotten.
-If a #defined identifier is the subject of a subsequent #define with no intervening #
 ```
 
-define, then the two token-strings are compared textually. If the two token-strings are not identical (all white space is considered as equivalent), then the identifier is considered to be redefined.
+causes the identifier’s preprocessor definition (if any) to be forgotten.
+
+If a #defined identifier is the subject of a subsequent #define with no intervening # define, then the two token-strings are compared textually. If the two token-strings are not identical (all white space is considered as equivalent), then the identifier is considered to be redefined.
 
 #### C.12.2 File Inclusion
 
-```text
 A compiler control line of the form
+
+```c
 #include "filename"
 ```
 
-```text
-causes the replacement of that line by the entire contents of the file filename. The named
-file is searched for first in the directory of the file containing the #include, and then in a
-sequence of specified or standard places. Alternatively, a control line of the form
+causes the replacement of that line by the entire contents of the file filename. The named file is searched for first in the directory of the file containing the #include, and then in a sequence of specified or standard places. Alternatively, a control line of the form
+
+```c
 #include <filename>
 ```
 
-```text
-searches only the specified or standard places and not the directory of the #include. (How
-the places are specified is not part of the language.)
-```
+searches only the specified or standard places and not the directory of the #include. (How the places are specified is not part of the language.)
 
-#includes may be nested.
+`#includes` may be nested.
 
 #### C.12.3 Conditional Compilation
 
-```text
 A compiler control line of the form
+
+```c
 #if constant-expression
 ```
 
-checks whether the constant expression evaluates to nonzero. (Constant expressions are discussed in Section C.15. A control line of the form #ifdef identifier
+checks whether the constant expression evaluates to nonzero. (Constant expressions are discussed in Section C.15.) A control line of the form 
 
-```text
-checks whether the identifier is currently defined in the preprocessor; i.e., whether it has
-been the subject of a #define control line. It is equivalent to #if defined(identifier).
+```c
+#ifdef identifier
+```
+checks whether the identifier is currently defined in the preprocessor; i.e., whether it has been the subject of a #define control line. It is equivalent to 
+
+```c
+#if defined(identifier).
+```
 A control line of the form
+
+```c
 #ifndef identifier
 ```
 
-```text
 checks whether the identifier is currently undefined in the preprocessor. It is equivalent to
+
+```c
 #if !defined(identifier).
 ```
 
-All three forms are followed by an arbitrary number of lines, possibly containing a control line #else
+All three forms are followed by an arbitrary number of lines, possibly containing a control line 
 
-```text
+```c
+#else
+```
+
 and then by a control line
+
+```c
 #endif
 ```
 
-```text
-If the checked condition is true, then any lines between #else and #endif are ignored.
-If the checked condition is false, then any lines between the test and a #else or, lacking a
-#else, the #endif are ignored.
-```
+If the checked condition is true, then any lines between #else and #endif are ignored. If the checked condition is false, then any lines between the test and a #else or, lacking a #else, the #endif are ignored.
 
 These constructions may be nested.
 
@@ -3218,19 +3194,17 @@ These constructions may be nested.
 
 For the benefit of other preprocessors which generate C programs, a line of the form
 
+```c
 #line constant identifier
-
-```text
-causes the compiler to believe, for purposes of error diagnostics, that the line number of the
-next source line is given by the constant and the current input file is named by the identifier.
-If the identifier is absent, the remembered file name does not change.
 ```
+
+causes the compiler to believe, for purposes of error diagnostics, that the line number of the next source line is given by the constant and the current input file is named by the identifier. If the identifier is absent, the remembered file name does not change.
 
 ### C.13 Implicit Declarations
 
 It is not always necessary to specify both the storage class and the type of identifiers in a declaration. The storage class is supplied by the context in external definitions and in declarations of formal parameters and structure members. In a declaration inside a function, if a storage class but no type is given, the identifier is assumed to be of type int; if a type but no storage class is indicated, the identifier is assumed to have storage class auto. An exception to the latter rule is made for functions because auto functions do not exist. If the type of an identifier is “function returning ...,” it is implicitly declared to be extern.
 
-In an expression, an identifier followed by ( and not already declared is contextually declared to be “function returning int.”
+In an expression, an identifier followed by `(` and not already declared is contextually declared to be “function returning int.”
 
 ### C.14 Types Revisited
 
@@ -3244,32 +3218,37 @@ In a reference to a structure or union member, the name on the right of the -> o
 
 #### C.14.2 Functions
 
-There are only two things that can be done with a function m, call it or take its address. If the name of a function appears in an expression not in the function-name position of a call, a pointer to the function is generated. Thus, to pass one function to another, one might say int f(); ... g(f);
+There are only two things that can be done with a function m, call it or take its address. If the name of a function appears in an expression not in the function-name position of a call, a pointer to the function is generated. Thus, to pass one function to another, one might say 
 
-```text
+```c
+int f();
+...
+g(f);
+```
 Then the definition of g might read
+
+```c
 g(funcp)
 int (*funcp)();
 {
-```
-
-... (*funcp)(); ...
-
-```text
+    ...
+    (*funcp)();
+    ...
 }
-Notice that f must be declared explicitly in the calling routine since its appearance in
 ```
 
-g(f) was not followed by (.
+Notice that f must be declared explicitly in the calling routine since its appearance in
+`g(f)` was not followed by `(`.
 
 #### C.14.3 Arrays, Pointers, and Subscripting
 
-Every time an identifier of array type appears in an expression, it is converted into a pointer to the first member of the array. Because of this conversion, arrays are not lvalues. By definition, the subscript operator [] is interpreted in such a way that E1[E2] is identical to *((E1)+E2)). Because of the conversion rules which apply to +, if E1 is an array and E2 an integer, then E1[E2] refers to the E2-th member of E1. Therefore, despite its asymmetric appearance, subscripting is a commutative operation.
+Every time an identifier of array type appears in an expression, it is converted into a pointer to the first member of the array. Because of this conversion, arrays are not lvalues. By definition, the subscript operator [] is interpreted in such a way that `E1[E2]` is identical to `*((E1)+E2))`. Because of the conversion rules which apply to +, if E1 is an array and E2 an integer, then `E1[E2]` refers to the E2-th member of E1. Therefore, despite its asymmetric appearance, subscripting is a commutative operation.
 
 A consistent rule is followed in the case of multidimensional arrays. If E is an ndimensional array of rank i × j × … × k, then E appearing in an expression is converted to a pointer to an (n − 1)-dimensional array with rank j × … × k. If the * operator (either explicitly or implicitly as a result of subscripting) is applied to this pointer, the result is the pointed-to (n − 1)-dimensional array, which itself is immediately converted into a pointer.
 
-```text
 For example, consider
+
+```c
 int x[3][5];
 ```
 
@@ -3287,22 +3266,17 @@ An object of integral type may be explicitly converted to a pointer. The mapping
 
 A pointer to one type may be converted to a pointer to another type. The resulting pointer may cause addressing exceptions upon use if the subject pointer does not refer to an object suitably aligned in storage. It is guaranteed that a pointer to an object of a given size may be converted to a pointer to an object of a smaller size and back again without change.
 
-```text
-For example, a storage-allocation routine might accept a size (in bytes) of an object to
-allocate, and return a char pointer; it might be used in this way.
+For example, a storage-allocation routine might accept a size (in bytes) of an object to allocate, and return a char pointer; it might be used in this way.
+
+```c
 extern char *alloc();
 double *dp;
-```
 
-```text
 dp = (double *) alloc(sizeof(double));
 *dp = 22.0 / 7.0;
 ```
 
-```text
-The alloc must ensure (in a machine-dependent way) that its return value is suitable
-for conversion to a pointer to double; then the use of the function is portable.
-```
+The alloc must ensure (in a machine-dependent way) that its return value is suitable for conversion to a pointer to double; then the use of the function is portable.
 
 The pointer representation on the PDP-11 corresponds to a 16-bit integer and measures bytes. The chars have no alignment requirements; everything else must have an even address.
 
@@ -3312,24 +3286,27 @@ The 3B 20 computer has 24-bit pointers placed into 32-bit quantities. Most objec
 
 ### C.15 Constant Expressions
 
-In several places C requires expressions which evaluate to a constant: after case, as array bounds, and in initializers. In the first two cases, the expression can involve only integer constants, character constants, and sizeof expressions, possibly connected by the binary operators + - * / % & | ^ << >> == != < > <= >= && ||
+In several places C requires expressions which evaluate to a constant: after case, as array bounds, and in initializers. In the first two cases, the expression can involve only integer constants, character constants, and sizeof expressions, possibly connected by the binary operators 
 
-```text
+```c
++ - * / % & | ^ << >> == != < > <= >= && ||
+```
+
 or by the unary operators
+
+```c
 - ~
 ```
 
-```text
 or by the ternary operator
+
+```c
 ?:
 ```
 
-```text
 Parentheses may be used for grouping, but not for function calls.
-More latitude is permitted for initializers; besides constant expressions as discussed
-```
 
-above, one can also use floating constants and arbitrary casts and can also apply the unary & operator to external or static objects and to external or static arrays subscripted with a constant expression. The unary & can also be applied implicitly by appearance of unsubscripted arrays and functions. The basic rule is that initializers must evaluate either to a constant or to the address of a previously declared external or static object plus or minus a constant.
+More latitude is permitted for initializers; besides constant expressions as discussed above, one can also use floating constants and arbitrary casts and can also apply the unary & operator to external or static objects and to external or static arrays subscripted with a constant expression. The unary & can also be applied implicitly by appearance of unsubscripted arrays and functions. The basic rule is that initializers must evaluate either to a constant or to the address of a previously declared external or static object plus or minus a constant.
 
 ### C.16 Portability Considerations
 
@@ -3347,38 +3324,35 @@ Since character constants are really objects of type int, multi-character charac
 
 Fields are assigned to words and characters to integers right to left on some machines and left to right on other machines. These differences are invisible to isolated programs that do not indulge in type punning (e.g., by converting an int pointer to a char pointer and inspecting the pointed-to storage) butmust be accounted forwhen conforming to externallyimposed storage layouts.
 
-The language accepted by the various compilers differs in minor details. Most notably, the current PDP-11 compiler will not initialize structures containing bitfields, and does not
-
-accept a few assignment operators in certain contexts where the value of the assignment is used.
+The language accepted by the various compilers differs in minor details. Most notably, the current PDP-11 compiler will not initialize structures containing bitfields, and does not accept a few assignment operators in certain contexts where the value of the assignment is used.
 
 ### C.17 Anachronisms
 
 Since C is an evolving language, certain obsolete constructions may be found in older programs. Although most versions of the compiler support such anachronisms, ultimately they will disappear, leaving only a portability problem behind.
 
-```text
-Earlier versions of C used the form =op instead of op= for assignment operators. This
-leads to ambiguities, typified by:
+Earlier versions of C used the form =op instead of op= for assignment operators. This leads to ambiguities, typified by:
+
+```c
 x=-1
 ```
 
-```text
-which actually decrements x since the = and the - are adjacent, but which might easily be
-intended to assign the value -1 to x.
-```
+which actually decrements x since the = and the - are adjacent, but which might easily be intended to assign the value -1 to x.
 
-```text
-The syntax of initializers has changed: previously, the equals sign that introduces and
-initializer was not present, so instead of
+The syntax of initializers has changed: previously, the equals sign that introduces and initializer was not present, so instead of
+
+```c
 int x = 1;
 ```
 
-```text
 one used
+
+```c
 int x 1;
 ```
 
-```text
 The change was made because the initialization
+
+```c
 int f (1+2)
 ```
 
@@ -3390,199 +3364,246 @@ This summary of C syntax is intended more for aiding comprehension than as an ex
 
 #### C.18.1 Expressions
 
-The basic expressions are: expression:
+The basic expressions are: 
 
-primary * expression & lvalue - expression ! expression ~ expression ++ lvalue
+```
+expression:
+        primary 
+        * expression 
+        & lvalue 
+        - expression 
+        ! expression 
+        ~ expression 
+        ++ lvalue
+        -- lvalue 
+        lvalue ++ 
+        lvalue --
+        sizeof expression 
+        sizeof ( type−name ) 
+        ( type−name ) expression 
+        expression binop expression 
+        expression ? expression : expression 
+        lvalue asgnop expression 
+        expression , expression
 
--- lvalue lvalue ++ lvalue -sizeof expression sizeof ( type−name ) ( type−name ) expression expression binop expression expression ? expression : expression lvalue asgnop expression expression , expression
+primary: 
+        identifier 
+        constant 
+        string 
+        ( expression ) 
+        primary ( expression−list<sub>opt</sub> ) 
+        primary [ expression ] 
+        primary . identifier 
+        primary - identifier
 
-primary: identifier constant string ( expression ) primary ( expression−listopt ) primary [ expression ] primary . identifier primary - identifier
+lvalue: 
+        identifier 
+        primary [ expression ] 
+        lvalue . identifier 
+        primary - identifier 
+        * expression 
+        ( lvalue )
+```
 
-lvalue: identifier primary [ expression ] lvalue . identifier primary - identifier * expression ( lvalue )
+The primary-expression operators 
 
-The primary-expression operators () [] . -> have highest priority and group left to right. The unary operators
+```c
+() [] . ->
+```
 
-```text
+have highest priority and group left to right. The unary operators
+
+```c
 * & - ! ~ ++ -- sizeof ( type-name )
-have priority below the primary operators but higher than any binary operator and group
 ```
 
-right to left. Binary operators group left to right; they have priority decreasing as indicated below. binop:
+have priority below the primary operators but higher than any binary operator and group right to left. Binary operators group left to right; they have priority decreasing as indicated below. 
 
-* / % + - >> <<
+binop:
 
-```text
-< > <= >=
-== !=
-&
-^
-|
-&&
-||
+```c
+        * / %
+        + -
+        >> <<
+        < > <= >=
+        == !=
+        &
+        ^
+        |
+        &&
+        ||
 ```
 
-The conditional operator groups right to left. Assignment operators all have the same priority and all group right to left.
+The conditional operator groups right to left. 
+
+Assignment operators all have the same priority and all group right to left.
 
 ```text
 asgnop:
-= += -= *= /= %= >>= <<= &= ^= |=
+        = += -= *= /= %= >>= <<= &= ^= |=
 ```
 
 The comma operator has the lowest priority and groups left to right.
 
 #### C.18.2 Declarations
 
+```
 declaration:
+        decl−specifiers init−declarator−list<sub>opt</sub> ;
 
-decl−specifiers init−declarator−listopt ;
+decl−specifiers: 
+        type−specifier decl−specifiers<sub>opt</sub> 
+        sc−specifier decl−specifiers<sub>opt</sub>
 
-decl−specifiers: type−specifier decl−specifiersopt sc−specifier decl−specifiersopt
-
-```text
 sc−specifier:
-auto
-static
-extern
-register
-typedef
-```
+        auto
+        static
+        extern
+        register
+        typedef
 
-```text
 type−specifier:
-char
-short
-int
-long
-unsigned
-float
-double
-struct−or−union−specifier
-typedef−name
-```
+        char
+        short
+        int
+        long
+        unsigned
+        float
+        double
+        struct−or−union−specifier
+        typedef−name
 
 init−declarator−list:
+        init−declarator 
+        init−declarator , init−declarator−list
 
-init−declarator init−declarator , init−declarator−list
+init−declarator: 
+        declarator initializer<sub>opt</sub>
 
-init−declarator: declarator initializeropt
+declarator: 
+        identifier 
+        ( declarator ) 
+        * declarator 
+        declarator () 
+        declarator [ constant−expressionopt ]
 
-declarator: identifier ( declarator ) * declarator declarator () declarator [ constant−expressionopt ]
-
-```text
 struct−or−union−specifier:
-struct { struct−decl−list }
-struct identifier { struct−decl−list }
-struct identifier
-union { struct−decl−list }
-union identifier { struct−decl−list }
-union identifier
-```
+        struct { struct−decl−list }
+        struct identifier { struct−decl−list }
+        struct identifier
+        union { struct−decl−list }
+        union identifier { struct−decl−list }
+        union identifier
 
-```text
 struct−decl−list:
-struct−declaration
-struct−declaration struct−decl−list
-```
+        struct−declaration
+        struct−declaration struct−decl−list
 
-```text
 struct−declaration:
-type−specifier struct−declarator−list ;
-```
+        type−specifier struct−declarator−list ;
 
-```text
 struct−declarator−list:
-struct−declarator
-struct−declarator , struct−declarator−list
-```
+        struct−declarator
+        struct−declarator , struct−declarator−list
 
-struct−declarator: declarator declarator : constant−expression : constant−expression
+struct−declarator: 
+        declarator 
+        declarator : constant−expression 
+        : constant−expression
 
-```text
 initializer:
-= expression
-= { initializer−list }
-= { initializer−list , }
-```
+        = expression
+        = { initializer−list }
+        = { initializer−list , }
 
-initializer−list: expression initializer−list , initializer−list { initializer−list } { initializer−list , }
+initializer−list: 
+        expression 
+        initializer−list , initializer−list 
+        { initializer−list } 
+        { initializer−list , }
 
-type−name: type−specifier abstract−declarator
+type−name: 
+        type−specifier abstract−declarator
 
-abstract−declarator: empty ( abstract−declarator ) * abstract−declarator abstract−declarator () abstract−declarator [ constant−expressionopt ]
+abstract−declarator: 
+        empty 
+        ( abstract−declarator ) 
+        * abstract−declarator 
+        abstract−declarator () 
+        abstract−declarator [ constant−expressionopt ]
 
-```text
 typedef−name:
-identifier
+        identifier
 ```
 
 #### C.18.3 Statements
 
-```text
+```
 compound−statement:
-{ declaration−listopt statement−listopt }
-```
+        { declaration−listopt statement−listopt }
 
-declaration−list: declaration declaration declaration−list
+declaration−list: 
+        declaration 
+        declaration declaration−list
 
-statement−list: statement statement statement−list
+statement−list: 
+        statement 
+        statement statement−list
 
-```text
 statement:
-compound−statement
-expression ;
-if ( expression ) statement
-if ( expression ) statement else statement
-while ( expression ) statement
-do statement while ( expression ) ;
-for ( expopt ; expopt ; expopt ) statement
-```
-
-```text
-switch ( expression ) statement
-case constant−expression : statement
-default : statement
-break ;
-continue ;
-return ;
-return expression ;
-goto identifier ;
-identifier : statement
-;
+        compound−statement
+        expression ;
+        if ( expression ) statement
+        if ( expression ) statement else statement
+        while ( expression ) statement
+        do statement while ( expression ) ;
+        for ( expopt ; expopt ; expopt ) statement
+        switch ( expression ) statement
+        case constant−expression : statement
+        default : statement
+        break ;
+        continue ;
+        return ;
+        return expression ;
+        goto identifier ;
+        identifier : statement
+        ;
 ```
 
 #### C.18.4 External definitions
 
-program:
-
-external−definition external−definition program
-
-external−definition: function−definition data−definition
-
-function−definition: decl−specifieropt function−declarator function−body
-
-```text
-function−declarator:
-declarator ( parameter−listopt )
 ```
+program:
+        external−definition 
+        external−definition program
 
-parameter−list: identifier identifier , parameter−list
+external−definition: 
+        function−definition 
+        data−definition
 
-function−body: declaration−listopt compound−statement
+function−definition: 
+        decl−specifier<sub>opt</sub> function−declarator function−body
 
-```text
+function−declarator:
+        declarator ( parameter−list<sub>opt</sub> )
+
+parameter−list: 
+        identifier 
+        identifier , parameter−list
+
+function−body: 
+        declaration−list<sub>opt</sub> compound−statement
+
 data−definition:
-extern declaration ;
-static declaration ;
+        extern declaration ;
+        static declaration ;
 ```
 
 #### C.18.5 Preprocessor
 
-```text
-#define identifier token−stringopt
-#define identifier(identifier,…) token−stringopt
-```
-
-```text
+```c
+#define identifier token−string<sub>opt</sub>
+#define identifier(identifier,…) token−string<sub>opt</sub>
 #undef identifier
 #include "filename"
 #include <filename>
@@ -3600,40 +3621,39 @@ This package contains the DCC C Compiler. Many improvements and bug fixes have b
 
 The remainder of this notice describes the changes made since the 1983 releases of the Microware compiler.
 
-General The compiler’s binaries have all been renamed, to allow coexistence with the Microware compiler.
+### General
 
-Executive (dcc) The dcc executive does not generate command files, instead directly executing the various parts of the compiler in the appropriate sequence.
+The compiler’s binaries have all been renamed, to allow coexistence with the Microware compiler.
 
-```text
-Preprocessor (dcpp)
+### Executive (dcc)
+
+The dcc executive does not generate command files, instead directly executing the various parts of the compiler in the appropriate sequence.
+
+### Preprocessor (dcpp)
+
 dcpp supports the #if directive.
-```
 
-```text
-dcpp supports the standard #line directive, for use by external tools that generate C
-source.
-```
+dcpp supports the standard #line directive, for use by external tools that generate C source.
 
-```text
 dcpp supports ANSI/ISO “stringizing” and token pasting in the #define directive.
-dcpp supports #warning and #error directives, to allow error and potentially dangerous
-```
 
-conditions to be signaled to the compiler phase. dcpp supports the ANSI/ISO standard __FILE__ symbol, which expands to a C string
+dcpp supports #warning and #error directives, to allow error and potentially dangerous conditions to be signaled to the compiler phase. 
 
-literal containing the name of the current file.. dcpp supports the null directive, meaning preprocessor lines that contain no directives
+dcpp supports the ANSI/ISO standard __FILE__ symbol, which expands to a C string literal containing the name of the current file.. 
 
-are no longer considered errors. Comments in preprocessor lines will never be seen by the compiler. dcpp automatically defines the symbols _OS9, __mc6809__, and _BIG_END.
+dcpp supports the null directive, meaning preprocessor lines that contain no directives are no longer considered errors. 
+
+Comments in preprocessor lines will never be seen by the compiler. 
+
+dcpp automatically defines the symbols _OS9, __mc6809__, and _BIG_END.
 
 These changes make dcpp much more compliant with modern C.
 
-Compiler (dcc68) There is currently no multi-pass version of the compiler, but research continues into how that version may be resurrected.
+### Compiler (dcc68)
 
-```text
-dcc68 supports new types taken from the ANSI standard: unsigned char, unsigned
-short and unsigned long. dcc68 also supports the signed keyword to better cope with
-modern code standards.
-```
+There is currently no multi-pass version of the compiler, but research continues into how that version may be resurrected.
+
+dcc68 supports new types taken from the ANSI standard: unsigned char, unsigned short and unsigned long. dcc68 also supports the signed keyword to better cope with modern code standards.
 
 dcc68 can generate and signal warning messages that are not classified as errors, but which may be serious enough that the programmer may wish to change the code anyway.
 
@@ -3641,68 +3661,25 @@ A bug in the expression handler for math being done inside a switch expression h
 
 dcc68 is able to trace the contents of the D and X registers, in order to know when and when not to generate code to reload them.
 
-```text
-Optimizer (dco68)
-dco68 is no longer hard-codedwith a specific set of instruction recognition patterns; instead,
-patterns may be found in *.patterns files on disk.
-```
+### Optimizer (dco68)
+
+dco68 is no longer hard-codedwith a specific set of instruction recognition patterns; instead, patterns may be found in *.patterns files on disk.
 
 dco68 includes patterns that enable it to optimize forOS-9 Level II systems, which always place the start of the program data area at address zero. On such systems, the data area may be accessed using absolute addressing instead of indexed addressing, saving bytes and cycles.
 
-Library (clib.l and clibt.l) The standard library has been replaced with a newer one assembled by Carl Kreider, and contains many new functions from Unix and OS-9 for 68000 processors.
+### Library (clib.l and clibt.l)
 
-Runtime (cstart.r) It is now possible to return a value from the program’s main function instead of explicitly calling exit(), bringing behavior more in line with ANSI C language standards. However, if the program does not return a value from the program’s main function, the undefined behavior may cause the program’s exit status to be anything.
+The standard library has been replaced with a newer one assembled by Carl Kreider, and contains many new functions from Unix and OS-9 for 68000 processors.
 
-Index
+### Runtime (cstart.r)
 
-```text
-#define, 9 dot operator, 77
-meaning of, 73
-```
+It is now possible to return a value from the program’s main function instead of explicitly calling exit(), bringing behavior more in line with ANSI C language standards. However, if the program does not return a value from the program’s main function, the undefined behavior may cause the program’s exit status to be anything.
 
-assignments, 6 parentheses, 76 basic types, 6 prefix operators, 78 break, 94 main, 3 build program, 2 memory module, 25 comments, 5 operator continue, 93, 95 additive, 79 declarations, 5 assignment, 8, 82
+## Glossary
 
-```text
-comma, 83
-direct, 15
-direct page, 16, 28 conditional, 82
-```
+**arguments** parameters given to a function to control its operation
 
-```text
-equality, 80
-do, 93
-```
+**escape sequence** A group of characters, beginning with \{}, that stands for a special character that is impossible, difficult, or annoying to have represent itself.
 
-multiplicative, 79 edata, 21 relational, 80 end, 21 shift, 80 escape sequences, 4, 70 unary, 77 etext, 21
-
-```text
-pffinit(), 19
-float pflinit(), 19
-```
-
-formatting, see pffinit() printf, 4, 7 for, 8, 93 conversion, 7 functions, 3 program
-
-memory layout of, 28 goto, 95 PSECT, 48, 50
-
-ibrk(), 29 return, 95 identifiers, 69
-
-sbrk(), 29 K&R, 15 switch, 94
-
-```text
-long VSECT, 48, 50
-formatting, see pflinit()
-```
-
-lvalue, 73, 76 while, 6, 93 arrays, 102 arrow operator, 77
-
-Glossary
-
-arguments parameters given to a function to control its operation
-
-```text
-escape sequence A group of characters, beginning with \{}, that stands for a special charac-
-ter that is impossible, difficult, or annoying to have represent itself.
-```
-
-function a set of statements encapsulated under a name to perform some sequence of actions
+**function** a set of statements encapsulated under a name to perform some sequence of actions
 
