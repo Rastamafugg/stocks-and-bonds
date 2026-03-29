@@ -256,6 +256,7 @@ DIM mapCnt  : INTEGER
 DIM mapType(12): INTEGER
 DIM mapId(12)  : INTEGER
 DIM mapKey(12) : INTEGER
+DIM mapQty(12) : INTEGER
 DIM stockCnt : INTEGER
 DIM bondCnt  : INTEGER
 DIM keyLbl   : STRING[1]
@@ -315,19 +316,7 @@ LOOP
   PRINT "  Obligation remaining : $"; pStr; " [$"; pStr2; "]"
   PRINT
 
-  mapCnt := 0
-  stockCnt := 0
-  FOR s := 1 TO 9
-    IF plyr.stckShrs(s) > 0 THEN
-      stockCnt := stockCnt + 1
-    ENDIF
-  NEXT s
-  bondCnt := 0
-  FOR b := 1 TO 3
-    IF plyr.bondUnts(b) > 0 THEN
-      bondCnt := bondCnt + 1
-    ENDIF
-  NEXT b
+  RUN prepAssetMaps(plyr, mkt, 2, ordType, ordId, ordQty, ordCnt, mapType, mapId, mapKey, mapQty, mapCnt, stockCnt, bondCnt)
 
   PRINT "  STOCKS:";
   IF stockCnt = 1 THEN
@@ -337,19 +326,11 @@ LOOP
   ELSE
     PRINT
   ENDIF \ENDIF
-  FOR s := 1 TO 9
-    IF plyr.stckShrs(s) > 0 THEN
-      mapCnt := mapCnt + 1
-      mapType(mapCnt) := 1
-      mapId(mapCnt)   := s
-      mapKey(mapCnt)  := ASC("0") + mapCnt
-      slotQty := 0
-      FOR i := 1 TO ordCnt
-        IF ordType(i) = 1 AND ordId(i) = s THEN
-          slotQty := ordQty(i)
-        ENDIF
-      NEXT i
-      keyLbl := CHR$(mapKey(mapCnt))
+  FOR i := 1 TO mapCnt
+    IF mapType(i) = 1 THEN
+      s := mapId(i)
+      slotQty := mapQty(i)
+      keyLbl := CHR$(mapKey(i))
       ! Line exceeds 79 chars; PRINT USING row format requires single line.
       PRINT USING "'  ',S1<,' ',S12<,I5>,' shrs @ $',I4>", keyLbl, sNam(s), plyr.stckShrs(s), mkt.stckPrice(s);
       IF plyr.mgnBal(s) > 0 THEN
@@ -360,7 +341,7 @@ LOOP
       ENDIF
       PRINT
     ENDIF
-  NEXT s
+  NEXT i
   PRINT
   PRINT "  BONDS:";
   IF bondCnt = 1 THEN
@@ -370,19 +351,11 @@ LOOP
   ELSE
     PRINT
   ENDIF \ENDIF
-  FOR b := 1 TO 3
-    IF plyr.bondUnts(b) > 0 THEN
-      mapCnt := mapCnt + 1
-      mapType(mapCnt) := 2
-      mapId(mapCnt)   := b
-      mapKey(mapCnt)  := ASC("A") + b - 1
-      slotQty := 0
-      FOR i := 1 TO ordCnt
-        IF ordType(i) = 2 AND ordId(i) = b THEN
-          slotQty := ordQty(i)
-        ENDIF
-      NEXT i
-      keyLbl := CHR$(mapKey(mapCnt))
+  FOR i := 1 TO mapCnt
+    IF mapType(i) = 2 THEN
+      b := mapId(i)
+      slotQty := mapQty(i)
+      keyLbl := CHR$(mapKey(i))
       ! Line exceeds 79 chars; PRINT USING row format requires single line.
       PRINT USING "'  ',S1<,' $',I6>,' bond  ',I3>,' unit(s)'", keyLbl, bPar(b), plyr.bondUnts(b);
       IF slotQty > 0 THEN
@@ -390,7 +363,7 @@ LOOP
       ENDIF
       PRINT
     ENDIF
-  NEXT b
+  NEXT i
   PRINT
   PRINT "  X=confirm  D=bankrupt"
   GET #0, kIn
@@ -413,22 +386,12 @@ LOOP
     action := 1
     END
   ELSE
-    selIdx := 0
-    FOR i := 1 TO mapCnt
-      IF mapKey(i) = keyCode THEN
-        selIdx := i
-      ENDIF
-    NEXT i
+    RUN findMapSel(mapKey, mapCnt, keyCode, selIdx)
 
     IF selIdx > 0 THEN
       s := mapId(selIdx)
       b := mapId(selIdx)
-      slotIdx := 0
-      FOR i := 1 TO ordCnt
-        IF ordType(i) = mapType(selIdx) AND ordId(i) = mapId(selIdx) THEN
-          slotIdx := i
-        ENDIF
-      NEXT i
+      RUN findOrderSlot(ordType, ordId, ordQty, ordCnt, mapType(selIdx), mapId(selIdx), slotIdx, slotQty)
       baseCash := plyr.cashBal
       baseMgn  := currMgnTot
       baseOblg := oblgRem
@@ -465,25 +428,8 @@ LOOP
           RUN getLotQty("=== FORCED LIQUIDATION ===", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, 3, 0, plyr.stckShrs(s), baseCash, baseOblg, 0, qtyAct) \ ! ordMode=LIQ allowNav=0
           valid := TRUE
         ELSE
-          RUN fmtMoney(bPar(b), pStr)
-          PRINT "$"; pStr; " bond  "; plyr.bondUnts(b); " unit(s) held"
-          INPUT "  Sell units (0/Enter=clear): ", qIn
-          IF qIn = "" THEN
-            qty   := 0
-            valid := TRUE
-          ELSE
-            RUN getNumIn(qIn, qty, numOk)
-            IF NOT numOk THEN
-              PRINT "  Invalid: enter a number."
-            ELSE IF qty < 0 THEN
-              PRINT "  Invalid: enter 0 or a positive amount."
-            ELSE IF qty > plyr.bondUnts(b) THEN
-              PRINT "  Invalid: you hold only ";
-              PRINT plyr.bondUnts(b); " unit(s)."
-            ELSE
-              valid := TRUE
-            ENDIF \ENDIF \ENDIF
-          ENDIF
+          RUN promptBondQty(bPar(b), plyr.bondUnts(b), 0, qty, keyCode)
+          valid := TRUE
         ENDIF
       ENDWHILE
       IF qty = 0 THEN
@@ -556,6 +502,7 @@ DIM mapCnt     : INTEGER
 DIM mapType(12): INTEGER
 DIM mapId(12)  : INTEGER
 DIM mapKey(12) : INTEGER
+DIM mapQty(12) : INTEGER
 DIM stockCnt   : INTEGER
 DIM bondCnt    : INTEGER
 DIM keyLbl     : STRING[1]
@@ -632,19 +579,7 @@ LOOP
   PRINT "  All margin must be cleared before the buy phase."
   PRINT
 
-  mapCnt := 0
-  stockCnt := 0
-  FOR s := 1 TO 9
-    IF plyr.stckShrs(s) > 0 THEN
-      stockCnt := stockCnt + 1
-    ENDIF
-  NEXT s
-  bondCnt := 0
-  FOR b := 1 TO 3
-    IF plyr.bondUnts(b) > 0 THEN
-      bondCnt := bondCnt + 1
-    ENDIF
-  NEXT b
+  RUN prepAssetMaps(plyr, mkt, 2, ordType, ordId, ordQty, ordCnt, mapType, mapId, mapKey, mapQty, mapCnt, stockCnt, bondCnt)
 
   PRINT "  STOCKS:";
   IF stockCnt = 1 THEN
@@ -654,19 +589,11 @@ LOOP
   ELSE
     PRINT
   ENDIF \ENDIF
-  FOR s := 1 TO 9
-    IF plyr.stckShrs(s) > 0 THEN
-      mapCnt := mapCnt + 1
-      mapType(mapCnt) := 1
-      mapId(mapCnt)   := s
-      mapKey(mapCnt)  := ASC("0") + mapCnt
-      slotQty := 0
-      FOR i := 1 TO ordCnt
-        IF ordType(i) = 1 AND ordId(i) = s THEN
-          slotQty := ordQty(i)
-        ENDIF
-      NEXT i
-      keyLbl := CHR$(mapKey(mapCnt))
+  FOR i := 1 TO mapCnt
+    IF mapType(i) = 1 THEN
+      s := mapId(i)
+      slotQty := mapQty(i)
+      keyLbl := CHR$(mapKey(i))
       ! Line exceeds 79 chars; PRINT USING row format requires single line.
       PRINT USING "'  ',S1<,' ',S12<,I5>,' shrs @ $',I4>", keyLbl, sNam(s), plyr.stckShrs(s), mkt.stckPrice(s);
       IF plyr.mgnBal(s) > 0 THEN
@@ -677,7 +604,7 @@ LOOP
       ENDIF
       PRINT
     ENDIF
-  NEXT s
+  NEXT i
   PRINT
   PRINT "  BONDS:";
   IF bondCnt = 1 THEN
@@ -687,19 +614,11 @@ LOOP
   ELSE
     PRINT
   ENDIF \ENDIF
-  FOR b := 1 TO 3
-    IF plyr.bondUnts(b) > 0 THEN
-      mapCnt := mapCnt + 1
-      mapType(mapCnt) := 2
-      mapId(mapCnt)   := b
-      mapKey(mapCnt)  := ASC("A") + b - 1
-      slotQty := 0
-      FOR i := 1 TO ordCnt
-        IF ordType(i) = 2 AND ordId(i) = b THEN
-          slotQty := ordQty(i)
-        ENDIF
-      NEXT i
-      keyLbl := CHR$(mapKey(mapCnt))
+  FOR i := 1 TO mapCnt
+    IF mapType(i) = 2 THEN
+      b := mapId(i)
+      slotQty := mapQty(i)
+      keyLbl := CHR$(mapKey(i))
       ! Line exceeds 79 chars; PRINT USING row format requires single line.
       PRINT USING "'  ',S1<,' $',I6>,' bond  ',I3>,' unit(s)'", keyLbl, bPar(b), plyr.bondUnts(b);
       IF slotQty > 0 THEN
@@ -707,7 +626,7 @@ LOOP
       ENDIF
       PRINT
     ENDIF
-  NEXT b
+  NEXT i
   PRINT
   PRINT "  M=repay with cash  X=confirm  D=bankrupt"
   GET #0, kIn
@@ -765,22 +684,12 @@ LOOP
       RUN waitKey
     ENDIF
   ELSE
-    selIdx := 0
-    FOR i := 1 TO mapCnt
-      IF mapKey(i) = keyCode THEN
-        selIdx := i
-      ENDIF
-    NEXT i
+    RUN findMapSel(mapKey, mapCnt, keyCode, selIdx)
 
     IF selIdx > 0 THEN
       s := mapId(selIdx)
       b := mapId(selIdx)
-      slotIdx := 0
-      FOR i := 1 TO ordCnt
-        IF ordType(i) = mapType(selIdx) AND ordId(i) = mapId(selIdx) THEN
-          slotIdx := i
-        ENDIF
-      NEXT i
+      RUN findOrderSlot(ordType, ordId, ordQty, ordCnt, mapType(selIdx), mapId(selIdx), slotIdx, slotQty)
       baseCash := plyr.cashBal
       FOR j := 1 TO 9
         baseBal(j) := plyr.mgnBal(j)
@@ -833,25 +742,8 @@ LOOP
           ENDIF
           valid := TRUE
         ELSE
-          RUN fmtMoney(bPar(b), pStr)
-          PRINT "$"; pStr; " bond  "; plyr.bondUnts(b); " unit(s) held"
-          INPUT "  Sell units (0/Enter=clear): ", qIn
-          IF qIn = "" THEN
-            qty   := 0
-            valid := TRUE
-          ELSE
-            RUN getNumIn(qIn, qty, numOk)
-            IF NOT numOk THEN
-              PRINT "  Invalid: enter a number."
-            ELSE IF qty < 0 THEN
-              PRINT "  Invalid: enter 0 or a positive amount."
-            ELSE IF qty > plyr.bondUnts(b) THEN
-              PRINT "  Invalid: you hold only ";
-              PRINT plyr.bondUnts(b); " unit(s)."
-            ELSE
-              valid := TRUE
-            ENDIF \ENDIF \ENDIF
-          ENDIF
+          RUN promptBondQty(bPar(b), plyr.bondUnts(b), 0, qty, keyCode)
+          valid := TRUE
         ENDIF
       ENDWHILE
       IF qty = 0 THEN
