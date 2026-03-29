@@ -1,0 +1,178 @@
+PROCEDURE snbMgnRev
+(* ================================================== *)
+(* PROCEDURE: snbMgnRev                               *)
+(* PURPOSE:   README entry for snbMgnRev module.      *)
+(*            Lists all procedures in this module.    *)
+(* PARAMS:    None                                    *)
+(* ================================================== *)
+PRINT "snbMgnRev"
+PRINT "  applyLiqOrdr"
+PRINT "  scrMgnInt"
+END
+
+PROCEDURE applyLiqOrdr
+(* ============================================================ *)
+(* PROCEDURE : applyLiqOrdr                                     *)
+(* PURPOSE   : Apply forced liquidation sell orders from S21   *)
+(*             to the player record. Recalculates cashBal and  *)
+(*             oblgRem after each order.                       *)
+(*             Stock sell (forced liquidation rule):           *)
+(*               prcd := qty * stckPrice(s)                    *)
+(*               oblgRem is reduced by proceeds first.         *)
+(*               Any excess after oblgRem reaches 0 is added   *)
+(*               to cashBal. Company margin balances are not   *)
+(*               reduced here;                                 *)
+(*               margin repayment happens later via normal     *)
+(*               repayment flow.                               *)
+(*               stckShrs(s) -= qty                            *)
+(*             Bond sell (same forced-liquidation rule):       *)
+(*               oblgRem reduced by proceeds first             *)
+(*               excess proceeds added to cashBal              *)
+(*               bondUnts(b) -= qty                            *)
+(*             oblgRem is clamped at 0 after each order.       *)
+(*             ordCnt = 0 is a safe no-op.                     *)
+(* PARAMS    : plyr      - player record (modified)            *)
+(*             mkt       - market state (read-only)            *)
+(*             ordType   - 1=STOCK 2=BOND per order            *)
+(*             ordId     - asset index per order               *)
+(*             ordQty    - quantity per order                  *)
+(*             ordCnt    - number of orders (0..12)            *)
+(*             oblgRem   - obligation remaining (modified)     *)
+(* SIDE EFX  : Modifies plyr.cashBal,                         *)
+(*             plyr.stckShrs, plyr.bondUnts.                   *)
+(*             Reduces oblgRem; clamps to 0.                   *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+PARAM plyr        : PlyrRec
+PARAM mkt         : MktState
+PARAM ordType(12) : INTEGER
+PARAM ordId(12)   : INTEGER
+PARAM ordQty(12)  : INTEGER
+PARAM ordCnt      : INTEGER
+PARAM oblgRem     : INTEGER
+DIM bPar(3) : INTEGER
+DIM i       : INTEGER
+DIM s       : INTEGER
+DIM b       : INTEGER
+DIM qty     : INTEGER
+DIM prcd    : INTEGER
+DIM applyAmt: INTEGER
+
+RUN initBondPar(bPar)
+
+FOR i := 1 TO ordCnt
+
+  s   := ordId(i)
+  b   := ordId(i)
+  qty := ordQty(i)
+
+  IF ordType(i) = 1 THEN
+
+    ! Stock sell
+    prcd := qty * mkt.stckPrice(s)
+
+    plyr.stckShrs(s) := plyr.stckShrs(s) - qty
+
+  ELSE IF ordType(i) = 2 THEN
+
+    ! Bond sell
+    prcd := qty * bPar(b)
+    plyr.bondUnts(b) := plyr.bondUnts(b) - qty
+
+  ENDIF \ENDIF
+
+  ! Apply proceeds to obligation first; excess becomes cash.
+  applyAmt := oblgRem
+  IF prcd < applyAmt THEN
+    applyAmt := prcd
+  ENDIF
+  oblgRem := oblgRem - applyAmt
+  plyr.cashBal := plyr.cashBal + (prcd - applyAmt)
+  IF oblgRem < 0 THEN
+    oblgRem := 0
+  ENDIF
+
+NEXT i
+
+END
+
+PROCEDURE scrMgnInt
+(* ============================================================ *)
+(* PROCEDURE : scrMgnInt                                        *)
+(* PURPOSE   : S10 Margin Interest Notice screen.              *)
+(*             Displays annual margin interest charge and the  *)
+(*             resulting cash balance for one player.          *)
+(*             Called once per non-bankrupt player with        *)
+(*             outstanding margin after applyMgnInt runs.      *)
+(*             If isFrcLiq is TRUE, displays a forced          *)
+(*             liquidation warning before waitKey; caller is   *)
+(*             responsible for routing to scrForceLiq after    *)
+(*             this screen returns.                            *)
+(*             Internal guard: no-ops for Year 1 and Year 10; *)
+(*             those years have no margin interest charge.     *)
+(*             Caller should not invoke in Year 1 or Year 10, *)
+(*             but the guard prevents display if called in     *)
+(*             error.                                          *)
+(* PARAMS    : currYear  - current game year (1..10)           *)
+(*             plyrNam   - player name for display             *)
+(*             mgnTot    - outstanding margin before charge    *)
+(*             mgnChg    - interest deducted this year (>= 0)  *)
+(*             cashBef   - cash balance before deduction       *)
+(*             cashAft   - cash balance after deduction        *)
+(*             isFrcLiq  - TRUE if cashAft < 0                 *)
+(*             action    - OUT: always 1 (CONTINUE)            *)
+(* SIDE EFX  : Clears screen. Blocks on keypress via            *)
+(*             getPhaseNav.                                     *)
+(* ============================================================ *)
+PARAM currYear : INTEGER
+PARAM plyrNam  : STRING[20]
+PARAM mgnTot   : INTEGER
+PARAM mgnChg   : INTEGER
+PARAM cashBef  : INTEGER
+PARAM cashAft  : INTEGER
+PARAM isFrcLiq : BOOLEAN
+PARAM action   : INTEGER
+DIM pStr : STRING[8]
+DIM navAct: INTEGER
+
+! Internal guard: margin interest does not apply in Year 1 or 10.
+IF currYear = 1 OR currYear = 10 THEN
+  action := 1
+  END
+ENDIF
+
+RUN clrScr
+PRINT "=== MARGIN INTEREST ==="
+PRINT "  "; plyrNam; "  YEAR "; currYear; " OF 10"
+PRINT
+
+RUN fmtMoney(mgnTot, pStr)
+PRINT "  Outstanding margin : $"; pStr
+RUN fmtMoney(mgnChg, pStr)
+PRINT "  Annual charge (5%) : $"; pStr
+PRINT
+
+RUN fmtMoney(cashBef, pStr)
+PRINT "  Cash before charge : $"; pStr
+RUN fmtMoney(cashAft, pStr)
+PRINT "  Cash after charge  : $"; pStr
+PRINT
+
+IF isFrcLiq THEN
+  PRINT "  *** FORCED LIQUIDATION REQUIRED ***"
+  PRINT "  Cash balance is negative after margin interest."
+  PRINT "  You must liquidate assets to cover the deficit."
+  PRINT
+ENDIF
+
+RUN getPhaseNav(navAct)
+IF navAct = 2 THEN
+  action := 2
+ELSE IF navAct = 3 THEN
+  action := 3
+ELSE
+  action := 1
+ENDIF \ENDIF
+END

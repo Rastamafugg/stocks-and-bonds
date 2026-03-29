@@ -29,6 +29,7 @@ grouping. The table below records every entry procedure for each module.
 | `snbBuySell`    | `snbBuySell`  | `snbBuySell.b09`    |
 | `snbEndGame`    | `snbEndGame`  | `snbEndGame.b09`    |
 | `snbMargin`     | `snbMargin`   | `snbMargin.b09`     |
+| `snbMgnRev`     | `snbMgnRev`   | `snbMgnRev.b09`     |
 | `snbMktEng`     | `snbMktEng`   | `snbMktEng.b09`     |
 | `snbMktScr`     | `snbMktScr`   | `snbMktScr.b09`     |
 | `snbSaveLoad`   | `snbSaveLoad` | `snbSaveLoad.b09`   |
@@ -46,7 +47,8 @@ grouping. The table below records every entry procedure for each module.
 | `snbAI`        | snbAI, initAIProf, aiSell, aiBuy                                                                         | snbUtil              |
 | `snbBuySell`   | snbBuySell, scrSell, scrBuy                                                                              | snbUtil              |
 | `snbEndGame`   | snbEndGame, scrFinalMkt, scrWealth, scrWinner, scrPostGame                                               | snbUtil              |
-| `snbMargin`    | snbMargin, scrMgnCall, applyLiqOrdr, scrBankrupt, scrMgnInt, aiLiqOrdr, scrForceLiq, scrMgnClr         | snbUtil              |
+| `snbMargin`    | snbMargin, scrMgnCall, scrBankrupt, aiLiqOrdr, scrForceLiq, scrMgnClr, applySells                       | snbUtil              |
+| `snbMgnRev`    | snbMgnRev, applyLiqOrdr, scrMgnInt                                                                       | snbUtil              |
 | `snbMktEng`    | snbMktEng, getMktDelta, getCard, resolvePrice, applyMktYear, applyDivInt, applyMgnInt, drawCard, doRolls | snbUtil              |
 | `snbMktScr`    | snbMktScr, scrYearHdr, scrDivInt, scrDivFlag, scrCard, scrDice, scrMktBoard, scrSplit                    | snbUtil, snbMktEng   |
 | `snbSaveLoad`  | snbSaveLoad, saveGame, loadGame                                                                          | snbUtil              |
