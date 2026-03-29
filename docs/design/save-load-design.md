@@ -101,6 +101,40 @@ procedure uses this to route directly to the correct resume point.
 | 3            | FORCED_LIQ  | Forced liquidation active for `savedPlyr`;         | S21 — Forced Liquidation     |
 |              |             | `plyrs(savedPlyr).obligation` holds outstanding    |                              |
 |              |             | amount                                             |                              |
+| 8            | RETURN_TO_SETUP | Coordinator/menu control signal; leave active  | Main menu / setup flow       |
+|              |                | game flow and re-enter setup/menu                |                              |
+| 9            | QUIT_TO_MENU   | Coordinator/menu control signal; leave active  | Main menu without resuming   |
+|              |                | game flow without continuing year-loop state    |                              |
+
+### Combined State Contract
+
+`gameStage` and `savedPhase` serve different purposes and must be read
+together:
+
+- `gameStage` is the macro-state of the overall game loop
+- `savedPhase` is the intra-year resume checkpoint when `gameStage = 2`
+
+`gameStage` values:
+
+| `gameStage` | Meaning |
+|-------------|---------|
+| 1 | `GS_PREGM` — pre-game/setup state |
+| 2 | `GS_YEAR` — active year-loop state |
+| 3 | `GS_DONE` — yearly play complete; coordinator exits to closing flow |
+
+Valid combinations in the current design:
+
+| `gameStage` | `savedPhase` | Meaning |
+|-------------|--------------|---------|
+| 1 | 0 | Setup complete, year loop not yet started |
+| 2 | 0 | Start of active year before market resolution |
+| 2 | 1 | Sell phase pending for `savedPlyr` |
+| 2 | 2 | Buy phase pending for `savedPlyr` |
+| 2 | 3 | Forced liquidation active for `savedPlyr` |
+| 3 | 0 | Year loop complete; coordinator proceeds to closing flow |
+
+`savedPhase` values `8` and `9` are coordinator/menu control signals, not
+normal active-year checkpoints.
 
 ### YEAR_START resume behavior
 
