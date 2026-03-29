@@ -425,7 +425,7 @@ LOOP
           ENDIF
           qtyAct := 1
           ! Line exceeds 79 chars; getLotQty call requires full arguments.
-          RUN getLotQty("=== FORCED LIQUIDATION ===", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, 3, 0, plyr.stckShrs(s), baseCash, baseOblg, 0, qtyAct) \ ! ordMode=LIQ allowNav=0
+          RUN getLotQty("=== FORCED LIQUIDATION ===", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, 3, 0, plyr.stckShrs(s), baseCash, baseOblg, -1, 0, qtyAct) \ ! ordMode=LIQ allowNav=0
           valid := TRUE
         ELSE
           RUN promptBondQty(bPar(b), plyr.bondUnts(b), 0, qty, keyCode)
@@ -650,8 +650,8 @@ LOOP
     doneClr := TRUE
   ELSE IF keyCode = ASC("M") THEN
     maxRpy := currMgnTot
-    IF plyr.cashBal < maxRpy THEN
-      maxRpy := plyr.cashBal
+      IF simCash < maxRpy THEN
+        maxRpy := simCash
     ENDIF
     IF maxRpy < 0 THEN
       maxRpy := 0
@@ -736,9 +736,9 @@ LOOP
           qtyAct := 1
           ! Line exceeds 79 chars; getLotQty call requires full arguments.
           IF plyr.mgnBal(s) > 0 THEN
-            RUN getLotQty("=== YEAR 10 - MARGIN CLEARANCE REQUIRED ===", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, 2, 0, plyr.stckShrs(s), baseCash, baseBal(s), 0, qtyAct) \ ! ordMode=MARG allowNav=0
+            RUN getLotQty("=== YEAR 10 - MARGIN CLEARANCE REQUIRED ===", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, 2, 0, plyr.stckShrs(s), baseCash, baseMgn, baseBal(s), 0, qtyAct) \ ! ordMode=MARG allowNav=0
           ELSE
-            RUN getLotQty("=== YEAR 10 - MARGIN CLEARANCE REQUIRED ===", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, 0, 0, plyr.stckShrs(s), baseCash, baseMgn, 0, qtyAct) \ ! ordMode=SELL allowNav=0
+            RUN getLotQty("=== YEAR 10 - MARGIN CLEARANCE REQUIRED ===", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, 0, 0, plyr.stckShrs(s), baseCash, baseMgn, baseBal(s), 0, qtyAct) \ ! ordMode=SELL allowNav=0
           ENDIF
           valid := TRUE
         ELSE

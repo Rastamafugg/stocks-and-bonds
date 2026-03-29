@@ -40,6 +40,8 @@ PROCEDURE getLotQty
 (*                       projection; <0 disables      *)
 (*            currMrgObl - current margin or current  *)
 (*                       obligation, per ordMode      *)
+(*            currStkMgn - current stock margin for   *)
+(*                       display; <0 disables         *)
 (*            allowNav - 1 allows S/Q, else no nav    *)
 (*            navAct   - OUT 1=confirm 3=save 4=quit  *)
 (* EFFECTS:   Clears screen and redraws editor using  *)
@@ -56,6 +58,7 @@ PARAM canMode  : INTEGER
 PARAM maxQty   : INTEGER
 PARAM currCash : INTEGER
 PARAM currMrgObl : INTEGER
+PARAM currStkMgn : INTEGER
 PARAM allowNav : INTEGER
 PARAM navAct   : INTEGER
 
@@ -69,6 +72,8 @@ DIM lblCsh       : STRING[8]
 DIM lblCshPrj    : STRING[8]
 DIM lblMgnObl    : STRING[8]
 DIM lblMgnOblPrj : STRING[8]
+DIM lblStkMgn    : STRING[8]
+DIM lblStkMgnPrj : STRING[8]
 DIM kIn          : STRING[1]
 DIM lastChr      : STRING[1]
 DIM keyCode      : INTEGER
@@ -82,6 +87,7 @@ DIM iBits        : INTEGER
 DIM dispQty      : INTEGER
 DIM cashNow      : INTEGER
 DIM mgnNow       : INTEGER
+DIM stkMgnNow    : INTEGER
 DIM prjCost      : INTEGER
 DIM prjCash      : INTEGER
 DIM prjAmt       : INTEGER
@@ -99,12 +105,16 @@ LOOP
   dispQty := qty
   cashNow := currCash
   mgnNow  := currMrgObl
+  stkMgnNow := currStkMgn
   IF dispQty > 0 THEN
     prjCost := dispQty * price
     IF ordMode = 2 AND canMode <> 0 THEN \ ! MARG
       prjCash := prjCost / 2
       cashNow := cashNow - prjCash
       mgnNow  := mgnNow + (prjCost - prjCash)
+      IF currStkMgn >= 0 THEN
+        stkMgnNow := currStkMgn + (prjCost - prjCash)
+      ENDIF
     ELSE IF ordMode = 1 THEN \ ! CASH
       cashNow := cashNow - prjCost
     ELSE IF ordMode = 3 THEN \ ! LIQ
@@ -118,6 +128,10 @@ LOOP
       RUN calcSaleMgnRpy(currMrgObl, prjCost, prjAmt)
       mgnNow  := currMrgObl - prjAmt
       cashNow := currCash + (prjCost - prjAmt)
+      IF currStkMgn >= 0 THEN
+        RUN calcSaleMgnRpy(currStkMgn, prjCost, prjAmt)
+        stkMgnNow := currStkMgn - prjAmt
+      ENDIF
     ELSE
       cashNow := currCash + prjCost
     ENDIF \ENDIF \ENDIF \ENDIF
@@ -126,13 +140,24 @@ LOOP
   RUN fmtMoney(cashNow, lblCshPrj)
   RUN fmtMoney(currMrgObl, lblMgnObl)
   RUN fmtMoney(mgnNow, lblMgnOblPrj)
+  IF currStkMgn >= 0 THEN
+    RUN fmtMoney(currStkMgn, lblStkMgn)
+    RUN fmtMoney(stkMgnNow, lblStkMgnPrj)
+  ENDIF
   PRINT "  Cash: $"; lblCsh; " [$"; lblCshPrj; "]";
   IF ordMode = 3 THEN \ ! LIQ
     PRINT "  Obligation: $"; lblMgnObl; " [$"; lblMgnOblPrj; "]"
   ELSE
-    PRINT "  Margin: $"; lblMgnObl; " [$"; lblMgnOblPrj; "]"
+    PRINT "  Margin: $"; lblMgnObl; " [$"; lblMgnOblPrj; "]";
+    IF currStkMgn >= 0 THEN
+      PRINT "  Stock Mgn: $"; lblStkMgn; " [$"; lblStkMgnPrj; "]"
+    ELSE
+      PRINT
+    ENDIF
   ENDIF
-  PRINT
+  IF ordMode = 3 THEN
+    PRINT
+  ENDIF
   RUN fmtMoney(price, priceLbl)
   infoTxt := "  " + stockNm + "  " + TRIM$(STR$(holdQty))
   infoTxt := infoTxt + " shrs @ $" + priceLbl
