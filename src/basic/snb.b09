@@ -417,11 +417,13 @@ LOOP
     iGSt   := hdr.gameStage
     IF iSavPh = 8 THEN \ ! RETURN_TO_SETUP
       needSetup := TRUE
+    ELSE IF iSavPh = 9 THEN \ ! QUIT_TO_MENU
+      END
     ELSE IF iGSt <> 3 THEN
       needSetup := FALSE
     ELSE
       END
-    ENDIF \ENDIF
+    ENDIF \ENDIF \ENDIF
 
   ENDIF
 
