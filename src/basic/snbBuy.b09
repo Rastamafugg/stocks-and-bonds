@@ -15,7 +15,7 @@ PROCEDURE snbBuy
 (*             coordinator before fork.                        *)
 (* ============================================================ *)
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 TYPE AIProfile = tier,concenCap,spltSlPct,distSlPrc,mgnMaxExpo,mgnBuffer,mgnResvPct,repayFrac,mgnClrYear,endgameYr,spltSlPcE,repayFrcE:BYTE;bondIdlCsh,bndIdlCsE:INTEGER;zeroDivEl,useYldScr,useMargin,bondPriory:BOOLEAN
 DIM hdr        : SaveHdr
@@ -42,6 +42,7 @@ DIM mgnYrOk    : BOOLEAN
 DIM usrAct     : INTEGER
 DIM navAct     : BYTE
 DIM tInt       : INTEGER
+DIM actualRpy  : INTEGER
 DIM aiTierVal  : INTEGER
 DIM pTypeVal   : INTEGER
 DIM p          : INTEGER
@@ -87,8 +88,7 @@ FOR p := startP TO iPCnt
           END
         ENDIF \ENDIF
       IF mgnRpy > 0 THEN
-        plyrs(p).cashBal   := plyrs(p).cashBal - mgnRpy
-        plyrs(p).marginTot := plyrs(p).marginTot - mgnRpy
+        RUN applyCashMgnRepay(plyrs(p), mgnRpy, actualRpy)
       ENDIF
       IF ordCnt > 0 THEN
         RUN applyBuys(plyrs(p), mkt, ordTyp, ordId, ordQty, ordPur, ordCnt)
@@ -106,8 +106,7 @@ FOR p := startP TO iPCnt
       ENDIF
       RUN aiBuy(iCYr, plyrs(p), mkt, prof, ordTyp, ordId, ordQty, ordPur, ordCnt, mgnRpy)
       IF mgnRpy > 0 THEN
-        plyrs(p).cashBal   := plyrs(p).cashBal - mgnRpy
-        plyrs(p).marginTot := plyrs(p).marginTot - mgnRpy
+        RUN applyCashMgnRepay(plyrs(p), mgnRpy, actualRpy)
       ENDIF
       IF ordCnt > 0 THEN
         RUN applyBuys(plyrs(p), mkt, ordTyp, ordId, ordQty, ordPur, ordCnt)
@@ -205,7 +204,7 @@ PROCEDURE aiBuy
 (*             Array slots cap at 12; extras silently dropped. *)
 (* ============================================================ *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE AIProfile = tier,concenCap,spltSlPct,distSlPrc,mgnMaxExpo,mgnBuffer,mgnResvPct,repayFrac,mgnClrYear,endgameYr,spltSlPcE,repayFrcE:BYTE;bondIdlCsh,bndIdlCsE:INTEGER;zeroDivEl,useYldScr,useMargin,bondPriory:BOOLEAN
@@ -249,6 +248,7 @@ DIM simCash      : INTEGER \ ! simulated cash after repayment
 DIM annlChrg     : INTEGER \ ! estimated annual margin interest charge
 DIM burdenThr    : INTEGER \ ! repayment trigger threshold
 DIM repayAmt     : INTEGER \ ! candidate repay amount (pre-clamp)
+DIM totalMgn     : INTEGER \ ! aggregate outstanding margin
 DIM candCnt      : INTEGER \ ! number of eligible buy candidates
 DIM maxPos       : INTEGER \ ! selection sort: index of current max
 DIM maxCash      : INTEGER \ ! cap-limited cash for this stock
@@ -301,21 +301,22 @@ mgnRepay := 0
 ! ============================================================
 ! Step 1 - Voluntary margin repayment check.
 ! MarginInterestRate = 5% (spec Section 1 constant).
-! annlChrg  = marginTot * 5 / 100  (= marginTot / 20).
+! annlChrg  = totalMgn * 5 / 100  (= totalMgn / 20).
 ! burdenThr = cashBal * mgnRsvPctW / 100.
 ! If annlChrg > burdenThr AND cashBal > 0:
-!   repayAmt = cashBal * repayFracW / 100; clamp to marginTot.
+!   repayAmt = cashBal * repayFracW / 100; clamp to totalMgn.
 !   Return as mgnRepay; reduce simCash by repayAmt.
 ! ============================================================
 
 simCash := plyr.cashBal
-IF plyr.marginTot > 0 AND plyr.cashBal > 0 THEN
-  annlChrg  := plyr.marginTot / 20
+RUN calcMgnTot(plyr, totalMgn)
+IF totalMgn > 0 AND plyr.cashBal > 0 THEN
+  annlChrg  := totalMgn / 20
   burdenThr := plyr.cashBal / 100 * mgnRsvPctW
   IF annlChrg > burdenThr THEN
     repayAmt := plyr.cashBal / 100 * repayFracW
-    IF repayAmt > plyr.marginTot THEN
-      repayAmt := plyr.marginTot
+    IF repayAmt > totalMgn THEN
+      repayAmt := totalMgn
     ENDIF
     mgnRepay := repayAmt
     simCash  := simCash - repayAmt
@@ -437,7 +438,7 @@ NEXT i
 ! Hard tier only (margAllwd=TRUE); skipped for Easy/Medium.
 ! Per spec Section 5.5, all four checks must pass:
 !   priceOK    : price >= MarginCallPrice(25) + mgnBufW
-!   exposureOK : marginTot < portfVal * mgnMaxExpW%
+!   exposureOK : totalMgn < portfVal * mgnMaxExpW%
 !   headroomOK : remaining cap after cash pass >= 1 lot cost
 !   lotsOK     : maxLots >= 10
 ! MarginRate = 0.50: cash covers 50% of full purchase cost.
@@ -455,8 +456,9 @@ IF margAllwd THEN
       FOR j := 1 TO 3
         portfVal := portfVal + plyr.bondUnts(j) * bPar(j)
       NEXT j
-      ! Exposure check: marginTot < portfVal * mgnMaxExpW%
-      IF plyr.marginTot < portfVal / 100 * mgnMaxExpW THEN
+      RUN calcMgnTot(plyr, totalMgn)
+      ! Exposure check: totalMgn < portfVal * mgnMaxExpW%
+      IF totalMgn < portfVal / 100 * mgnMaxExpW THEN
         ! Concentration headroom after cash pass.
         capLmt   := portfVal / 100 * concentCapW
         alrdySpt := cashPassLt(s) * mkt.stckPrice(s)
@@ -535,15 +537,15 @@ PROCEDURE applyBuys
 (*               cashPay := cost / 2   (MarginRate = 50%)      *)
 (*               mgnPay  := cost - cashPay                     *)
 (*               cashBal   -= cashPay                          *)
-(*               marginTot += mgnPay                           *)
+(*               mgnBal(s) += mgnPay                           *)
 (*               stckShrs(s) += qty                            *)
-(*               mgnHeld(s) := TRUE                            *)
 (*             Bond buy (always cash; ordPurch=1):             *)
 (*               cashBal -= qty * bPar(b)                      *)
 (*               bondUnts(b) += qty                            *)
 (*             ordType: 1=STOCK 2=BOND.                        *)
 (*             Caller is responsible for applying mgnRepay     *)
-(*             (cashBal -= mgnRepay; marginTot -= mgnRepay)    *)
+(*             (cashBal -= mgnRepay; per-company margin        *)
+(*              balances reduced by helper)                    *)
 (*             BEFORE calling this procedure. This procedure   *)
 (*             does not handle voluntary margin repayment.     *)
 (*             No-op when ordCnt = 0 (player passed).          *)
@@ -555,12 +557,12 @@ PROCEDURE applyBuys
 (*             ordPurch  - purchase type per order             *)
 (*                         1=CASH  2=MARGIN                    *)
 (*             ordCnt    - number of valid orders (0..12)      *)
-(* SIDE EFX  : Modifies plyr.cashBal, plyr.marginTot,          *)
-(*             plyr.stckShrs, plyr.mgnHeld, plyr.bondUnts,     *)
+(* SIDE EFX  : Modifies plyr.cashBal, plyr.mgnBal,             *)
+(*             plyr.stckShrs, plyr.bondUnts,                   *)
 (*             plyr.hadCashPur.                                *)
 (* ============================================================ *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 PARAM plyr         : PlyrRec
 PARAM mkt          : MktState
@@ -602,9 +604,8 @@ FOR i := 1 TO ordCnt
       cashPay := cost / 2
       mgnPay  := cost - cashPay
 
-      plyr.cashBal   := plyr.cashBal   - cashPay
-      plyr.marginTot := plyr.marginTot + mgnPay
-      plyr.mgnHeld(s) := TRUE
+      plyr.cashBal  := plyr.cashBal - cashPay
+      plyr.mgnBal(s) := plyr.mgnBal(s) + mgnPay
 
     ELSE
 
@@ -639,18 +640,19 @@ PROCEDURE scrMgnRepay
 (*             it in amtToRpy.                                 *)
 (*             Called from scrBuy when player selects the      *)
 (*             repay margin option. maxRpy must equal          *)
-(*             MIN(marginTot, cashBal) - caller is responsible *)
+(*             MIN(total margin, cashBal) - caller is          *)
+(*             responsible                                     *)
 (*             for computing this before calling.              *)
 (*             0 is a valid entry (player declines repayment   *)
 (*             after viewing the screen).                      *)
-(* PARAMS    : marginTot  - current outstanding margin total   *)
+(* PARAMS    : currMgnTot - current outstanding margin total   *)
 (*             cashBal    - current available cash             *)
 (*             maxRpy     - maximum repayable amount           *)
-(*                          (MIN(marginTot, cashBal))          *)
+(*                          (MIN(total margin, cashBal))       *)
 (*             amtToRpy   - output: amount player will repay   *)
 (* SIDE EFX  : Clears screen. Uses INPUT for repayment amount. *)
 (* ============================================================ *)
-PARAM marginTot : INTEGER
+PARAM currMgnTot : INTEGER
 PARAM cashBal   : INTEGER
 PARAM maxRpy    : INTEGER
 PARAM amtToRpy  : INTEGER
@@ -665,7 +667,7 @@ ON ERROR GOTO 900
 RUN clrScr
 PRINT "=== MARGIN REPAYMENT ==="
 PRINT
-RUN fmtMoney(marginTot, pStr)
+RUN fmtMoney(currMgnTot, pStr)
 PRINT "  Outstanding margin : $"; pStr
 RUN fmtMoney(cashBal, pStr)
 PRINT "  Cash available     : $"; pStr
@@ -825,7 +827,7 @@ PROCEDURE scrBuy
 (*             selected. Uses GET and INPUT.                   *)
 (* ============================================================ *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 PARAM currYear      : INTEGER
 PARAM plyr          : PlyrRec
@@ -883,6 +885,7 @@ DIM baseCash : INTEGER
 DIM baseMgn  : INTEGER
 DIM cost     : INTEGER
 DIM mgnPay   : INTEGER
+DIM currMgnTot : INTEGER
 DIM cnfIn    : STRING[1]
 DIM editTxt  : STRING[48]
 DIM qtyAct   : INTEGER
@@ -930,7 +933,8 @@ NEXT i
 LOOP
 
   simCash := plyr.cashBal - mgnRepay
-  simMgn  := plyr.marginTot - mgnRepay
+  RUN calcMgnTot(plyr, currMgnTot)
+  simMgn  := currMgnTot - mgnRepay
   FOR i := 1 TO ordCnt
     IF ordType(i) = 1 THEN
       s := ordId(i)
@@ -958,7 +962,7 @@ LOOP
   RUN fmtMoney(plyr.cashBal, pStr)
   RUN fmtMoney(simCash, pStr2)
   PRINT "  Cash: $"; pStr; " [$"; pStr2; "]";
-  RUN fmtMoney(plyr.marginTot, pStr)
+  RUN fmtMoney(currMgnTot, pStr)
   RUN fmtMoney(simMgn, pStr2)
   IF mgnYrOk THEN
     PRINT "  Margin: $"; pStr; " [$"; pStr2; "]"
@@ -1042,13 +1046,13 @@ LOOP
 
   PRINT
   IF ordCnt > 0 OR mgnRepay > 0 THEN
-    IF mgnYrOk AND plyr.marginTot > 0 THEN
+    IF mgnYrOk AND currMgnTot > 0 THEN
       PRINT "  X=confirm orders  P=pass  M=repay margin  S=save+exit  Q=quit"
     ELSE
       PRINT "  X=confirm orders  P=pass  S=save+exit  Q=quit"
     ENDIF
   ELSE
-    IF mgnYrOk AND plyr.marginTot > 0 THEN
+    IF mgnYrOk AND currMgnTot > 0 THEN
       PRINT "  P=pass  M=repay margin  S=save+exit  Q=quit"
     ELSE
       PRINT "  P=pass  S=save+exit  Q=quit"
@@ -1099,7 +1103,7 @@ LOOP
       action := 1
       END
     ENDIF
-  ELSE IF keyCode = ASC("M") AND mgnYrOk AND plyr.marginTot > 0 THEN
+  ELSE IF keyCode = ASC("M") AND mgnYrOk AND currMgnTot > 0 THEN
     baseCash := simCash + mgnRepay
     baseMgn  := simMgn + mgnRepay
     maxRpy := baseMgn

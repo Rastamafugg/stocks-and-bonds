@@ -12,6 +12,9 @@ PRINT "  getLotQty"
 PRINT "  fmtMoney"
 PRINT "  fmtPlyrName"
 PRINT "  calcMgnTot"
+PRINT "  calcSaleMgnRpy"
+PRINT "  applyCashMgnRepay"
+PRINT "  applyStockMgnRepay"
 PRINT "  getMenuKey"
 PRINT "  getPhaseNav"
 PRINT "  getSaveQuitAct"
@@ -143,10 +146,7 @@ LOOP
       mgnNow  := currMrgObl - prjAmt
       cashNow := currCash + (prjCost - prjAmt)
     ELSE IF ordMode = 2 THEN \ ! MARG sell
-      prjAmt := currMrgObl
-      IF prjCost < prjAmt THEN
-        prjAmt := prjCost
-      ENDIF
+      RUN calcSaleMgnRpy(currMrgObl, prjCost, prjAmt)
       mgnNow  := currMrgObl - prjAmt
       cashNow := currCash + (prjCost - prjAmt)
     ELSE
@@ -419,7 +419,7 @@ PROCEDURE calcMgnTot
 (* EFFECTS:   None beyond output PARAM assignment.    *)
 (* ================================================== *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 PARAM plyr   : PlyrRec
 PARAM mgnTot : INTEGER
 DIM s        : INTEGER
@@ -428,6 +428,109 @@ mgnTot := 0
 FOR s := 1 TO 9
   mgnTot := mgnTot + plyr.mgnBal(s)
 NEXT s
+END
+
+PROCEDURE calcSaleMgnRpy
+(* ================================================== *)
+(* PROCEDURE: calcSaleMgnRpy                           *)
+(* PURPOSE:   Return the company-margin repayment due  *)
+(*            from a stock sale under the simplified   *)
+(*            rule: 50% of proceeds, clamped to the    *)
+(*            company's remaining margin balance.      *)
+(* PARAMS:    compMgn - current company margin balance *)
+(*            proceeds - sale proceeds                 *)
+(*            repay   - receives margin repayment      *)
+(* EFFECTS:   None beyond output PARAM assignment.     *)
+(* ================================================== *)
+PARAM compMgn : INTEGER
+PARAM proceeds: INTEGER
+PARAM repay   : INTEGER
+
+repay := proceeds / 2
+IF repay > compMgn THEN
+  repay := compMgn
+ENDIF
+IF repay < 0 THEN
+  repay := 0
+ENDIF
+END
+
+PROCEDURE applyCashMgnRepay
+(* ================================================== *)
+(* PROCEDURE: applyCashMgnRepay                        *)
+(* PURPOSE:   Apply a general cash repayment against   *)
+(*            per-company margin balances in ascending *)
+(*            stock-id order.                          *)
+(* PARAMS:    plyr      - player record (modified)     *)
+(*            repayReq  - requested cash repayment     *)
+(*            actualRpy - receives applied amount      *)
+(* EFFECTS:   Reduces cashBal and mgnBal(1..9).        *)
+(* ================================================== *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+PARAM plyr      : PlyrRec
+PARAM repayReq  : INTEGER
+PARAM actualRpy : INTEGER
+DIM rem         : INTEGER
+DIM totMgn      : INTEGER
+DIM takeAmt     : INTEGER
+DIM s           : INTEGER
+
+RUN calcMgnTot(plyr, totMgn)
+actualRpy := repayReq
+IF actualRpy > plyr.cashBal THEN
+  actualRpy := plyr.cashBal
+ENDIF
+IF actualRpy > totMgn THEN
+  actualRpy := totMgn
+ENDIF
+IF actualRpy < 0 THEN
+  actualRpy := 0
+ENDIF
+plyr.cashBal := plyr.cashBal - actualRpy
+rem := actualRpy
+FOR s := 1 TO 9
+  IF rem > 0 THEN
+    takeAmt := plyr.mgnBal(s)
+    IF takeAmt > rem THEN
+      takeAmt := rem
+    ENDIF
+    plyr.mgnBal(s) := plyr.mgnBal(s) - takeAmt
+    rem := rem - takeAmt
+  ENDIF
+NEXT s
+END
+
+PROCEDURE applyStockMgnRepay
+(* ================================================== *)
+(* PROCEDURE: applyStockMgnRepay                       *)
+(* PURPOSE:   Apply a cash repayment against one      *)
+(*            company's margin balance.               *)
+(* PARAMS:    plyr      - player record (modified)    *)
+(*            stockId   - company index 1..9          *)
+(*            repayReq  - requested repayment         *)
+(*            actualRpy - receives applied amount     *)
+(* EFFECTS:   Reduces cashBal and mgnBal(stockId).    *)
+(* ================================================== *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+PARAM plyr      : PlyrRec
+PARAM stockId   : INTEGER
+PARAM repayReq  : INTEGER
+PARAM actualRpy : INTEGER
+
+actualRpy := repayReq
+IF actualRpy > plyr.cashBal THEN
+  actualRpy := plyr.cashBal
+ENDIF
+IF actualRpy > plyr.mgnBal(stockId) THEN
+  actualRpy := plyr.mgnBal(stockId)
+ENDIF
+IF actualRpy < 0 THEN
+  actualRpy := 0
+ENDIF
+plyr.cashBal := plyr.cashBal - actualRpy
+plyr.mgnBal(stockId) := plyr.mgnBal(stockId) - actualRpy
 END
 
 PROCEDURE getMenuKey
@@ -539,7 +642,7 @@ PROCEDURE quitToMenu
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 ! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 PARAM hdr        : SaveHdr
 PARAM deckOrd(36): BYTE
@@ -573,7 +676,7 @@ PROCEDURE saveQuitToMenu
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 ! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 PARAM savePhase  : INTEGER
 PARAM savePlyr   : INTEGER
@@ -680,7 +783,7 @@ PROCEDURE saveGame
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 ! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 PARAM savePath   : STRING[20]
 PARAM hdr        : SaveHdr
@@ -784,7 +887,7 @@ PROCEDURE loadGame
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 ! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 PARAM savePath   : STRING[20]
 PARAM hdr        : SaveHdr

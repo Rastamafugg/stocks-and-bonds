@@ -25,7 +25,7 @@ PROCEDURE snbDividend
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 ! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 DIM hdr        : SaveHdr
 DIM deckOrd(36): BYTE
@@ -42,6 +42,7 @@ DIM divRate(9) : INTEGER  \ ! dividend per share (spec Section 2.1)
 DIM bndRate(3) : INTEGER  \ ! annual interest per bond unit (spec 2.2)
 DIM totRcvd    : INTEGER  \ ! total div+int received this year
 DIM mgnChg     : INTEGER  \ ! annual margin interest charge
+DIM totalMgn   : INTEGER  \ ! aggregate outstanding margin
 DIM cashNow    : INTEGER  \ ! cash before annual margin charge
 DIM oblgRem    : INTEGER  \ ! liquidation obligation after charge
 DIM pNam       : STRING[27] \ ! staged display name for scrDivInt call
@@ -150,8 +151,9 @@ IF iCYr > 1 THEN
     IF iCYr < iMaxYr THEN
       FOR p := 1 TO iPCnt
         IF NOT plyrs(p).isBankrupt THEN
-          IF plyrs(p).marginTot > 0 THEN
-            mgnChg  := plyrs(p).marginTot / 20
+          RUN calcMgnTot(plyrs(p), totalMgn)
+          IF totalMgn > 0 THEN
+            mgnChg  := totalMgn / 20
             cashNow := plyrs(p).cashBal
             plyrs(p).cashBal := cashNow - mgnChg
             isNegCash := FALSE
@@ -160,7 +162,7 @@ IF iCYr > 1 THEN
             ENDIF
             mgnAct := 1
             ! Line exceeds 79 chars; RUN statement cannot be split.
-            RUN scrMgnInt(iCYr, plyrs(p).plyrName, plyrs(p).marginTot, mgnChg, cashNow, plyrs(p).cashBal, isNegCash, mgnAct)
+            RUN scrMgnInt(iCYr, plyrs(p).plyrName, totalMgn, mgnChg, cashNow, plyrs(p).cashBal, isNegCash, mgnAct)
             IF plyrs(p).cashBal < 0 THEN
               oblgRem := 0 - plyrs(p).cashBal
               IF plyrs(p).plyrType = 1 THEN
@@ -241,7 +243,7 @@ PROCEDURE applyDivInt
 (*             here. That is handled during card resolution.   *)
 (* ============================================================ *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 PARAM currYear : INTEGER
 PARAM plyrCnt  : INTEGER

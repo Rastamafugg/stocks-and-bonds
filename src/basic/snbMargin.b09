@@ -74,11 +74,11 @@ PROCEDURE applyLiqOrdr
 (*               prcd := qty * stckPrice(s)                    *)
 (*               oblgRem is reduced by proceeds first.         *)
 (*               Any excess after oblgRem reaches 0 is added   *)
-(*               to cashBal. marginTot is NOT reduced here;    *)
+(*               to cashBal. Company margin balances are not   *)
+(*               reduced here;                                 *)
 (*               margin repayment happens later via normal     *)
 (*               repayment flow.                               *)
 (*               stckShrs(s) -= qty                            *)
-(*               mgnHeld(s) cleared only when stckShrs(s) = 0  *)
 (*             Bond sell (same forced-liquidation rule):       *)
 (*               oblgRem reduced by proceeds first             *)
 (*               excess proceeds added to cashBal              *)
@@ -93,11 +93,11 @@ PROCEDURE applyLiqOrdr
 (*             ordCnt    - number of orders (0..12)            *)
 (*             oblgRem   - obligation remaining (modified)     *)
 (* SIDE EFX  : Modifies plyr.cashBal,                         *)
-(*             plyr.stckShrs, plyr.mgnHeld, plyr.bondUnts.     *)
+(*             plyr.stckShrs, plyr.bondUnts.                   *)
 (*             Reduces oblgRem; clamps to 0.                   *)
 (* ============================================================ *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 PARAM plyr        : PlyrRec
 PARAM mkt         : MktState
@@ -130,9 +130,6 @@ FOR i := 1 TO ordCnt
     prcd := qty * mkt.stckPrice(s)
 
     plyr.stckShrs(s) := plyr.stckShrs(s) - qty
-    IF plyr.stckShrs(s) = 0 THEN
-      plyr.mgnHeld(s) := FALSE
-    ENDIF
 
   ELSE IF ordType(i) = 2 THEN
 
@@ -179,7 +176,7 @@ PROCEDURE scrBankrupt
 (*             Clears screen. Waits for keypress via waitKey.  *)
 (* ============================================================ *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 PARAM plyr      : PlyrRec
 PARAM finalCash : INTEGER
 PARAM reason    : BYTE
@@ -311,7 +308,7 @@ PROCEDURE aiLiqOrdr
 (* SIDE EFX  : None beyond output PARAM population.             *)
 (* ============================================================ *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 PARAM plyr        : PlyrRec
 PARAM mkt         : MktState
@@ -410,7 +407,7 @@ PROCEDURE scrForceLiq
 (* SIDE EFX  : Clears screen. Uses INPUT for order quantities. *)
 (* ============================================================ *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 PARAM plyrNam     : STRING[20]
 PARAM oblgRem     : INTEGER
@@ -454,6 +451,7 @@ DIM qtyAct  : INTEGER
 DIM baseCash : INTEGER
 DIM baseMgn  : INTEGER
 DIM baseOblg : INTEGER
+DIM currMgnTot : INTEGER
 
 ON ERROR GOTO 900
 
@@ -481,7 +479,8 @@ NEXT i
 LOOP
 
   simCash := plyr.cashBal
-  simMgn  := plyr.marginTot
+  RUN calcMgnTot(plyr, currMgnTot)
+  simMgn  := currMgnTot
   simOblg := oblgRem
   FOR i := 1 TO ordCnt
     IF ordType(i) = 1 THEN
@@ -504,7 +503,7 @@ LOOP
   RUN fmtMoney(plyr.cashBal, pStr)
   RUN fmtMoney(simCash, pStr2)
   PRINT "  Current cash         : $"; pStr; " [$"; pStr2; "]"
-  RUN fmtMoney(plyr.marginTot, pStr)
+  RUN fmtMoney(currMgnTot, pStr)
   PRINT "  Current margin       : $"; pStr
   RUN fmtMoney(oblgRem, pStr)
   RUN fmtMoney(simOblg, pStr2)
@@ -548,7 +547,7 @@ LOOP
       keyLbl := CHR$(mapKey(mapCnt))
       ! Line exceeds 79 chars; PRINT USING row format requires single line.
       PRINT USING "'  ',S1<,' ',S12<,I5>,' shrs @ $',I4>", keyLbl, sNam(s), plyr.stckShrs(s), mkt.stckPrice(s);
-      IF plyr.mgnHeld(s) THEN
+      IF plyr.mgnBal(s) > 0 THEN
         PRINT " [M]";
       ENDIF
       IF slotQty > 0 THEN
@@ -626,7 +625,7 @@ LOOP
         ENDIF
       NEXT i
       baseCash := plyr.cashBal
-      baseMgn  := plyr.marginTot
+      baseMgn  := currMgnTot
       baseOblg := oblgRem
       FOR i := 1 TO ordCnt
         IF i <> slotIdx THEN
@@ -719,11 +718,11 @@ PROCEDURE scrMgnClr
 (* PROCEDURE : scrMgnClr                                        *)
 (* PURPOSE   : S23 Year 10 Margin Clearance Required screen.   *)
 (*             Enforced at the Year 10 boundary for any player *)
-(*             with marginTot > 0. Uses a persistent keyed     *)
+(*             with total margin > 0. Uses a persistent keyed  *)
 (*             editor for per-asset sells plus M for cash      *)
 (*             repayment. X confirms pending sells/repayment.  *)
 (*             D declares bankruptcy. Caller re-enters this    *)
-(*             screen if plyr.marginTot > 0 after return.      *)
+(*             screen if total margin > 0 after return.        *)
 (* PARAMS    : plyr   - player record (modified)               *)
 (*             mkt    - market state (read-only)               *)
 (*             action - OUT: 1=SUBMIT 2=DECLARE_BANKRUPTCY     *)
@@ -731,7 +730,7 @@ PROCEDURE scrMgnClr
 (*             Modifies plyr via applyLiqOrdr and repayment.   *)
 (* ============================================================ *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 PARAM plyr        : PlyrRec
 PARAM mkt         : MktState
@@ -763,6 +762,7 @@ DIM mapKey(12) : INTEGER
 DIM stockCnt   : INTEGER
 DIM bondCnt    : INTEGER
 DIM keyLbl     : STRING[1]
+DIM j          : INTEGER
 DIM slotIdx    : INTEGER
 DIM slotQty    : INTEGER
 DIM selIdx     : INTEGER
@@ -775,6 +775,9 @@ DIM qtyAct     : INTEGER
 DIM doneClr    : BOOLEAN
 DIM baseCash   : INTEGER
 DIM baseMgn    : INTEGER
+DIM currMgnTot : INTEGER
+DIM simBal(9)  : INTEGER
+DIM baseBal(9) : INTEGER
 
 ON ERROR GOTO 900
 
@@ -804,26 +807,24 @@ NEXT i
 LOOP
 
   simCash := plyr.cashBal
-  simMgn  := plyr.marginTot
+  FOR s := 1 TO 9
+    simBal(s) := plyr.mgnBal(s)
+  NEXT s
+  simMgn  := 0
   FOR i := 1 TO ordCnt
     IF ordType(i) = 1 THEN
       prcd := ordQty(i) * mkt.stckPrice(ordId(i))
-      actualRpy := simMgn
-      IF prcd < actualRpy THEN
-        actualRpy := prcd
-      ENDIF
-      simMgn  := simMgn - actualRpy
+      RUN calcSaleMgnRpy(simBal(ordId(i)), prcd, actualRpy)
+      simBal(ordId(i)) := simBal(ordId(i)) - actualRpy
       simCash := simCash + (prcd - actualRpy)
     ELSE
       prcd := ordQty(i) * bPar(ordId(i))
-      actualRpy := simMgn
-      IF prcd < actualRpy THEN
-        actualRpy := prcd
-      ENDIF
-      simMgn  := simMgn - actualRpy
-      simCash := simCash + (prcd - actualRpy)
+      simCash := simCash + prcd
     ENDIF
   NEXT i
+  FOR s := 1 TO 9
+    simMgn := simMgn + simBal(s)
+  NEXT s
   actualRpy := repay
   IF actualRpy > simMgn THEN
     actualRpy := simMgn
@@ -835,12 +836,14 @@ LOOP
     actualRpy := 0
   ENDIF
   simCash := simCash - actualRpy
+  simMgn  := simMgn - actualRpy
+  RUN calcMgnTot(plyr, currMgnTot)
 
   RUN clrScr
   PRINT "=== YEAR 10 - MARGIN CLEARANCE REQUIRED ==="
   PRINT "  Player: "; plyr.plyrName
   PRINT
-  RUN fmtMoney(plyr.marginTot, pStr)
+  RUN fmtMoney(currMgnTot, pStr)
   RUN fmtMoney(simMgn, pStr2)
   PRINT "  Margin outstanding : $"; pStr; " [$"; pStr2; "]"
   RUN fmtMoney(plyr.cashBal, pStr)
@@ -886,7 +889,7 @@ LOOP
       keyLbl := CHR$(mapKey(mapCnt))
       ! Line exceeds 79 chars; PRINT USING row format requires single line.
       PRINT USING "'  ',S1<,' ',S12<,I5>,' shrs @ $',I4>", keyLbl, sNam(s), plyr.stckShrs(s), mkt.stckPrice(s);
-      IF plyr.mgnHeld(s) THEN
+      IF plyr.mgnBal(s) > 0 THEN
         PRINT " [M]";
       ENDIF
       IF slotQty > 0 THEN
@@ -947,7 +950,7 @@ LOOP
     action := 1
     doneClr := TRUE
   ELSE IF keyCode = ASC("M") THEN
-    maxRpy := plyr.marginTot
+    maxRpy := currMgnTot
     IF plyr.cashBal < maxRpy THEN
       maxRpy := plyr.cashBal
     ENDIF
@@ -999,22 +1002,26 @@ LOOP
         ENDIF
       NEXT i
       baseCash := plyr.cashBal
-      baseMgn  := plyr.marginTot
+      FOR j := 1 TO 9
+        baseBal(j) := plyr.mgnBal(j)
+      NEXT j
       FOR i := 1 TO ordCnt
         IF i <> slotIdx THEN
           IF ordType(i) = 1 THEN
             prcd := ordQty(i) * mkt.stckPrice(ordId(i))
+            RUN calcSaleMgnRpy(baseBal(ordId(i)), prcd, actualRpy)
+            baseBal(ordId(i)) := baseBal(ordId(i)) - actualRpy
+            baseCash := baseCash + (prcd - actualRpy)
           ELSE
             prcd := ordQty(i) * bPar(ordId(i))
+            baseCash := baseCash + prcd
           ENDIF
-          actualRpy := baseMgn
-          IF prcd < actualRpy THEN
-            actualRpy := prcd
-          ENDIF
-          baseMgn  := baseMgn - actualRpy
-          baseCash := baseCash + (prcd - actualRpy)
         ENDIF
       NEXT i
+      baseMgn := 0
+      FOR j := 1 TO 9
+        baseMgn := baseMgn + baseBal(j)
+      NEXT j
       actualRpy := repay
       IF actualRpy > baseMgn THEN
         actualRpy := baseMgn
@@ -1039,7 +1046,11 @@ LOOP
           ENDIF
           qtyAct := 1
           ! Line exceeds 79 chars; getLotQty call requires full arguments.
-          RUN getLotQty("=== YEAR 10 - MARGIN CLEARANCE REQUIRED ===", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, 2, 0, plyr.stckShrs(s), baseCash, baseMgn, 0, qtyAct) \ ! ordMode=MARG allowNav=0
+          IF plyr.mgnBal(s) > 0 THEN
+            RUN getLotQty("=== YEAR 10 - MARGIN CLEARANCE REQUIRED ===", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, 2, 0, plyr.stckShrs(s), baseCash, baseBal(s), 0, qtyAct) \ ! ordMode=MARG allowNav=0
+          ELSE
+            RUN getLotQty("=== YEAR 10 - MARGIN CLEARANCE REQUIRED ===", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, 0, 0, plyr.stckShrs(s), baseCash, baseMgn, 0, qtyAct) \ ! ordMode=SELL allowNav=0
+          ENDIF
           valid := TRUE
         ELSE
           RUN fmtMoney(bPar(b), pStr)
@@ -1092,40 +1103,10 @@ LOOP
 
 ENDLOOP
 
-FOR i := 1 TO ordCnt
-  s := ordId(i)
-  b := ordId(i)
-  qty := ordQty(i)
-  IF ordType(i) = 1 THEN
-    prcd := qty * mkt.stckPrice(s)
-    plyr.stckShrs(s) := plyr.stckShrs(s) - qty
-    IF plyr.stckShrs(s) = 0 THEN
-      plyr.mgnHeld(s) := FALSE
-    ENDIF
-  ELSE
-    prcd := qty * bPar(b)
-    plyr.bondUnts(b) := plyr.bondUnts(b) - qty
-  ENDIF
-  actualRpy := plyr.marginTot
-  IF prcd < actualRpy THEN
-    actualRpy := prcd
-  ENDIF
-  plyr.marginTot := plyr.marginTot - actualRpy
-  plyr.cashBal   := plyr.cashBal + (prcd - actualRpy)
-NEXT i
-
-actualRpy := repay
-IF actualRpy > plyr.marginTot THEN
-  actualRpy := plyr.marginTot
+IF ordCnt > 0 THEN
+  RUN applySells(plyr, mkt, ordType, ordId, ordQty, ordCnt)
 ENDIF
-IF actualRpy > plyr.cashBal THEN
-  actualRpy := plyr.cashBal
-ENDIF
-IF actualRpy < 0 THEN
-  actualRpy := 0
-ENDIF
-plyr.cashBal   := plyr.cashBal - actualRpy
-plyr.marginTot := plyr.marginTot - actualRpy
+RUN applyCashMgnRepay(plyr, repay, actualRpy)
 
 action := 1
 END
