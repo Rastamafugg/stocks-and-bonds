@@ -549,7 +549,7 @@ TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBa
 PARAM turnType : INTEGER
 PARAM readOK   : BOOLEAN
 DIM hdr        : SaveHdr
-DIM plyrRec    : PlyrRec
+DIM turnPlyr   : PlyrRec
 DIM deckByt    : BYTE
 DIM path       : BYTE
 DIM pathOpen   : BOOLEAN
@@ -607,10 +607,10 @@ FOR i := 1 TO iDeckCnt
 NEXT i
 
 FOR i := 1 TO pIdx
-  GET #path, plyrRec
+  GET #path, turnPlyr
 NEXT i
 
-turnType := plyrRec.plyrType
+turnType := turnPlyr.plyrType
 readOK := TRUE
 
 CLOSE #path
