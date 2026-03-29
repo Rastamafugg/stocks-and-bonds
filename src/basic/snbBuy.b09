@@ -538,8 +538,7 @@ LOOP
         ENDIF
         ordTxt := ordTxt + TRIM$(STR$(totalQty))
       ENDIF
-      ! Line exceeds 79 chars; PRINT USING row format requires single line.
-      PRINT USING "'  ',S1<,' ',S12<,'  $',I4>,' ',I2>,'% -> $',I4>,' ',S8<,' ',S7<,' OWN ',I3>,' ',S24<", keyLbl, sNam(s), mkt.stckPrice(s), yldPct, divVal, projTxt, mgnTxt, holdQty, ordTxt
+      PRINT USING "'  ',S1<,' ',S12<,'  $',I3>,' ',I2>,'% -> $',I2>,' ',S6<,' ',S6<,' OWN ',I3>,' ',S16<", keyLbl, sNam(s), mkt.stckPrice(s), yldPct, divVal, projTxt, mgnTxt, holdQty, ordTxt
     ENDIF
   NEXT s
 
