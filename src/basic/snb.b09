@@ -182,6 +182,14 @@ LOOP
         gameOver := TRUE
       ENDIF
       IF NOT gameOver THEN
+        modNam := "snbTradeUtil"
+        RUN ensureModule(modNam, TRUE, debugLog, ok)
+        IF NOT ok THEN
+          PRINT "SNB: failed to ensure snbTradeUtil (snbDividend)"
+          gameOver := TRUE
+        ENDIF
+      ENDIF
+      IF NOT gameOver THEN
         modNam := "snbMargin"
         RUN ensureModule(modNam, TRUE, debugLog, ok)
         IF NOT ok THEN
@@ -239,6 +247,14 @@ LOOP
           gameOver := TRUE
         ENDIF
         IF NOT gameOver THEN
+          modNam := "snbTradeUtil"
+          RUN ensureModule(modNam, TRUE, debugLog, ok)
+          IF NOT ok THEN
+            PRINT "SNB: failed to ensure snbTradeUtil (snbSell)"
+            gameOver := TRUE
+          ENDIF
+        ENDIF
+        IF NOT gameOver THEN
           modNam := "snbMargin"
           RUN ensureModule(modNam, TRUE, debugLog, ok)
           IF NOT ok THEN
@@ -278,6 +294,14 @@ LOOP
         IF NOT ok THEN
           PRINT "SNB: failed to ensure snbUtil (snbBuy)"
           gameOver := TRUE
+        ENDIF
+        IF NOT gameOver THEN
+          modNam := "snbTradeUtil"
+          RUN ensureModule(modNam, TRUE, debugLog, ok)
+          IF NOT ok THEN
+            PRINT "SNB: failed to ensure snbTradeUtil (snbBuy)"
+            gameOver := TRUE
+          ENDIF
         ENDIF
         IF NOT gameOver THEN
           modNam := "snbBuy"

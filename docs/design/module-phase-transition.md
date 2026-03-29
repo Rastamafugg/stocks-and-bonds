@@ -36,6 +36,7 @@ grouping. The table below records every entry procedure for each module.
 | `snbSaveLoad`   | `snbSaveLoad` | `snbSaveLoad.b09`   |
 | `snbSellAI`     | `snbSellAI`   | `snbSellAI.b09`     |
 | `snbSetup`      | `snbSetup`    | `snbSetup.b09`      |
+| `snbTradeUtil`  | `snbTradeUtil`| `snbTradeUtil.b09`  |
 | `snbUtil`       | `snbUtil`     | `snb.b09`           |
 | `snbYearLoop`   | `snbYearLoop` | `snbYearLoop.b09`   |
 
@@ -48,15 +49,16 @@ grouping. The table below records every entry procedure for each module.
 | `SNB`          | SNB, memMapGet, memModGet, memReport, memEnsure, memRelease                                              | *(none)*             |
 | `snbAI`        | snbAI, initAIProf, aiSell, aiBuy                                                                         | snbUtil              |
 | `snbBuySell`   | snbBuySell, scrSell, scrBuy                                                                              | snbUtil              |
-| `snbBuyAI`     | snbBuyAI, aiBuy, scrAIBuyTurn                                                                            | snbUtil, snbBuy      |
+| `snbBuyAI`     | snbBuyAI, aiBuy, scrAIBuyTurn                                                                            | snbUtil, snbTradeUtil, snbBuy |
 | `snbEndGame`   | snbEndGame, scrFinalMkt, scrWealth, scrWinner, scrPostGame                                               | snbUtil              |
-| `snbMargin`    | snbMargin, scrMgnCall, scrBankrupt, aiLiqOrdr, scrForceLiq, scrMgnClr, applySells                       | snbUtil              |
-| `snbMgnRev`    | snbMgnRev, applyLiqOrdr, scrMgnInt                                                                       | snbUtil              |
+| `snbMargin`    | snbMargin, scrMgnCall, scrBankrupt, aiLiqOrdr, scrForceLiq, scrMgnClr, applySells                       | snbUtil, snbTradeUtil |
+| `snbMgnRev`    | snbMgnRev, applyLiqOrdr, scrMgnInt                                                                       | snbUtil, snbTradeUtil |
 | `snbMktEng`    | snbMktEng, getMktDelta, getCard, resolvePrice, applyMktYear, applyDivInt, applyMgnInt, drawCard, doRolls | snbUtil              |
 | `snbMktScr`    | snbMktScr, scrYearHdr, scrDivInt, scrDivFlag, scrCard, scrDice, scrMktBoard, scrSplit                    | snbUtil, snbMktEng   |
 | `snbSaveLoad`  | snbSaveLoad, saveGame, loadGame                                                                          | snbUtil              |
-| `snbSellAI`    | snbSellAI, aiSell, scrAISellTurn                                                                         | snbUtil, snbMargin   |
+| `snbSellAI`    | snbSellAI, aiSell, scrAISellTurn                                                                         | snbUtil, snbTradeUtil, snbMargin |
 | `snbSetup`     | snbSetup, initPlayer, initMkt, scrStart, scrSetup, scrConfirm                                            | snbUtil, snbSaveLoad |
+| `snbTradeUtil` | snbTradeUtil, getLotQty, initStockNames, initBondPar, clrOrders, dropOrderAt, findMapSel, findOrderSlot, findNextActivePlyr, prepAssetMaps, readTurnPlyrType, promptBondQty | snbUtil |
 | `snbUtil`      | snbUtil, clrScr, printAt, fmtMoney, getMenuKey, waitKey, getNumIn, shuffleDeck                           | *(none)*             |
 | `snbYearLoop`  | snbYearLoop, runYearLoop                                                                                 | snbUtil              |
 

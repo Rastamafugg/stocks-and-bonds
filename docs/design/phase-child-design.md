@@ -18,8 +18,9 @@ The top-level coordinator is `snb` in `src/basic/snb.b09`.
 It runs this process sequence:
 
 1. Load `snbUtil` into the current process.
-2. Fork `snbSetup` for setup.
-3. For each game year, fork these child entries in order:
+2. Ensure `snbTradeUtil` before trade or revenue paths that need it.
+3. Fork `snbSetup` for setup.
+4. For each game year, fork these child entries in order:
    - `snbDividend`
    - `snbMarket`
    - `snbSell` or `snbSellAI`
@@ -213,8 +214,9 @@ Notes:
 
 | File | Key procedures | Role |
 |------|----------------|------|
-| `snbUtil.b09` | `clrScr`, `printAt`, `fmtMoney`, `fmtPlyrName`, `getMenuKey`, `waitKey`, `getNumIn`, `saveGame`, `loadGame`, `guardSave`, `initAIProf`, `shuffleDeck` | Utility, save/load, and shared setup helpers |
-| `snbMargin.b09` | `scrMgnCall`, `applyLiqOrdr`, `scrBankrupt`, `scrMgnInt`, `aiLiqOrdr`, `scrForceLiq`, `scrMgnClr` | Shared margin and liquidation engine/screens |
+| `snbUtil.b09` | `clrScr`, `fmtMoney`, `fmtPlyrName`, `getMenuKey`, `waitKey`, `getNumIn`, `saveGame`, `loadGame`, `initAIProf`, `shuffleDeck` | Core utility, save/load, and shared setup helpers |
+| `snbTradeUtil.b09` | `getLotQty`, `initStockNames`, `initBondPar`, `clrOrders`, `dropOrderAt`, `findMapSel`, `findOrderSlot`, `findNextActivePlyr`, `prepAssetMaps`, `readTurnPlyrType`, `promptBondQty` | Trade and trade-adjacent shared helpers |
+| `snbMargin.b09` | `scrMgnCall`, `scrBankrupt`, `aiLiqOrdr`, `scrForceLiq`, `scrMgnClr`, `applySells` | Shared margin and liquidation engine/screens |
 
 ### 6.3 Procedures co-located inside child modules
 

@@ -10,8 +10,9 @@ PROCEDURE snbSell
 (* SIDE EFX  : Reads and writes SNBSTATE. Modifies player      *)
 (*             cash, margin, holdings, and margin flags via    *)
 (*             applySells.                                     *)
-(* NOTE      : snbUtil, snbMargin, and snbSell must be         *)
-(*             pre-loaded by the coordinator before fork.      *)
+(* NOTE      : snbUtil, snbTradeUtil, snbMargin, and snbSell   *)
+(*             must be pre-loaded by the coordinator before    *)
+(*             fork.                                           *)
 (* ============================================================ *)
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
