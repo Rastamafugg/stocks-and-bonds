@@ -7,7 +7,6 @@ PROCEDURE snbUtil
 (* ================================================== *)
 PRINT "snbUtil"
 PRINT "  clrScr"
-PRINT "  printAt"
 PRINT "  getLotQty"
 PRINT "  fmtMoney"
 PRINT "  fmtPlyrName"
@@ -25,29 +24,6 @@ PRINT "  getNumIn"
 PRINT "  saveGame"
 PRINT "  loadGame"
 PRINT "  initAIProf"
-END
-
-PROCEDURE printAt
-(* ================================================== *)
-(* PROCEDURE: printAt                                 *)
-(* PURPOSE:   Position cursor and print text.        *)
-(* PARAMS:    row - target row offset (0-based)      *)
-(*            col - target column (1-based, per TAB) *)
-(*            txt - text to display                  *)
-(* EFFECTS:   Prints row newlines then TAB to col.   *)
-(*            Intended for use after clrScr.         *)
-(* NOTE:      row/col are INTEGER per bestPractices; *)
-(*            callers pass integer literals.         *)
-(* ================================================== *)
-PARAM row, col:INTEGER
-PARAM txt:STRING
-
-DIM r:INTEGER
-
-FOR r := 1 TO row
-  PRINT
-NEXT r
-PRINT TAB(col); txt
 END
 
 PROCEDURE getLotQty
@@ -966,37 +942,6 @@ END
     ENDIF
     PRINT "loadGame error ("; ERR; ") reading: "; savePath
     loadOK := FALSE
-END
-
-PROCEDURE guardSave
-(* ============================================================ *)
-(* PROCEDURE : guardSave                                        *)
-(* PURPOSE   : Reject any player-supplied save filename that   *)
-(*             matches the reserved internal name "SNBSTATE".  *)
-(*             SNBSTATE is used exclusively by the SNB          *)
-(*             coordinator as an IPC channel; it must never    *)
-(*             appear in the player-visible save slot list and  *)
-(*             must never be overwritten by a user save call.  *)
-(*             Does NOT open, create, or delete any file.      *)
-(*             Performs only a string comparison.              *)
-(*                                                             *)
-(*             All callers of saveGame that accept a            *)
-(*             user-supplied filename must call guardSave first *)
-(*             and check isOK before proceeding.               *)
-(*                                                             *)
-(* PARAMS    : savName - player-supplied filename to check      *)
-(*             isOK    - FALSE if savName = "SNBSTATE";         *)
-(*                       TRUE otherwise                        *)
-(* ============================================================ *)
-PARAM savName : STRING[20]
-PARAM isOK    : BOOLEAN
-
-IF savName = "SNBSTATE" THEN
-  isOK := FALSE
-  PRINT "SNBSTATE is reserved and cannot be used as a save file name."
-ELSE
-  isOK := TRUE
-ENDIF
 END
 
 PROCEDURE initAIProf
