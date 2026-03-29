@@ -9,7 +9,7 @@ PROCEDURE snbSell
 (* PARAMS    : None (child process; no PARAM handoff)          *)
 (* SIDE EFX  : Reads and writes SNBSTATE. Modifies player      *)
 (*             cash, margin, holdings, and margin flags via    *)
-(*             applySells and applyCashMgnRepay.               *)
+(*             applySells and applyStockMgnRepay.              *)
 (* NOTE      : snbUtil, snbTradeUtil, snbMargin, and snbSell   *)
 (*             must be pre-loaded by the coordinator before    *)
 (*             fork.                                           *)
@@ -30,6 +30,7 @@ DIM ordQty(12) : INTEGER
 DIM ordCnt     : INTEGER
 DIM usrAct     : INTEGER
 DIM mgnRpy     : INTEGER
+DIM mgnRpyStk  : INTEGER
 DIM liqAct     : BYTE
 DIM clrAct     : BYTE
 DIM aiTierVal  : INTEGER
@@ -69,9 +70,10 @@ IF NOT plyrs(p).isBankrupt THEN
   RUN fmtPlyrName(plyrs(p).plyrName, pTypeVal, aiTierVal, pNam)
   ordCnt := 0
   mgnRpy := 0
+  mgnRpyStk := 0
 
   IF iCYr > 1 THEN
-    RUN scrSell(iCYr, plyrs(p), mkt, ordTyp, ordId, ordQty, ordCnt, mgnRpy, usrAct)
+    RUN scrSell(iCYr, plyrs(p), mkt, ordTyp, ordId, ordQty, ordCnt, mgnRpy, mgnRpyStk, usrAct)
     IF usrAct = 3 THEN
       RUN saveQuitToMenu(1, p, hdr, deckOrd, plyrs, mkt)
       END
@@ -82,8 +84,8 @@ IF NOT plyrs(p).isBankrupt THEN
     IF ordCnt > 0 THEN
       RUN applySells(plyrs(p), mkt, ordTyp, ordId, ordQty, ordCnt)
     ENDIF
-    IF mgnRpy > 0 THEN
-      RUN applyCashMgnRepay(plyrs(p), mgnRpy, payAmt)
+    IF mgnRpy > 0 AND mgnRpyStk > 0 THEN
+      RUN applyStockMgnRepay(plyrs(p), mgnRpyStk, mgnRpy, payAmt)
     ENDIF
   ENDIF
 
@@ -190,6 +192,7 @@ PROCEDURE scrSell
 (*             ordQty   - output: quantity per order            *)
 (*             ordCnt   - output: number of orders placed      *)
 (*             mgnRepay - output: repayment amount (0=none)    *)
+(*             mgnRpyStk - output: repayment stock id (0=none) *)
 (*             action   - output: 1=CONFIRM 2=PASS             *)
 (*                        3=SAVE+EXIT 4=QUIT                   *)
 (* SIDE EFX  : Clears screen. Uses GET and INPUT.              *)
@@ -205,6 +208,7 @@ PARAM ordId(12)   : INTEGER
 PARAM ordQty(12)  : INTEGER
 PARAM ordCnt      : INTEGER
 PARAM mgnRepay    : INTEGER
+PARAM mgnRpyStk   : INTEGER
 PARAM action      : INTEGER
 DIM sNam(9) : STRING[14]
 DIM bDen(3) : INTEGER
@@ -282,6 +286,7 @@ divRate(9) := 3
 RUN initBondPar(bDen)
 RUN clrOrders(ordType, ordId, ordQty, ordCnt)
 mgnRepay := 0
+mgnRpyStk := 0
 
 LOOP
 
@@ -289,6 +294,9 @@ LOOP
   FOR s := 1 TO 9
     simBal(s) := plyr.mgnBal(s)
   NEXT s
+  IF mgnRpyStk > 0 THEN
+    simBal(mgnRpyStk) := simBal(mgnRpyStk) - mgnRepay
+  ENDIF
   simMgn  := 0
   hasSell := FALSE
   totProc := 0
@@ -384,7 +392,7 @@ LOOP
         ordTxt := "- SELL " + TRIM$(STR$(slotQty))
         ordTxt := ordTxt + " = TOT " + TRIM$(STR$(prjQty))
       ENDIF
-      PRINT USING "'  ',S1<,' ',S12<,'  $',I4>,' ',I2>,'% -> $',I2>,' ',S5<,' ',S6<,' OWN ',I3>,' ',S16<", keyLbl, sNam(s), mkt.stckPrice(s), yldPct, divVal, projTxt, mgnTxt, holdQty, ordTxt
+      PRINT USING "'  ',S1<,' ',S12<,'  $',I4>,' ',I2>,'% -> $',I2>,' ',S5<,' ',S6<,' OWN ',I3>,' ',S18<", keyLbl, sNam(s), mkt.stckPrice(s), yldPct, divVal, projTxt, mgnTxt, holdQty, ordTxt
     ENDIF
   NEXT i
 
@@ -475,6 +483,7 @@ LOOP
       IF cnfIn = "Y" OR cnfIn = "y" THEN
         ordCnt := 0
         mgnRepay := 0
+        mgnRpyStk := 0
         action := 2
         END
       ENDIF
@@ -495,9 +504,12 @@ LOOP
       maxRpy := baseCash
     ENDIF
     IF maxRpy > 0 THEN
-      repayAmt := 0
-      RUN scrMgnRepay(baseMgn, baseCash, maxRpy, repayAmt)
+      repayAmt := mgnRepay
+      RUN scrMgnRepay(plyr, mkt, baseMgn, baseCash, mgnRpyStk, repayAmt)
       mgnRepay := repayAmt
+      IF mgnRepay = 0 THEN
+        mgnRpyStk := 0
+      ENDIF
     ELSE
       PRINT "No margin repayment available."
       RUN waitKey
@@ -513,6 +525,9 @@ LOOP
       FOR j := 1 TO 9
         baseBal(j) := plyr.mgnBal(j)
       NEXT j
+      IF mgnRpyStk > 0 THEN
+        baseBal(mgnRpyStk) := baseBal(mgnRpyStk) - mgnRepay
+      ENDIF
       FOR i := 1 TO ordCnt
         IF i <> slotIdx THEN
           IF ordType(i) = 1 THEN

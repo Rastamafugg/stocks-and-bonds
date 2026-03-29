@@ -30,6 +30,7 @@ DIM ordQty(12) : INTEGER
 DIM ordPur(12) : INTEGER
 DIM ordCnt     : INTEGER
 DIM mgnRpy     : INTEGER
+DIM mgnRpyStk  : INTEGER
 DIM pNam       : STRING[27]
 DIM mgnElig    : BOOLEAN
 DIM mgnYrOk    : BOOLEAN
@@ -74,9 +75,10 @@ IF NOT plyrs(p).isBankrupt THEN
   RUN fmtPlyrName(plyrs(p).plyrName, pTypeVal, aiTierVal, pNam)
   ordCnt  := 0
   mgnRpy  := 0
+  mgnRpyStk := 0
   mgnElig := plyrs(p).hadCashPur
 
-  RUN scrBuy(iCYr, plyrs(p), mkt, mgnElig, mgnYrOk, ordTyp, ordId, ordQty, ordPur, ordCnt, mgnRpy, usrAct)
+  RUN scrBuy(iCYr, plyrs(p), mkt, mgnElig, mgnYrOk, ordTyp, ordId, ordQty, ordPur, ordCnt, mgnRpy, mgnRpyStk, usrAct)
   IF usrAct = 3 THEN
     RUN saveQuitToMenu(2, p, hdr, deckOrd, plyrs, mkt)
     END
@@ -85,8 +87,8 @@ IF NOT plyrs(p).isBankrupt THEN
     END
   ENDIF \ENDIF
 
-  IF mgnRpy > 0 THEN
-    RUN applyCashMgnRepay(plyrs(p), mgnRpy, actualRpy)
+  IF mgnRpy > 0 AND mgnRpyStk > 0 THEN
+    RUN applyStockMgnRepay(plyrs(p), mgnRpyStk, mgnRpy, actualRpy)
   ENDIF
   IF ordCnt > 0 THEN
     RUN applyBuys(plyrs(p), mkt, ordTyp, ordId, ordQty, ordPur, ordCnt)
@@ -230,79 +232,6 @@ NEXT i
 
 END
 
-PROCEDURE scrMgnRepay
-(* ============================================================ *)
-(* PROCEDURE : scrMgnRepay                                      *)
-(* PURPOSE   : S18 Margin Repayment sub-screen.                *)
-(*             Displays outstanding margin, available cash,    *)
-(*             and the valid repayment range. Accepts a single *)
-(*             integer amount in range 0..maxRpy and returns   *)
-(*             it in amtToRpy.                                 *)
-(*             Called from scrBuy when player selects the      *)
-(*             repay margin option. maxRpy must equal          *)
-(*             MIN(total margin, cashBal) - caller is          *)
-(*             responsible                                     *)
-(*             for computing this before calling.              *)
-(*             0 is a valid entry (player declines repayment   *)
-(*             after viewing the screen).                      *)
-(* PARAMS    : currMgnTot - current outstanding margin total   *)
-(*             cashBal    - current available cash             *)
-(*             maxRpy     - maximum repayable amount           *)
-(*                          (MIN(total margin, cashBal))       *)
-(*             amtToRpy   - output: amount player will repay   *)
-(* SIDE EFX  : Clears screen. Uses INPUT for repayment amount. *)
-(* ============================================================ *)
-PARAM currMgnTot : INTEGER
-PARAM cashBal   : INTEGER
-PARAM maxRpy    : INTEGER
-PARAM amtToRpy  : INTEGER
-DIM qIn   : STRING[8]
-DIM amt   : INTEGER
-DIM numOk : BOOLEAN
-DIM valid : BOOLEAN
-DIM pStr  : STRING[8]
-
-ON ERROR GOTO 900
-
-RUN clrScr
-PRINT "=== MARGIN REPAYMENT ==="
-PRINT
-RUN fmtMoney(currMgnTot, pStr)
-PRINT "  Outstanding margin : $"; pStr
-RUN fmtMoney(cashBal, pStr)
-PRINT "  Cash available     : $"; pStr
-RUN fmtMoney(maxRpy, pStr)
-PRINT "  Maximum repayable  : $"; pStr
-PRINT
-
-valid := FALSE
-WHILE NOT valid DO
-  PRINT "  Enter repayment amount (0 to "; maxRpy; ", 0=none):"
-  INPUT "  > ", qIn
-  IF qIn = "" THEN
-    amt   := 0
-    valid := TRUE
-  ELSE
-    RUN getNumIn(qIn, amt, numOk)
-    IF NOT numOk THEN
-      PRINT "  Invalid: enter a number."
-    ELSE IF amt < 0 THEN
-      PRINT "  Invalid: amount cannot be negative."
-    ELSE IF amt > maxRpy THEN
-      RUN fmtMoney(maxRpy, pStr)
-      PRINT "  Invalid: maximum repayable is $"; pStr; "."
-    ELSE
-      valid := TRUE
-    ENDIF \ENDIF \ENDIF
-  ENDIF
-ENDWHILE
-
-amtToRpy := amt
-END
-
-900 PRINT "scrMgnRepay error ("; ERR; ")"
-END
-
 PROCEDURE scrBuy
 (* ============================================================ *)
 (* PROCEDURE : scrBuy                                           *)
@@ -331,6 +260,7 @@ PROCEDURE scrBuy
 (*             ordPurch   - output: 1=CASH 2=MARGIN per order  *)
 (*             ordCnt     - output: number of orders (0..12)   *)
 (*             mgnRepay   - output: repayment amount (0=none)  *)
+(*             mgnRpyStk  - output: repayment stock id         *)
 (*             action     - output: 1=CONFIRM 2=PASS           *)
 (*                          3=SAVE+EXIT 4=QUIT                *)
 (* SIDE EFX  : Clears screen. Calls scrMgnRepay if repayment   *)
@@ -350,6 +280,7 @@ PARAM ordQty(12)    : INTEGER
 PARAM ordPurch(12)  : INTEGER
 PARAM ordCnt        : INTEGER
 PARAM mgnRepay      : INTEGER
+PARAM mgnRpyStk     : INTEGER
 PARAM action        : INTEGER
 DIM sNam(9)  : STRING[14]
 DIM bPar(3)  : INTEGER
@@ -437,6 +368,7 @@ bPar(3) := 10000
 ! canMgn: TRUE only when both eligibility conditions met.
 canMgn   := mgnElig AND mgnYrOk
 mgnRepay := 0
+mgnRpyStk := 0
 ordCnt := 0
 FOR i := 1 TO 12
   ordType(i)  := 0
@@ -538,7 +470,7 @@ LOOP
         ENDIF
         ordTxt := ordTxt + TRIM$(STR$(totalQty))
       ENDIF
-      PRINT USING "'  ',S1<,' ',S12<,'  $',I4>,' ',I2>,'% -> $',I2>,' ',S5<,' ',S6<,' OWN ',I3>,' ',S16<", keyLbl, sNam(s), mkt.stckPrice(s), yldPct, divVal, projTxt, mgnTxt, holdQty, ordTxt
+      PRINT USING "'  ',S1<,' ',S12<,'  $',I4>,' ',I2>,'% -> $',I2>,' ',S5<,' ',S6<,' OWN ',I3>,' ',S18<", keyLbl, sNam(s), mkt.stckPrice(s), yldPct, divVal, projTxt, mgnTxt, holdQty, ordTxt
     ENDIF
   NEXT s
 
@@ -597,11 +529,13 @@ LOOP
   IF sqAct = 3 THEN
     ordCnt   := 0
     mgnRepay := 0
+    mgnRpyStk := 0
     action   := 3
     END
   ELSE IF sqAct = 4 THEN
     ordCnt   := 0
     mgnRepay := 0
+    mgnRpyStk := 0
     action   := 4
     END
   ENDIF \ENDIF
@@ -623,6 +557,7 @@ LOOP
       IF cnfIn = "Y" OR cnfIn = "y" THEN
         ordCnt   := 0
         mgnRepay := 0
+        mgnRpyStk := 0
         action   := 2
         END
       ENDIF
@@ -643,9 +578,12 @@ LOOP
       maxRpy := baseCash
     ENDIF
     IF maxRpy > 0 THEN
-      repayAmt := 0
-      RUN scrMgnRepay(baseMgn, baseCash, maxRpy, repayAmt)
+      repayAmt := mgnRepay
+      RUN scrMgnRepay(plyr, mkt, baseMgn, baseCash, mgnRpyStk, repayAmt)
       mgnRepay := repayAmt
+      IF mgnRepay = 0 THEN
+        mgnRpyStk := 0
+      ENDIF
     ELSE
       PRINT "No margin repayment available."
       RUN waitKey
@@ -671,6 +609,9 @@ LOOP
       baseCash := simCash
       baseMgn  := simMgn
       baseStkMgn := plyr.mgnBal(s)
+      IF mgnRpyStk = s THEN
+        baseStkMgn := baseStkMgn - mgnRepay
+      ENDIF
       IF slotIdx > 0 THEN
         IF ordType(slotIdx) = 1 THEN
           cost := ordQty(slotIdx) * mkt.stckPrice(ordId(slotIdx))
@@ -730,11 +671,13 @@ LOOP
           IF qtyAct = 3 THEN
             ordCnt   := 0
             mgnRepay := 0
+            mgnRpyStk := 0
             action   := 3
             END
           ELSE IF qtyAct = 4 THEN
             ordCnt   := 0
             mgnRepay := 0
+            mgnRpyStk := 0
             action   := 4
             END
           ENDIF \ENDIF
@@ -767,11 +710,13 @@ LOOP
             IF sqAct = 3 THEN
               ordCnt   := 0
               mgnRepay := 0
+              mgnRpyStk := 0
               action   := 3
               END
             ELSE IF sqAct = 4 THEN
               ordCnt   := 0
               mgnRepay := 0
+              mgnRpyStk := 0
               action   := 4
               END
             ELSE
