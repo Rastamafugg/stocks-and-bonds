@@ -169,7 +169,6 @@ IF iCYr > 1 THEN
                   ENDIF
                 ENDIF
               ENDIF
-              ENDIF
             NEXT s
           ENDIF
         ENDIF

@@ -471,7 +471,7 @@ TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBa
 PARAM plyr      : PlyrRec
 PARAM repayReq  : INTEGER
 PARAM actualRpy : INTEGER
-DIM rem         : INTEGER
+DIM remAmt      : INTEGER
 DIM totMgn      : INTEGER
 DIM takeAmt     : INTEGER
 DIM s           : INTEGER
@@ -488,15 +488,15 @@ IF actualRpy < 0 THEN
   actualRpy := 0
 ENDIF
 plyr.cashBal := plyr.cashBal - actualRpy
-rem := actualRpy
+remAmt := actualRpy
 FOR s := 1 TO 9
-  IF rem > 0 THEN
+  IF remAmt > 0 THEN
     takeAmt := plyr.mgnBal(s)
-    IF takeAmt > rem THEN
-      takeAmt := rem
+    IF takeAmt > remAmt THEN
+      takeAmt := remAmt
     ENDIF
     plyr.mgnBal(s) := plyr.mgnBal(s) - takeAmt
-    rem := rem - takeAmt
+    remAmt := remAmt - takeAmt
   ENDIF
 NEXT s
 END

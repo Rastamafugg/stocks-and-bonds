@@ -35,6 +35,9 @@ These instructions apply to all work in this repository.
 - If a repair could be made by moving an `ENDIF` between adjacent closure
   lines, report that as a distinct same-block formatting/structure issue rather
   than only proposing a net token-count fix.
+- When two adjacent closure tokens belong at the same indentation level, append
+  the later token to the same physical source line as the prior closure token
+  instead of leaving it on its own line.
 
 ## Repository Authority
 
