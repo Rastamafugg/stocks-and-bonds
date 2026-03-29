@@ -11,6 +11,7 @@ PRINT "  printAt"
 PRINT "  getLotQty"
 PRINT "  fmtMoney"
 PRINT "  fmtPlyrName"
+PRINT "  calcMgnTot"
 PRINT "  getMenuKey"
 PRINT "  getPhaseNav"
 PRINT "  getSaveQuitAct"
@@ -408,6 +409,27 @@ IF plyrType = 2 THEN
 ENDIF
 END
 
+PROCEDURE calcMgnTot
+(* ================================================== *)
+(* PROCEDURE: calcMgnTot                              *)
+(* PURPOSE:   Sum per-company margin balances into a  *)
+(*            total outstanding margin value.         *)
+(* PARAMS:    plyr   - player record to inspect       *)
+(*            mgnTot - receives total margin balance  *)
+(* EFFECTS:   None beyond output PARAM assignment.    *)
+(* ================================================== *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+PARAM plyr   : PlyrRec
+PARAM mgnTot : INTEGER
+DIM s        : INTEGER
+
+mgnTot := 0
+FOR s := 1 TO 9
+  mgnTot := mgnTot + plyr.mgnBal(s)
+NEXT s
+END
+
 PROCEDURE getMenuKey
 (* ================================================== *)
 (* PROCEDURE: getMenuKey                              *)
@@ -517,7 +539,7 @@ PROCEDURE quitToMenu
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 ! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;bondUnts(3):INTEGER
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 PARAM hdr        : SaveHdr
 PARAM deckOrd(36): BYTE
@@ -551,7 +573,7 @@ PROCEDURE saveQuitToMenu
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 ! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;bondUnts(3):INTEGER
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 PARAM savePhase  : INTEGER
 PARAM savePlyr   : INTEGER
@@ -658,7 +680,7 @@ PROCEDURE saveGame
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 ! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;bondUnts(3):INTEGER
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 PARAM savePath   : STRING[20]
 PARAM hdr        : SaveHdr
@@ -762,7 +784,7 @@ PROCEDURE loadGame
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 ! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;bondUnts(3):INTEGER
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,marginTot,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnHeld(9):BOOLEAN;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 PARAM savePath   : STRING[20]
 PARAM hdr        : SaveHdr
@@ -796,7 +818,7 @@ IF hdr.magic <> $53 THEN
 ENDIF
 
 ! Validate format version.
-IF hdr.fmtVersion <> 1 THEN
+IF hdr.fmtVersion <> 2 THEN
   PRINT "loadGame: incompatible save file version: "; savePath
   END
 ENDIF
