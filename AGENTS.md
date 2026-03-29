@@ -14,6 +14,16 @@ These instructions apply to all work in this repository.
   same task.
 - Place durable behavior-change rules near the top of the AGENTS file so they
   govern later task-specific instructions.
+- Before any completion response for a Basic09 edit, explicitly audit each
+  edited procedure for `TYPE` field collisions against all `PARAM` and `DIM`
+  names in that same procedure.
+- Do not rely on memory or visual skimming for that audit. Re-read the actual
+  `TYPE`, `PARAM`, and `DIM` declarations in the edited procedure and verify
+  that no `PARAM` or `DIM` identifier matches any field name declared in a
+  `TYPE` within that procedure.
+- If a procedure is moved between files or rewritten with copied `TYPE`
+  declarations, treat that move as requiring a fresh collision audit even if
+  the logic itself is unchanged.
 
 ## Exact Line Citations
 
