@@ -311,7 +311,8 @@ PROCEDURE scrBuy
 (*             in a persistent keyed editor. Each asset row    *)
 (*             shows its selection key. Selecting a key edits  *)
 (*             only that one security, then returns to the     *)
-(*             main buy screen. P passes and X confirms orders.*)
+(*             main buy screen. P passes and Enter confirms    *)
+(*             orders.                                         *)
 (*             M edits margin repayment.                       *)
 (*             Stock quantity is entered first, then 1=CASH    *)
 (*             or 2=MARGIN when margin is eligible. Validates  *)
@@ -402,6 +403,7 @@ DIM qtyAct   : INTEGER
 DIM maxQty   : INTEGER
 DIM dispCash : INTEGER
 DIM dispMgn  : INTEGER
+DIM divPrj   : INTEGER
 
 ON ERROR GOTO 900
 
@@ -504,15 +506,30 @@ LOOP
       ! Line exceeds 79 chars; PRINT USING row format requires single line.
       PRINT USING "'  ',S1<,' ',S12<,'  $',I4>,' ',I2>,'% -> $',I4>", keyLbl, sNam(s), mkt.stckPrice(s), yldPct, divVal;
       holdQty := plyr.stckShrs(s)
-      IF holdQty > 0 THEN
-        PRINT "  Own "; holdQty;
-      ENDIF
+      totalQty := holdQty
+      divPrj := divVal
       IF slotQty > 0 THEN
         totalQty := holdQty + slotQty
+        IF holdQty > 0 THEN
+          divPrj := (divVal * totalQty) / holdQty
+        ENDIF
+        RUN fmtMoney(divPrj, pStr)
+        PRINT " [$"; pStr; "]";
+      ENDIF
+      IF plyr.mgnBal(s) > 0 THEN
+        PRINT " [ MGN]";
+      ENDIF
+      IF slotQty > 0 AND purch = 2 THEN
+        PRINT " [+MGN]";
+      ENDIF
+      IF holdQty > 0 THEN
+        PRINT " OWN "; holdQty;
+      ENDIF
+      IF slotQty > 0 THEN
         IF purch = 2 THEN
-          PRINT "  [Buy "; slotQty; " M] = "; totalQty; " Total"
+          PRINT " + BUY "; slotQty; "M = TOT "; totalQty
         ELSE
-          PRINT "  [Buy "; slotQty; " C] = "; totalQty; " Total"
+          PRINT " + BUY "; slotQty; "C = TOT "; totalQty
         ENDIF
       ELSE
         PRINT
@@ -557,9 +574,9 @@ LOOP
   PRINT
   IF ordCnt > 0 OR mgnRepay > 0 THEN
     IF mgnYrOk AND currMgnTot > 0 THEN
-      PRINT "  X=confirm orders  P=pass  M=repay margin  S=save+exit  Q=quit"
+      PRINT "  Enter=confirm orders  P=pass  M=repay margin  S=save+exit  Q=quit"
     ELSE
-      PRINT "  X=confirm orders  P=pass  S=save+exit  Q=quit"
+      PRINT "  Enter=confirm orders  P=pass  S=save+exit  Q=quit"
     ENDIF
   ELSE
     IF mgnYrOk AND currMgnTot > 0 THEN
@@ -608,7 +625,7 @@ LOOP
       action := 2
       END
     ENDIF
-  ELSE IF keyCode = ASC("X") THEN
+  ELSE IF keyCode = 13 THEN
     IF ordCnt > 0 OR mgnRepay > 0 THEN
       action := 1
       END

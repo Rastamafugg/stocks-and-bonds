@@ -210,7 +210,7 @@ PROCEDURE scrForceLiq
 (*             and all held assets in a persistent keyed       *)
 (*             editor. Selecting an asset key edits only that  *)
 (*             one pending sell order, then returns to the     *)
-(*             main screen. X confirms current orders. D       *)
+(*             main screen. Enter confirms current orders. D   *)
 (*             declares bankruptcy.                            *)
 (*             Stock qty: mult of 10, <=stckShrs. Bond qty:    *)
 (*             positive integer <=bondUnts. Zero/Enter clears  *)
@@ -365,7 +365,7 @@ LOOP
     ENDIF
   NEXT i
   PRINT
-  PRINT "  X=confirm  D=bankrupt"
+  PRINT "  Enter=confirm  D=bankrupt"
   GET #0, kIn
   PRINT
 
@@ -382,7 +382,7 @@ LOOP
     action := 2
     ordCnt := 0
     END
-  ELSE IF keyCode = ASC("X") THEN
+  ELSE IF keyCode = 13 THEN
     action := 1
     END
   ELSE
@@ -463,7 +463,8 @@ PROCEDURE scrMgnClr
 (*             Enforced at the Year 10 boundary for any player *)
 (*             with total margin > 0. Uses a persistent keyed  *)
 (*             editor for per-asset sells plus M for cash      *)
-(*             repayment. X confirms pending sells/repayment.  *)
+(*             repayment. Enter confirms pending sells and     *)
+(*             repayment.                                      *)
 (*             D declares bankruptcy. Caller re-enters this    *)
 (*             screen if total margin > 0 after return.        *)
 (* PARAMS    : plyr   - player record (modified)               *)
@@ -628,7 +629,7 @@ LOOP
     ENDIF
   NEXT i
   PRINT
-  PRINT "  M=repay with cash  X=confirm  D=bankrupt"
+  PRINT "  M=repay with cash  Enter=confirm  D=bankrupt"
   GET #0, kIn
   PRINT
   doneClr := FALSE
@@ -645,7 +646,7 @@ LOOP
   IF keyCode = ASC("D") THEN
     action := 2
     END
-  ELSE IF keyCode = ASC("X") THEN
+  ELSE IF keyCode = 13 THEN
     action := 1
     doneClr := TRUE
   ELSE IF keyCode = ASC("M") THEN

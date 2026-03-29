@@ -9,7 +9,7 @@ PROCEDURE snbSell
 (* PARAMS    : None (child process; no PARAM handoff)          *)
 (* SIDE EFX  : Reads and writes SNBSTATE. Modifies player      *)
 (*             cash, margin, holdings, and margin flags via    *)
-(*             applySells.                                     *)
+(*             applySells and applyCashMgnRepay.               *)
 (* NOTE      : snbUtil, snbTradeUtil, snbMargin, and snbSell   *)
 (*             must be pre-loaded by the coordinator before    *)
 (*             fork.                                           *)
@@ -29,6 +29,7 @@ DIM ordId(12)  : INTEGER
 DIM ordQty(12) : INTEGER
 DIM ordCnt     : INTEGER
 DIM usrAct     : INTEGER
+DIM mgnRpy     : INTEGER
 DIM liqAct     : BYTE
 DIM clrAct     : BYTE
 DIM aiTierVal  : INTEGER
@@ -67,9 +68,10 @@ IF NOT plyrs(p).isBankrupt THEN
   aiTierVal := plyrs(p).aiTier
   RUN fmtPlyrName(plyrs(p).plyrName, pTypeVal, aiTierVal, pNam)
   ordCnt := 0
+  mgnRpy := 0
 
   IF iCYr > 1 THEN
-    RUN scrSell(iCYr, plyrs(p), mkt, ordTyp, ordId, ordQty, ordCnt, usrAct)
+    RUN scrSell(iCYr, plyrs(p), mkt, ordTyp, ordId, ordQty, ordCnt, mgnRpy, usrAct)
     IF usrAct = 3 THEN
       RUN saveQuitToMenu(1, p, hdr, deckOrd, plyrs, mkt)
       END
@@ -79,6 +81,9 @@ IF NOT plyrs(p).isBankrupt THEN
     ENDIF \ENDIF
     IF ordCnt > 0 THEN
       RUN applySells(plyrs(p), mkt, ordTyp, ordId, ordQty, ordCnt)
+    ENDIF
+    IF mgnRpy > 0 THEN
+      RUN applyCashMgnRepay(plyrs(p), mgnRpy, payAmt)
     ENDIF
   ENDIF
 
@@ -170,7 +175,8 @@ PROCEDURE scrSell
 (*             a persistent keyed editor. Each asset row shows *)
 (*             its selection key. Selecting a key edits only   *)
 (*             that one security, then returns to the main     *)
-(*             sell screen. P passes and X confirms orders.    *)
+(*             sell screen. P passes and Enter confirms        *)
+(*             orders.                                         *)
 (*             Stock qty: positive multiple of 10, <= shares   *)
 (*             held. Bond qty: 0..units held. Bankrupt stocks  *)
 (*             (price=0) are skipped. Caller must not invoke   *)
@@ -183,6 +189,7 @@ PROCEDURE scrSell
 (*                        (1-9 stocks, 1-3 bonds)              *)
 (*             ordQty   - output: quantity per order            *)
 (*             ordCnt   - output: number of orders placed      *)
+(*             mgnRepay - output: repayment amount (0=none)    *)
 (*             action   - output: 1=CONFIRM 2=PASS             *)
 (*                        3=SAVE+EXIT 4=QUIT                   *)
 (* SIDE EFX  : Clears screen. Uses GET and INPUT.              *)
@@ -197,6 +204,7 @@ PARAM ordType(12) : INTEGER
 PARAM ordId(12)   : INTEGER
 PARAM ordQty(12)  : INTEGER
 PARAM ordCnt      : INTEGER
+PARAM mgnRepay    : INTEGER
 PARAM action      : INTEGER
 DIM sNam(9) : STRING[14]
 DIM bDen(3) : INTEGER
@@ -247,6 +255,11 @@ DIM ordModeVal : INTEGER
 DIM currMgnTot : INTEGER
 DIM simBal(9)  : INTEGER
 DIM baseBal(9) : INTEGER
+DIM holdQty   : INTEGER
+DIM prjQty    : INTEGER
+DIM divPrj    : INTEGER
+DIM repayAmt  : INTEGER
+DIM maxRpy    : INTEGER
 
 ON ERROR GOTO 900
 
@@ -265,6 +278,7 @@ divRate(9) := 3
 ! Bond par values (= denomination for this game)
 RUN initBondPar(bDen)
 RUN clrOrders(ordType, ordId, ordQty, ordCnt)
+mgnRepay := 0
 
 LOOP
 
@@ -295,6 +309,18 @@ LOOP
   FOR s := 1 TO 9
     simMgn := simMgn + simBal(s)
   NEXT s
+  repay := mgnRepay
+  IF repay > simMgn THEN
+    repay := simMgn
+  ENDIF
+  IF repay > simCash THEN
+    repay := simCash
+  ENDIF
+  IF repay < 0 THEN
+    repay := 0
+  ENDIF
+  simCash := simCash - repay
+  simMgn  := simMgn - repay
   RUN calcMgnTot(plyr, currMgnTot)
 
   RUN clrScr
@@ -329,13 +355,32 @@ LOOP
       keyLbl := CHR$(mapKey(i))
       yldPct := divRate(s)
       divVal := (mkt.stckPrice(s) * divRate(s)) / 100
+      holdQty := plyr.stckShrs(s)
+      prjQty := holdQty
+      divPrj := divVal
+      IF slotQty > 0 THEN
+        prjQty := holdQty - slotQty
+        IF holdQty > 0 THEN
+          divPrj := (divVal * prjQty) / holdQty
+        ELSE
+          divPrj := 0
+        ENDIF
+      ENDIF
       ! Line exceeds 79 chars; PRINT USING row format requires single line.
       PRINT USING "'  ',S1<,' ',S12<,I5>,' shr @ $',I4>,' ',I2>,'% -> $',I4>", keyLbl, sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), yldPct, divVal;
-      IF plyr.mgnBal(s) > 0 THEN
-        PRINT " [MGN]";
-      ENDIF
       IF slotQty > 0 THEN
-        PRINT "  [Sell "; slotQty; "]"
+        RUN fmtMoney(divPrj, pStr)
+        PRINT " [$"; pStr; "]";
+      ENDIF
+      IF plyr.mgnBal(s) > 0 THEN
+        PRINT " [ MGN]";
+      ENDIF
+      IF slotQty > 0 AND plyr.mgnBal(s) > 0 THEN
+        PRINT " [-MGN]";
+      ENDIF
+      PRINT " OWN "; holdQty;
+      IF slotQty > 0 THEN
+        PRINT " - SELL "; slotQty; " = TOT "; prjQty
       ELSE
         PRINT
       ENDIF
@@ -370,23 +415,33 @@ LOOP
   IF NOT hasSell THEN
     PRINT
     PRINT "Nothing to sell this turn."
-    RUN getPhaseNav(navAct)
-    ordCnt := 0
-    IF navAct = 2 THEN
-      action := 3
-    ELSE IF navAct = 3 THEN
-      action := 4
-    ELSE
-      action := 2
-    ENDIF \ENDIF
-    END
+    IF currMgnTot <= 0 THEN
+      RUN getPhaseNav(navAct)
+      ordCnt := 0
+      IF navAct = 2 THEN
+        action := 3
+      ELSE IF navAct = 3 THEN
+        action := 4
+      ELSE
+        action := 2
+      ENDIF \ENDIF
+      END
+    ENDIF
   ENDIF
 
   PRINT
-  IF ordCnt > 0 THEN
-    PRINT "  X=confirm orders  P=pass  S=save+exit  Q=quit"
+  IF ordCnt > 0 OR mgnRepay > 0 THEN
+    IF currMgnTot > 0 THEN
+      PRINT "  Enter=confirm orders  P=pass  M=repay margin  S=save+exit  Q=quit"
+    ELSE
+      PRINT "  Enter=confirm orders  P=pass  S=save+exit  Q=quit"
+    ENDIF
   ELSE
-    PRINT "  P=pass  S=save+exit  Q=quit"
+    IF currMgnTot > 0 THEN
+      PRINT "  P=pass  M=repay margin  S=save+exit  Q=quit"
+    ELSE
+      PRINT "  P=pass  S=save+exit  Q=quit"
+    ENDIF
   ENDIF
   GET #0, kIn
   PRINT
@@ -412,12 +467,13 @@ LOOP
   ENDIF
 
   IF keyCode = ASC("P") THEN
-    IF ordCnt > 0 THEN
+    IF ordCnt > 0 OR mgnRepay > 0 THEN
       PRINT "Pending orders will be discarded. Press Y to pass."
       GET #0, cnfIn
       PRINT
       IF cnfIn = "Y" OR cnfIn = "y" THEN
         ordCnt := 0
+        mgnRepay := 0
         action := 2
         END
       ENDIF
@@ -425,10 +481,25 @@ LOOP
       action := 2
       END
     ENDIF
-  ELSE IF keyCode = ASC("X") THEN
-    IF ordCnt > 0 THEN
+  ELSE IF keyCode = 13 THEN
+    IF ordCnt > 0 OR mgnRepay > 0 THEN
       action := 1
       END
+    ENDIF
+  ELSE IF keyCode = ASC("M") AND currMgnTot > 0 THEN
+    baseCash := simCash + mgnRepay
+    baseMgn  := simMgn + mgnRepay
+    maxRpy := baseMgn
+    IF baseCash < maxRpy THEN
+      maxRpy := baseCash
+    ENDIF
+    IF maxRpy > 0 THEN
+      repayAmt := 0
+      RUN scrMgnRepay(baseMgn, baseCash, maxRpy, repayAmt)
+      mgnRepay := repayAmt
+    ELSE
+      PRINT "No margin repayment available."
+      RUN waitKey
     ENDIF
   ELSE
     RUN findMapSel(mapKey, mapCnt, keyCode, selIdx)
@@ -437,7 +508,7 @@ LOOP
       s := mapId(selIdx)
       b := mapId(selIdx)
       RUN findOrderSlot(ordType, ordId, ordQty, ordCnt, mapType(selIdx), mapId(selIdx), slotIdx, slotQty)
-      baseCash := plyr.cashBal
+      baseCash := plyr.cashBal - mgnRepay
       FOR j := 1 TO 9
         baseBal(j) := plyr.mgnBal(j)
       NEXT j

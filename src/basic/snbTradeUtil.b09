@@ -22,11 +22,10 @@ END
 PROCEDURE getLotQty
 (* ================================================== *)
 (* PROCEDURE: getLotQty                               *)
-(* PURPOSE:   Edit a stock quantity using committed   *)
-(*            amount plus pending typed digits.       *)
-(*            Up/Down alters committed qty by 10.     *)
-(*            Enter commits typed digits or clears.   *)
-(*            X confirms the committed quantity.      *)
+(* PURPOSE:   Edit a stock quantity using only the    *)
+(*            committed quantity. Up/Down alters the  *)
+(*            amount by 10. Enter confirms the        *)
+(*            committed quantity.                     *)
 (* PARAMS:    title    - editor title line            *)
 (*            stockNm  - stock display name           *)
 (*            holdQty  - shares currently held        *)
@@ -125,13 +124,13 @@ LOOP
       mgnNow  := currMrgObl - prjAmt
       cashNow := currCash + (prjCost - prjAmt)
     ELSE IF ordMode = 2 THEN \ ! MARG sell
-      RUN calcSaleMgnRpy(currMrgObl, prjCost, prjAmt)
-      mgnNow  := currMrgObl - prjAmt
-      cashNow := currCash + (prjCost - prjAmt)
+      prjAmt := 0
       IF currStkMgn >= 0 THEN
         RUN calcSaleMgnRpy(currStkMgn, prjCost, prjAmt)
         stkMgnNow := currStkMgn - prjAmt
       ENDIF
+      mgnNow  := currMrgObl - prjAmt
+      cashNow := currCash + (prjCost - prjAmt)
     ELSE
       cashNow := currCash + prjCost
     ENDIF \ENDIF \ENDIF \ENDIF
@@ -178,10 +177,10 @@ LOOP
   ENDIF
   PRINT infoTxt
   PRINT
-  PRINT "  Enter Amount of Stock:"
+  PRINT "  Adjust Stock Amount:"
   PRINT
   ! Line exceeds 79 chars; command row is kept on one line for screen layout.
-  PRINT "  1-9=Manual Entry  Enter=Accept Amount  Up/Down=+/-10  X=Confirm"
+  PRINT "  Enter=Confirm Amount  Up/Down=+/-10"
   IF canMode <> 0 THEN
     PRINT "  C=Pay Cash        M=Pay on Margin"
   ENDIF
@@ -189,7 +188,7 @@ LOOP
     PRINT "  S=save+exit       Q=quit"
   ENDIF
   PRINT
-  dispTxt := "  Qty (0/Enter=clear, mult of 10): " + buf + "   "
+  dispTxt := "  Qty (Up/Down, 0 clears): " + TRIM$(STR$(qty)) + "   "
   PRINT dispTxt
   IF errTxt <> "" THEN
     PRINT
@@ -230,35 +229,8 @@ LOOP
     IF qty < 0 THEN
       qty := 0
     ENDIF
-  ELSE IF keyCode = ASC("X") THEN
-    IF buf <> "" THEN
-      errTxt := "  Press Enter to accept typed amount."
-    ELSE
-      END
-    ENDIF
   ELSE IF keyCode = 13 THEN
-    IF buf = "" THEN
-      qty := 0
-    ELSE
-      RUN getNumIn(buf, workQty, numOk)
-      IF NOT numOk THEN
-        errTxt := "  Invalid: enter a number."
-      ELSE IF workQty < 0 THEN
-        errTxt := "  Invalid: enter 0 or a positive amount."
-      ELSE
-        lastChr := MID$(buf, LEN(buf), 1)
-        IF lastChr <> "0" THEN
-          workQty := workQty * 10
-        ENDIF
-        IF workQty > maxQty THEN
-          maxTxt := TRIM$(STR$(maxQty))
-          errTxt := "  Invalid: maximum is " + maxTxt + "."
-        ELSE
-          qty := workQty
-          buf := ""
-        ENDIF
-      ENDIF \ENDIF
-    ENDIF
+    END
   ELSE IF allowNav <> 0 AND keyCode = ASC("S") THEN
     navAct := 3
     END
@@ -271,16 +243,6 @@ LOOP
   ELSE IF canMode <> 0 AND keyCode = ASC("M") THEN \ ! MARG
     ordMode := 2 \ ! MARG
     buf := ""
-  ELSE IF keyCode = 8 THEN
-    IF LEN(buf) = 1 THEN
-      buf := ""
-    ELSE IF LEN(buf) > 1 THEN
-      buf := MID$(buf, 1, LEN(buf) - 1)
-    ENDIF \ENDIF
-  ELSE IF keyCode >= ASC("0") AND keyCode <= ASC("9") THEN
-    IF LEN(buf) < 5 THEN
-      buf := buf + kIn
-    ENDIF
   ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF
 ENDLOOP
 
