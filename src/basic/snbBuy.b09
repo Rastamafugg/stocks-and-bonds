@@ -29,8 +29,7 @@ DIM ordId(12)  : INTEGER
 DIM ordQty(12) : INTEGER
 DIM ordPur(12) : INTEGER
 DIM ordCnt     : INTEGER
-DIM mgnRpy     : INTEGER
-DIM mgnRpyStk  : INTEGER
+DIM prjMgnBal(9): INTEGER
 DIM pNam       : STRING[27]
 DIM mgnElig    : BOOLEAN
 DIM mgnYrOk    : BOOLEAN
@@ -74,11 +73,12 @@ IF NOT plyrs(p).isBankrupt THEN
   aiTierVal := plyrs(p).aiTier
   RUN fmtPlyrName(plyrs(p).plyrName, pTypeVal, aiTierVal, pNam)
   ordCnt  := 0
-  mgnRpy  := 0
-  mgnRpyStk := 0
   mgnElig := plyrs(p).hadCashPur
+  FOR pTypeVal := 1 TO 9
+    prjMgnBal(pTypeVal) := plyrs(p).mgnBal(pTypeVal)
+  NEXT pTypeVal
 
-  RUN scrBuy(iCYr, plyrs(p), mkt, mgnElig, mgnYrOk, ordTyp, ordId, ordQty, ordPur, ordCnt, mgnRpy, mgnRpyStk, usrAct)
+  RUN scrBuy(iCYr, plyrs(p), mkt, mgnElig, mgnYrOk, ordTyp, ordId, ordQty, ordPur, ordCnt, prjMgnBal, usrAct)
   IF usrAct = 3 THEN
     RUN saveQuitToMenu(2, p, hdr, deckOrd, plyrs, mkt)
     END
@@ -87,9 +87,12 @@ IF NOT plyrs(p).isBankrupt THEN
     END
   ENDIF \ENDIF
 
-  IF mgnRpy > 0 AND mgnRpyStk > 0 THEN
-    RUN applyStockMgnRepay(plyrs(p), mgnRpyStk, mgnRpy, actualRpy)
-  ENDIF
+  FOR pTypeVal := 1 TO 9
+    IF prjMgnBal(pTypeVal) < plyrs(p).mgnBal(pTypeVal) THEN
+      actualRpy := plyrs(p).mgnBal(pTypeVal) - prjMgnBal(pTypeVal)
+      RUN applyStockMgnRepay(plyrs(p), pTypeVal, actualRpy, actualRpy)
+    ENDIF
+  NEXT pTypeVal
   IF ordCnt > 0 THEN
     RUN applyBuys(plyrs(p), mkt, ordTyp, ordId, ordQty, ordPur, ordCnt)
   ENDIF
@@ -145,9 +148,9 @@ PROCEDURE applyBuys
 (*               cashBal -= qty * bPar(b)                      *)
 (*               bondUnts(b) += qty                            *)
 (*             ordType: 1=STOCK 2=BOND.                        *)
-(*             Caller is responsible for applying mgnRepay     *)
-(*             (cashBal -= mgnRepay; per-company margin        *)
-(*              balances reduced by helper)                    *)
+(*             Caller is responsible for applying any staged   *)
+(*             projected company-margin repayments before this *)
+(*             procedure runs.                                *)
 (*             BEFORE calling this procedure. This procedure   *)
 (*             does not handle voluntary margin repayment.     *)
 (*             No-op when ordCnt = 0 (player passed).          *)
@@ -259,8 +262,7 @@ PROCEDURE scrBuy
 (*             ordQty     - output: quantity per order         *)
 (*             ordPurch   - output: 1=CASH 2=MARGIN per order  *)
 (*             ordCnt     - output: number of orders (0..12)   *)
-(*             mgnRepay   - output: repayment amount (0=none)  *)
-(*             mgnRpyStk  - output: repayment stock id         *)
+(*             prjMgnBal  - IN/OUT projected company margins   *)
 (*             action     - output: 1=CONFIRM 2=PASS           *)
 (*                          3=SAVE+EXIT 4=QUIT                *)
 (* SIDE EFX  : Clears screen. Calls scrMgnRepay if repayment   *)
@@ -279,8 +281,7 @@ PARAM ordId(12)     : INTEGER
 PARAM ordQty(12)    : INTEGER
 PARAM ordPurch(12)  : INTEGER
 PARAM ordCnt        : INTEGER
-PARAM mgnRepay      : INTEGER
-PARAM mgnRpyStk     : INTEGER
+PARAM prjMgnBal(9)  : INTEGER
 PARAM action        : INTEGER
 DIM sNam(9)  : STRING[14]
 DIM bPar(3)  : INTEGER
@@ -292,7 +293,6 @@ DIM b        : INTEGER
 DIM qty      : INTEGER
 DIM purch    : INTEGER
 DIM cashCost : INTEGER
-DIM repayAmt : INTEGER
 DIM maxRpy   : INTEGER
 DIM yldPct   : INTEGER
 DIM divVal   : INTEGER
@@ -338,6 +338,7 @@ DIM divPrj   : INTEGER
 DIM projTxt  : STRING[8]
 DIM mgnTxt   : STRING[7]
 DIM ordTxt   : STRING[24]
+DIM prjRpyTot : INTEGER
 
 ON ERROR GOTO 900
 
@@ -367,8 +368,6 @@ bPar(3) := 10000
 
 ! canMgn: TRUE only when both eligibility conditions met.
 canMgn   := mgnElig AND mgnYrOk
-mgnRepay := 0
-mgnRpyStk := 0
 ordCnt := 0
 FOR i := 1 TO 12
   ordType(i)  := 0
@@ -379,9 +378,15 @@ NEXT i
 
 LOOP
 
-  simCash := plyr.cashBal - mgnRepay
+  prjRpyTot := 0
+  FOR s := 1 TO 9
+    IF prjMgnBal(s) < plyr.mgnBal(s) THEN
+      prjRpyTot := prjRpyTot + (plyr.mgnBal(s) - prjMgnBal(s))
+    ENDIF
+  NEXT s
+  simCash := plyr.cashBal - prjRpyTot
   RUN calcMgnTot(plyr, currMgnTot)
-  simMgn  := currMgnTot - mgnRepay
+  simMgn  := currMgnTot - prjRpyTot
   FOR i := 1 TO ordCnt
     IF ordType(i) = 1 THEN
       s := ordId(i)
@@ -509,7 +514,7 @@ LOOP
   NEXT b
 
   PRINT
-  IF ordCnt > 0 OR mgnRepay > 0 THEN
+  IF ordCnt > 0 OR prjRpyTot > 0 THEN
     IF mgnYrOk AND currMgnTot > 0 THEN
       PRINT "  Enter=confirm orders  P=pass  M=repay margin  S=save+exit  Q=quit"
     ELSE
@@ -528,14 +533,16 @@ LOOP
   RUN getSaveQuitAct(kIn, sqAct)
   IF sqAct = 3 THEN
     ordCnt   := 0
-    mgnRepay := 0
-    mgnRpyStk := 0
+    FOR s := 1 TO 9
+      prjMgnBal(s) := plyr.mgnBal(s)
+    NEXT s
     action   := 3
     END
   ELSE IF sqAct = 4 THEN
     ordCnt   := 0
-    mgnRepay := 0
-    mgnRpyStk := 0
+    FOR s := 1 TO 9
+      prjMgnBal(s) := plyr.mgnBal(s)
+    NEXT s
     action   := 4
     END
   ENDIF \ENDIF
@@ -550,14 +557,15 @@ LOOP
   ENDIF
 
   IF keyCode = ASC("P") THEN
-    IF ordCnt > 0 OR mgnRepay > 0 THEN
+    IF ordCnt > 0 OR prjRpyTot > 0 THEN
       PRINT "Pending orders will be discarded. Press Y to pass."
       GET #0, cnfIn
       PRINT
       IF cnfIn = "Y" OR cnfIn = "y" THEN
         ordCnt   := 0
-        mgnRepay := 0
-        mgnRpyStk := 0
+        FOR s := 1 TO 9
+          prjMgnBal(s) := plyr.mgnBal(s)
+        NEXT s
         action   := 2
         END
       ENDIF
@@ -566,24 +574,18 @@ LOOP
       END
     ENDIF
   ELSE IF keyCode = 13 THEN
-    IF ordCnt > 0 OR mgnRepay > 0 THEN
+    IF ordCnt > 0 OR prjRpyTot > 0 THEN
       action := 1
       END
     ENDIF
   ELSE IF keyCode = ASC("M") AND mgnYrOk AND currMgnTot > 0 THEN
-    baseCash := simCash + mgnRepay
-    baseMgn  := simMgn + mgnRepay
-    maxRpy := baseMgn
+    baseCash := simCash + prjRpyTot
+    maxRpy := currMgnTot
     IF baseCash < maxRpy THEN
       maxRpy := baseCash
     ENDIF
     IF maxRpy > 0 THEN
-      repayAmt := mgnRepay
-      RUN scrMgnRepay(plyr, mkt, baseMgn, baseCash, mgnRpyStk, repayAmt)
-      mgnRepay := repayAmt
-      IF mgnRepay = 0 THEN
-        mgnRpyStk := 0
-      ENDIF
+      RUN scrMgnRepay(plyr, baseCash, prjMgnBal)
     ELSE
       PRINT "No margin repayment available."
       RUN waitKey
@@ -608,10 +610,7 @@ LOOP
 
       baseCash := simCash
       baseMgn  := simMgn
-      baseStkMgn := plyr.mgnBal(s)
-      IF mgnRpyStk = s THEN
-        baseStkMgn := baseStkMgn - mgnRepay
-      ENDIF
+      baseStkMgn := prjMgnBal(s)
       IF slotIdx > 0 THEN
         IF ordType(slotIdx) = 1 THEN
           cost := ordQty(slotIdx) * mkt.stckPrice(ordId(slotIdx))
@@ -670,14 +669,16 @@ LOOP
           RUN getLotQty("=== BUY QUANTITY ===", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, purch, canMgn, maxQty, baseCash, baseMgn, baseStkMgn, 1, qtyAct) \ ! allowNav=1
           IF qtyAct = 3 THEN
             ordCnt   := 0
-            mgnRepay := 0
-            mgnRpyStk := 0
+            FOR s := 1 TO 9
+              prjMgnBal(s) := plyr.mgnBal(s)
+            NEXT s
             action   := 3
             END
           ELSE IF qtyAct = 4 THEN
             ordCnt   := 0
-            mgnRepay := 0
-            mgnRpyStk := 0
+            FOR s := 1 TO 9
+              prjMgnBal(s) := plyr.mgnBal(s)
+            NEXT s
             action   := 4
             END
           ENDIF \ENDIF
@@ -709,14 +710,16 @@ LOOP
             RUN getSaveQuitAct(qIn, sqAct)
             IF sqAct = 3 THEN
               ordCnt   := 0
-              mgnRepay := 0
-              mgnRpyStk := 0
+              FOR s := 1 TO 9
+                prjMgnBal(s) := plyr.mgnBal(s)
+              NEXT s
               action   := 3
               END
             ELSE IF sqAct = 4 THEN
               ordCnt   := 0
-              mgnRepay := 0
-              mgnRpyStk := 0
+              FOR s := 1 TO 9
+                prjMgnBal(s) := plyr.mgnBal(s)
+              NEXT s
               action   := 4
               END
             ELSE

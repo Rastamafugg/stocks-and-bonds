@@ -257,48 +257,45 @@ PROCEDURE scrMgnRepay
 (* ============================================================ *)
 (* PROCEDURE : scrMgnRepay                                      *)
 (* PURPOSE   : S18 Margin Repayment sub-screen.                *)
-(*             Lists stocks with company margin debt, allows   *)
-(*             selection of one stock, and stages a cash       *)
-(*             repayment against that stock only. Displays     *)
-(*             projected total margin, projected cash, and     *)
-(*             projected per-stock company margin.             *)
+(*             Lists stocks with company margin debt and edits *)
+(*             the caller-owned projected margin array.        *)
+(*             Projected stock margins are shown only when the *)
+(*             projected value remains above zero. Confirm is  *)
+(*             Enter from the menu state; pass is P.           *)
 (* PARAMS    : plyr       - player record (read-only)          *)
-(*             mkt        - market state (read-only)           *)
-(*             currMgnTot - current outstanding margin total   *)
 (*             cashAvail  - current available cash             *)
-(*             repayStock - IN/OUT selected stock id           *)
-(*             amtToRpy   - IN/OUT staged repayment amount     *)
+(*             prjMgnBal  - IN/OUT projected company margins   *)
 (* SIDE EFX  : Clears screen. Uses INPUT.                      *)
 (* ============================================================ *)
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
-TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 PARAM plyr      : PlyrRec
-PARAM mkt       : MktState
-PARAM currMgnTot : INTEGER
 PARAM cashAvail : INTEGER
-PARAM repayStock : INTEGER
-PARAM amtToRpy  : INTEGER
+PARAM prjMgnBal(9): INTEGER
 DIM qIn      : STRING[8]
 DIM numOk    : BOOLEAN
-DIM pStr     : STRING[8]
-DIM pStr2    : STRING[8]
-DIM pStr3    : STRING[8]
-DIM pStr4    : STRING[8]
+DIM cashNowTxt : STRING[8]
+DIM cashPrjTxt : STRING[8]
+DIM mgnNowTxt  : STRING[8]
+DIM mgnPrjTxt  : STRING[8]
+DIM stkPrjTxt  : STRING[8]
+DIM maxAmtTxt  : STRING[8]
 DIM sNam(9)  : STRING[14]
 DIM mapId(9) : INTEGER
 DIM mapKey(9): INTEGER
 DIM mapCnt   : INTEGER
 DIM i        : INTEGER
 DIM s        : INTEGER
-DIM selIdx   : INTEGER
 DIM keyCode  : INTEGER
 DIM maxRpy   : INTEGER
 DIM prjCash  : INTEGER
-DIM prjMgn   : INTEGER
-DIM prjStk   : INTEGER
+DIM currMgnTot : INTEGER
+DIM prjMgnTot  : INTEGER
 DIM keyLbl   : STRING[1]
 DIM errTxt   : STRING[48]
-DIM validSel : BOOLEAN
+DIM selStock : INTEGER
+DIM editOpen : BOOLEAN
+DIM hasPrj   : BOOLEAN
+DIM repayAmt : INTEGER
 
 ON ERROR GOTO 900
 
@@ -313,47 +310,46 @@ FOR s := 1 TO 9
   ENDIF
 NEXT s
 
+RUN calcMgnTot(plyr, currMgnTot)
 IF mapCnt = 0 OR currMgnTot <= 0 OR cashAvail <= 0 THEN
-  repayStock := 0
-  amtToRpy := 0
   END
 ENDIF
 
-validSel := FALSE
-FOR i := 1 TO mapCnt
-  IF mapId(i) = repayStock THEN
-    validSel := TRUE
-  ENDIF
-NEXT i
-IF NOT validSel THEN
-  repayStock := mapId(1)
-ENDIF
-IF amtToRpy < 0 THEN
-  amtToRpy := 0
-ENDIF
+selStock := 0
+editOpen := FALSE
 errTxt := ""
 
 LOOP
-  maxRpy := plyr.mgnBal(repayStock)
-  IF cashAvail < maxRpy THEN
-    maxRpy := cashAvail
-  ENDIF
-  IF amtToRpy > maxRpy THEN
-    amtToRpy := maxRpy
-  ENDIF
+  prjMgnTot := 0
+  hasPrj := FALSE
+  FOR s := 1 TO 9
+    IF prjMgnBal(s) < 0 THEN
+      prjMgnBal(s) := 0
+    ENDIF
+    prjMgnTot := prjMgnTot + prjMgnBal(s)
+    IF prjMgnBal(s) < plyr.mgnBal(s) THEN
+      hasPrj := TRUE
+    ENDIF
+  NEXT s
+  prjCash := cashAvail - (currMgnTot - prjMgnTot)
 
-  prjCash := cashAvail - amtToRpy
-  prjMgn  := currMgnTot - amtToRpy
+  maxRpy := 0
+  IF selStock > 0 THEN
+    maxRpy := plyr.mgnBal(selStock)
+    IF cashAvail < maxRpy THEN
+      maxRpy := cashAvail
+    ENDIF
+  ENDIF
 
   RUN clrScr
   PRINT "=== MARGIN REPAYMENT ==="
   PRINT
-  RUN fmtMoney(currMgnTot, pStr)
-  RUN fmtMoney(prjMgn, pStr2)
-  PRINT "  Outstanding margin : $"; pStr; " [$"; pStr2; "]"
-  RUN fmtMoney(cashAvail, pStr)
-  RUN fmtMoney(prjCash, pStr2)
-  PRINT "  Cash available     : $"; pStr; " [$"; pStr2; "]"
+  RUN fmtMoney(currMgnTot, mgnNowTxt)
+  RUN fmtMoney(prjMgnTot, mgnPrjTxt)
+  PRINT "  Outstanding margin : $"; mgnNowTxt; " [$"; mgnPrjTxt; "]"
+  RUN fmtMoney(cashAvail, cashNowTxt)
+  RUN fmtMoney(prjCash, cashPrjTxt)
+  PRINT "  Cash available     : $"; cashNowTxt; " [$"; cashPrjTxt; "]"
   PRINT
   PRINT "  Stocks:";
   IF mapCnt = 1 THEN
@@ -363,81 +359,76 @@ LOOP
   ENDIF
   FOR i := 1 TO mapCnt
     s := mapId(i)
-    prjStk := plyr.mgnBal(s)
-    IF s = repayStock THEN
-      prjStk := prjStk - amtToRpy
-    ENDIF
-    RUN fmtMoney(prjStk, pStr3)
     keyLbl := CHR$(mapKey(i))
-    PRINT USING "'  ',S1<,' ',S12<,' $',I4>,'  [$',S6<,']'", keyLbl, sNam(s), mkt.stckPrice(s), pStr3
+    IF prjMgnBal(s) > 0 THEN
+      RUN fmtMoney(prjMgnBal(s), stkPrjTxt)
+      PRINT USING "'  ',S1<,' ',S12<,' $',I4>,'  [$',S7<,']'", keyLbl, sNam(s), plyr.mgnBal(s), stkPrjTxt
+    ELSE
+      PRINT USING "'  ',S1<,' ',S12<,' $',I4>", keyLbl, sNam(s), plyr.mgnBal(s)
+    ENDIF
   NEXT i
   PRINT
-  PRINT "Selected stock: "; sNam(repayStock)
-  PRINT "C=confirm P=pass"
-  PRINT "Enter repayment amount (0 to "; maxRpy; ", 0=none):"
+  IF selStock > 0 THEN
+    PRINT "Selected stock: "; sNam(selStock)
+  ELSE
+    PRINT "Selected stock:"
+  ENDIF
+  IF editOpen THEN
+    PRINT "P=pass"
+  ELSE IF hasPrj THEN
+    PRINT "Enter=confirm P=pass"
+  ELSE
+    PRINT "P=pass"
+  ENDIF \ENDIF
+  IF editOpen THEN
+    PRINT "Enter repayment amount (0 to "; maxRpy; ", 0=none):"
+  ENDIF
   IF errTxt <> "" THEN
     PRINT errTxt
   ENDIF
-  INPUT "> ", qIn
-  errTxt := ""
-  IF qIn = "" THEN
-    amtToRpy := 0
+  IF editOpen THEN
+    INPUT "> ", qIn
+    errTxt := ""
+    IF qIn = "" THEN
+      editOpen := FALSE
+    ELSE
+      RUN getNumIn(qIn, repayAmt, numOk)
+      IF NOT numOk THEN
+        errTxt := "Invalid: enter a number."
+      ELSE IF repayAmt < 0 THEN
+        errTxt := "Invalid: amount cannot be negative."
+      ELSE
+        IF repayAmt > maxRpy THEN
+          RUN fmtMoney(maxRpy, maxAmtTxt)
+          errTxt := "Invalid: maximum repayable is $" + maxAmtTxt + "."
+        ELSE
+          prjMgnBal(selStock) := plyr.mgnBal(selStock) - repayAmt
+          editOpen := FALSE
+        ENDIF
+      ENDIF \ENDIF
+    ENDIF
   ELSE
-    IF LEN(qIn) = 1 THEN
+    GET #0, qIn
+    errTxt := ""
+    IF qIn <> "" THEN
       keyCode := ASC(qIn)
       IF keyCode >= ASC("a") AND keyCode <= ASC("z") THEN
         keyCode := keyCode - 32
       ENDIF
-      IF keyCode = ASC("C") THEN
+      IF keyCode = 13 AND hasPrj THEN
         END
       ELSE IF keyCode = ASC("P") THEN
-        repayStock := 0
-        amtToRpy := 0
+        FOR s := 1 TO 9
+          prjMgnBal(s) := plyr.mgnBal(s)
+        NEXT s
         END
       ELSE
-        selIdx := 0
         FOR i := 1 TO mapCnt
           IF mapKey(i) = keyCode THEN
-            selIdx := i
+            selStock := mapId(i)
+            editOpen := TRUE
           ENDIF
         NEXT i
-        IF selIdx > 0 THEN
-          repayStock := mapId(selIdx)
-        ELSE
-          RUN getNumIn(qIn, prjStk, numOk)
-          IF NOT numOk THEN
-            errTxt := "Invalid: enter amount, stock key, C, or P."
-          ELSE IF prjStk < 0 THEN
-            errTxt := "Invalid: amount cannot be negative."
-          ELSE
-            amtToRpy := prjStk
-            maxRpy := plyr.mgnBal(repayStock)
-            IF cashAvail < maxRpy THEN
-              maxRpy := cashAvail
-            ENDIF
-            IF amtToRpy > maxRpy THEN
-              RUN fmtMoney(maxRpy, pStr4)
-              errTxt := "Invalid: maximum repayable is $" + pStr4 + "."
-            ENDIF
-          ENDIF \ENDIF
-        ENDIF
-      ENDIF \ENDIF
-    ELSE
-      RUN getNumIn(qIn, prjStk, numOk)
-      IF NOT numOk THEN
-        errTxt := "Invalid: enter amount, stock key, C, or P."
-      ELSE IF prjStk < 0 THEN
-        errTxt := "Invalid: amount cannot be negative."
-      ELSE
-        amtToRpy := prjStk
-        maxRpy := plyr.mgnBal(repayStock)
-        IF cashAvail < maxRpy THEN
-          maxRpy := cashAvail
-        ENDIF
-        IF amtToRpy > maxRpy THEN
-          RUN fmtMoney(maxRpy, pStr4)
-          errTxt := "Invalid: maximum repayable is $" + pStr4 + "."
-        ENDIF
       ENDIF \ENDIF
     ENDIF
   ENDIF
