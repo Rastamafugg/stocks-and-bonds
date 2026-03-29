@@ -23,21 +23,39 @@ These instructions apply to all work in this repository.
   1. the exact cited issue the user asked to fix
   2. any adjacent same-block issue proposed for bundled repair
 - Do not patch adjacent same-block issues unless they are disclosed first.
+- When the user scopes an edit to an exact line or exact line range, patch only
+  that cited target unless the user explicitly approves any additional edit.
+- After an exact-line patch, re-open the exact cited lines and verify:
+  1. the intended target line changed
+  2. no adjacent same-block line changed unless approved
+- If the patch lands on the wrong occurrence or changes additional lines, state
+  that explicitly as an observed fact. Do not describe such changes as earlier,
+  prior, or pre-existing when they were made during the current request.
+- Do not claim that only one line, block, or file changed unless that was
+  verified against the actual post-patch file state in the current task.
 
 ## Control-Flow Closure Accounting
 
 - For unmatched-control-structure diagnosis, do not stop at whole-procedure
   token parity. Also account for where each closure belongs inside the local
   nested block.
+- For any cited unmatched-control-structure line, build a local open-block
+  ledger from the nearest enclosing control structure down to the cited line.
+  Use that ledger as the primary source of truth over whole-procedure counts.
 - When an `ELSE IF` chain spans multiple closure lines, verify the closure
   distribution line-by-line against the actual nesting depth at each point, not
   just the net number of `ENDIF` tokens in the surrounding procedure.
+- Do not infer the number of `ENDIF` tokens needed for an `ELSE IF` chain from
+  another procedure or from generic language assumptions. Count only the actual
+  open blocks in the cited local context.
 - If a repair could be made by moving an `ENDIF` between adjacent closure
   lines, report that as a distinct same-block formatting/structure issue rather
   than only proposing a net token-count fix.
 - When two adjacent closure tokens belong at the same indentation level, append
   the later token to the same physical source line as the prior closure token
   instead of leaving it on its own line.
+- Whole-procedure `IF`/`ENDIF` counts may be used only as a secondary check.
+  They do not authorize edits that conflict with the local open-block ledger.
 
 ## Repository Authority
 
@@ -116,6 +134,9 @@ If a syscall detail appears ambiguous or undocumented, use
   closure count in that same procedure before making any further edits.
 - After any control-flow edit, immediately re-read the exact edited line block
   to confirm the patch landed in the intended procedure and nowhere else.
+- For exact-line control-flow fixes, do not patch any second line in the same
+  procedure during the same step unless that second line was disclosed first
+  as a distinct same-block issue and approved by the user.
 - Reuse existing utility procedures and established TYPE definitions when
   possible.
 - Check new identifiers against the reserved-word guidance in
@@ -156,6 +177,11 @@ If a syscall detail appears ambiguous or undocumented, use
 - That self-review must include a targeted scan of the edited procedures for
   any newly introduced syntax, built-in names, or control-flow forms that were
   not explicitly verified against the Basic09 manual or existing project code.
+- For unmatched-control-structure fixes, the completion response must also
+  include:
+  1. the exact cited line numbers re-opened after patching
+  2. the exact closure text now present on those lines
+  3. whether any other line changed in that procedure during the step
 
 ## When Helping With Syscalls
 
