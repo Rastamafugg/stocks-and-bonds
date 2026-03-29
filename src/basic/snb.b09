@@ -148,7 +148,7 @@ LOOP
   iMaxYr := hdr.maxYears    \ ! stage BYTE
   iSavPh := hdr.savedPhase  \ ! stage BYTE
 
-  IF iSavPh = 8 THEN
+  IF iSavPh = 8 THEN \ ! RETURN_TO_SETUP
     needSetup := TRUE
   ELSE
     needSetup := FALSE
@@ -174,7 +174,7 @@ LOOP
       EXITIF (iCYr >= iMaxYr AND iSavPh = 0) OR gameOver THEN
       ENDEXIT
 
-    IF iSavPh = 0 THEN
+    IF iSavPh = 0 THEN \ ! YEAR_START
       modNam := "snbUtil"
       RUN ensureModule(modNam, TRUE, debugLog, ok)
       IF NOT ok THEN
@@ -218,7 +218,7 @@ LOOP
     ENDIF
 
     IF NOT gameOver THEN
-      IF iSavPh = 0 OR iSavPh = 4 THEN
+      IF iSavPh = 0 THEN \ ! YEAR_START
         modNam := "snbUtil"
         RUN ensureModule(modNam, TRUE, debugLog, ok)
         IF NOT ok THEN
@@ -239,7 +239,7 @@ LOOP
     ENDIF
 
     IF NOT gameOver THEN
-      IF iSavPh = 0 OR iSavPh = 1 OR iSavPh = 4 THEN
+      IF iSavPh = 1 THEN \ ! SELL_PHASE
         modNam := "snbUtil"
         RUN ensureModule(modNam, TRUE, debugLog, ok)
         IF NOT ok THEN
@@ -288,7 +288,7 @@ LOOP
     ENDIF
 
     IF NOT gameOver THEN
-      IF iSavPh = 0 OR iSavPh = 1 OR iSavPh = 2 OR iSavPh = 4 THEN
+      IF iSavPh = 2 THEN \ ! BUY_PHASE
         modNam := "snbUtil"
         RUN ensureModule(modNam, TRUE, debugLog, ok)
         IF NOT ok THEN
@@ -360,8 +360,6 @@ LOOP
 
     ENDIF
 
-      iSavPh := 0
-
     ENDLOOP
 
     IF NOT runEndGame THEN
@@ -417,7 +415,7 @@ LOOP
     ENDIF
     iSavPh := hdr.savedPhase
     iGSt   := hdr.gameStage
-    IF iSavPh = 8 THEN
+    IF iSavPh = 8 THEN \ ! RETURN_TO_SETUP
       needSetup := TRUE
     ELSE IF iGSt <> 3 THEN
       needSetup := FALSE

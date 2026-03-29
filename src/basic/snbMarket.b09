@@ -36,6 +36,7 @@ DIM iMaxYr     : INTEGER  \ ! staged hdr.maxYears BYTE
 DIM iPCnt      : INTEGER  \ ! staged hdr.plyrCount BYTE
 DIM iRMode     : INTEGER  \ ! staged hdr.rollMode BYTE
 DIM iDkPos     : INTEGER  \ ! staged deck position within deckOrd
+DIM wasDone    : BOOLEAN  \ ! TRUE on closing-price pass after GS_DONE
 DIM cardId     : INTEGER  \ ! drawn card ID (1..36)
 DIM rolls(9)   : INTEGER  \ ! INTEGER copy of rTot for applyMktYear
 DIM dOne(9)    : BYTE     \ ! die 1 per stock slot
@@ -77,6 +78,10 @@ iCYr   := hdr.currYear   \ ! stage BYTE
 iMaxYr := hdr.maxYears   \ ! stage BYTE
 iPCnt  := hdr.plyrCount  \ ! stage BYTE
 iRMode := hdr.rollMode   \ ! stage BYTE
+wasDone := FALSE
+IF hdr.gameStage = 3 THEN
+  wasDone := TRUE
+ENDIF
 
 ! Draw and decode the situation card for this year.
 ! deckOrd is indexed by deckPos; drawCard advances it and
@@ -216,7 +221,14 @@ IF crd.divBonus > 0 AND iCYr > 1 AND iCYr < iMaxYr THEN
 ENDIF
 
 ! Always write GS_YEAR (2); snbMarket never terminates the game.
+! On a normal yearly market pass, advance the resume checkpoint
+! to the first sell turn. The closing-price draw runs after
+! GS_DONE and must not re-enter the sell phase.
 hdr.gameStage := 2  \ ! GS_YEAR
+IF NOT wasDone THEN
+  hdr.savedPhase := 1  \ ! SELL_PHASE
+  hdr.savedPlyr  := 1
+ENDIF
 
 RUN saveGame("SNBSTATE", hdr, deckOrd, plyrs, mkt)
 END
