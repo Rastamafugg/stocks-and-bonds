@@ -404,6 +404,9 @@ DIM maxQty   : INTEGER
 DIM dispCash : INTEGER
 DIM dispMgn  : INTEGER
 DIM divPrj   : INTEGER
+DIM projTxt  : STRING[8]
+DIM mgnTxt   : STRING[7]
+DIM ordTxt   : STRING[24]
 
 ON ERROR GOTO 900
 
@@ -503,37 +506,40 @@ LOOP
       keyLbl := CHR$(mapKey(mapCnt))
       yldPct := divRate(s)
       divVal := (mkt.stckPrice(s) * divRate(s)) / 100
-      ! Line exceeds 79 chars; PRINT USING row format requires single line.
-      PRINT USING "'  ',S1<,' ',S12<,'  $',I4>,' ',I2>,'% -> $',I4>", keyLbl, sNam(s), mkt.stckPrice(s), yldPct, divVal;
       holdQty := plyr.stckShrs(s)
       totalQty := holdQty
-      divPrj := divVal
+      divPrj := 0
       IF slotQty > 0 THEN
         totalQty := holdQty + slotQty
         IF holdQty > 0 THEN
           divPrj := (divVal * totalQty) / holdQty
+        ELSE
+          divPrj := (divVal * totalQty) / 10
         ENDIF
-        RUN fmtMoney(divPrj, pStr)
-        PRINT " [$"; pStr; "]";
       ENDIF
+      projTxt := ""
+      IF slotQty > 0 THEN
+        RUN fmtMoney(divPrj, pStr)
+        projTxt := "[$" + pStr + "]"
+      ENDIF
+      mgnTxt := ""
       IF plyr.mgnBal(s) > 0 THEN
-        PRINT " [ MGN]";
+        mgnTxt := "[ MGN]"
       ENDIF
       IF slotQty > 0 AND purch = 2 THEN
-        PRINT " [+MGN]";
+        mgnTxt := "[+MGN]"
       ENDIF
-      IF holdQty > 0 THEN
-        PRINT " OWN "; holdQty;
-      ENDIF
+      ordTxt := ""
       IF slotQty > 0 THEN
         IF purch = 2 THEN
-          PRINT " + BUY "; slotQty; "M = TOT "; totalQty
+          ordTxt := "+ BUY " + TRIM$(STR$(slotQty)) + "M = TOT "
         ELSE
-          PRINT " + BUY "; slotQty; "C = TOT "; totalQty
+          ordTxt := "+ BUY " + TRIM$(STR$(slotQty)) + "C = TOT "
         ENDIF
-      ELSE
-        PRINT
+        ordTxt := ordTxt + TRIM$(STR$(totalQty))
       ENDIF
+      ! Line exceeds 79 chars; PRINT USING row format requires single line.
+      PRINT USING "'  ',S1<,' ',S12<,'  $',I4>,' ',I2>,'% -> $',I4>,' ',S8<,' ',S7<,' OWN ',I3>,' ',S24<", keyLbl, sNam(s), mkt.stckPrice(s), yldPct, divVal, projTxt, mgnTxt, holdQty, ordTxt
     ENDIF
   NEXT s
 

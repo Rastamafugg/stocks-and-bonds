@@ -260,6 +260,9 @@ DIM prjQty    : INTEGER
 DIM divPrj    : INTEGER
 DIM repayAmt  : INTEGER
 DIM maxRpy    : INTEGER
+DIM projTxt   : STRING[8]
+DIM mgnTxt    : STRING[7]
+DIM ordTxt    : STRING[24]
 
 ON ERROR GOTO 900
 
@@ -357,33 +360,32 @@ LOOP
       divVal := (mkt.stckPrice(s) * divRate(s)) / 100
       holdQty := plyr.stckShrs(s)
       prjQty := holdQty
-      divPrj := divVal
+      divPrj := 0
       IF slotQty > 0 THEN
         prjQty := holdQty - slotQty
         IF holdQty > 0 THEN
           divPrj := (divVal * prjQty) / holdQty
-        ELSE
-          divPrj := 0
         ENDIF
       ENDIF
-      ! Line exceeds 79 chars; PRINT USING row format requires single line.
-      PRINT USING "'  ',S1<,' ',S12<,I5>,' shr @ $',I4>,' ',I2>,'% -> $',I4>", keyLbl, sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), yldPct, divVal;
+      projTxt := ""
       IF slotQty > 0 THEN
         RUN fmtMoney(divPrj, pStr)
-        PRINT " [$"; pStr; "]";
+        projTxt := "[$" + pStr + "]"
       ENDIF
+      mgnTxt := ""
       IF plyr.mgnBal(s) > 0 THEN
-        PRINT " [ MGN]";
+        mgnTxt := "[ MGN]"
       ENDIF
       IF slotQty > 0 AND plyr.mgnBal(s) > 0 THEN
-        PRINT " [-MGN]";
+        mgnTxt := "[-MGN]"
       ENDIF
-      PRINT " OWN "; holdQty;
+      ordTxt := ""
       IF slotQty > 0 THEN
-        PRINT " - SELL "; slotQty; " = TOT "; prjQty
-      ELSE
-        PRINT
+        ordTxt := "- SELL " + TRIM$(STR$(slotQty))
+        ordTxt := ordTxt + " = TOT " + TRIM$(STR$(prjQty))
       ENDIF
+      ! Line exceeds 79 chars; PRINT USING row format requires single line.
+      PRINT USING "'  ',S1<,' ',S12<,'  $',I4>,' ',I2>,'% -> $',I4>,' ',S8<,' ',S7<,' OWN ',I3>,' ',S24<", keyLbl, sNam(s), mkt.stckPrice(s), yldPct, divVal, projTxt, mgnTxt, holdQty, ordTxt
     ENDIF
   NEXT i
 
