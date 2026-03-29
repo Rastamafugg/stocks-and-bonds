@@ -13,8 +13,8 @@ PROCEDURE snb
 (*                           financial work; all      *)
 (*                           years for increment)     *)
 (*              snbMarket  - market resolution        *)
-(*              snbSell    - sell phase               *)
-(*              snbBuy     - buy phase                *)
+(*              snbSell or snbSellAI - sell phase     *)
+(*              snbBuy or snbBuyAI   - buy phase      *)
 (*            After the configured final year buy    *)
 (*            phase, forks one closing snbMarket     *)
 (*            pass to determine final prices, then   *)
@@ -76,6 +76,7 @@ DIM ok         : BOOLEAN
 DIM hasState   : BOOLEAN
 DIM debugLog   : BOOLEAN
 DIM needSetup  : BOOLEAN
+DIM turnPType  : INTEGER
 DIM i          : INTEGER
 
 ON ERROR GOTO 900
@@ -245,14 +246,26 @@ LOOP
             gameOver := TRUE
           ENDIF
         ENDIF
-        modNam := "snbSell"
-        RUN ensureModule(modNam, TRUE, debugLog, ok)
-        IF NOT ok THEN
-          PRINT "SNB: failed to ensure snbSell"
-          gameOver := TRUE
+        IF NOT gameOver THEN
+          RUN readTurnPlyrType(turnPType, loadOK)
+          IF NOT loadOK THEN
+            PRINT "SNB: failed to read sell turn player type"
+            gameOver := TRUE
+          ELSE IF turnPType = 2 THEN
+            modNam := "snbSellAI"
+          ELSE
+            modNam := "snbSell"
+          ENDIF \ENDIF
         ENDIF
         IF NOT gameOver THEN
-          RUN forkPhase("snbSell", debugLog, exitStat)
+          RUN ensureModule(modNam, TRUE, debugLog, ok)
+          IF NOT ok THEN
+            PRINT "SNB: failed to ensure "; modNam
+            gameOver := TRUE
+          ENDIF
+        ENDIF
+        IF NOT gameOver THEN
+          RUN forkPhase(modNam, debugLog, exitStat)
           GOSUB 100
         ENDIF
       ENDIF
@@ -266,14 +279,32 @@ LOOP
           PRINT "SNB: failed to ensure snbUtil (snbBuy)"
           gameOver := TRUE
         ENDIF
-        modNam := "snbBuy"
-        RUN ensureModule(modNam, TRUE, debugLog, ok)
-        IF NOT ok THEN
-          PRINT "SNB: failed to ensure snbBuy"
-          gameOver := TRUE
+        IF NOT gameOver THEN
+          modNam := "snbBuy"
+          RUN ensureModule(modNam, TRUE, debugLog, ok)
+          IF NOT ok THEN
+            PRINT "SNB: failed to ensure snbBuy"
+            gameOver := TRUE
+          ENDIF
         ENDIF
         IF NOT gameOver THEN
-          RUN forkPhase("snbBuy", debugLog, exitStat)
+          RUN readTurnPlyrType(turnPType, loadOK)
+          IF NOT loadOK THEN
+            PRINT "SNB: failed to read buy turn player type"
+            gameOver := TRUE
+          ELSE IF turnPType = 2 THEN
+            modNam := "snbBuyAI"
+            RUN ensureModule(modNam, TRUE, debugLog, ok)
+            IF NOT ok THEN
+              PRINT "SNB: failed to ensure snbBuyAI"
+              gameOver := TRUE
+            ENDIF
+          ELSE
+            modNam := "snbBuy"
+          ENDIF \ENDIF
+        ENDIF
+        IF NOT gameOver THEN
+          RUN forkPhase(modNam, debugLog, exitStat)
           GOSUB 100
         ENDIF
       ENDIF

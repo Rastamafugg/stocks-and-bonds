@@ -16,8 +16,10 @@ PRINT "  clrOrders"
 PRINT "  dropOrderAt"
 PRINT "  findMapSel"
 PRINT "  findOrderSlot"
+PRINT "  findNextActivePlyr"
 PRINT "  prepAssetMaps"
 PRINT "  promptBondQty"
+PRINT "  readTurnPlyrType"
 PRINT "  calcMgnTot"
 PRINT "  calcSaleMgnRpy"
 PRINT "  applyCashMgnRepay"
@@ -542,6 +544,36 @@ FOR i := 1 TO ordCnt
 NEXT i
 END
 
+PROCEDURE findNextActivePlyr
+(* ================================================== *)
+(* PROCEDURE: findNextActivePlyr                       *)
+(* PURPOSE:   Find the next non-bankrupt player after *)
+(*            currP within 1..plyrCnt.                *)
+(* PARAMS:    plyrs   - player array                  *)
+(*            plyrCnt - valid player count            *)
+(*            currP   - current player index          *)
+(*            nextP   - receives next active player   *)
+(*                      or 0 if none remain           *)
+(* EFFECTS:   None beyond output PARAM assignment.    *)
+(* ================================================== *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+PARAM plyrs(6) : PlyrRec
+PARAM plyrCnt  : INTEGER
+PARAM currP    : INTEGER
+PARAM nextP    : INTEGER
+DIM p          : INTEGER
+
+nextP := 0
+FOR p := currP + 1 TO plyrCnt
+  IF nextP = 0 THEN
+    IF NOT plyrs(p).isBankrupt THEN
+      nextP := p
+    ENDIF
+  ENDIF
+NEXT p
+END
+
 PROCEDURE prepAssetMaps
 (* ================================================== *)
 (* PROCEDURE: prepAssetMaps                           *)
@@ -629,6 +661,97 @@ FOR b := 1 TO 3
     mapQty(mapCnt) := slotQty
   ENDIF
 NEXT b
+END
+
+PROCEDURE readTurnPlyrType
+(* ============================================================ *)
+(* PROCEDURE : readTurnPlyrType                                  *)
+(* PURPOSE   : Read the current saved-turn player type from      *)
+(*             SNBSTATE without loading the full game state.     *)
+(* PARAMS    : plyrType - receives current player's plyrType     *)
+(*             readOK   - TRUE on success, FALSE on any error    *)
+(* SIDE EFX  : Reads SNBSTATE. Prints a diagnostic on failure.   *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+PARAM plyrType : INTEGER
+PARAM readOK   : BOOLEAN
+DIM hdr        : SaveHdr
+DIM plyr       : PlyrRec
+DIM deckByt    : BYTE
+DIM path       : BYTE
+DIM pathOpen   : BOOLEAN
+DIM chkExp     : INTEGER
+DIM iMaxYr     : INTEGER
+DIM iDeckCnt   : INTEGER
+DIM iPlyrCnt   : INTEGER
+DIM i          : INTEGER
+DIM pIdx       : INTEGER
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+readOK   := FALSE
+plyrType := 0
+
+OPEN #path, "SNBSTATE":READ
+pathOpen := TRUE
+GET #path, hdr
+
+IF hdr.magic <> $53 THEN
+  PRINT "readTurnPlyrType: not a valid save file"
+  END
+ENDIF
+IF hdr.fmtVersion <> 2 THEN
+  PRINT "readTurnPlyrType: incompatible save file version"
+  END
+ENDIF
+
+chkExp := hdr.magic      + hdr.fmtVersion + hdr.maxYears
+chkExp := chkExp + hdr.plyrCount  + hdr.rollMode
+chkExp := chkExp + hdr.mgnRule    + hdr.currYear
+chkExp := chkExp + hdr.savedPhase + hdr.savedPlyr
+chkExp := chkExp + hdr.gameStage  + hdr.bnkrFlgs
+chkExp := LAND(chkExp, 255)
+IF chkExp <> hdr.checksum THEN
+  PRINT "readTurnPlyrType: save file is corrupt"
+  END
+ENDIF
+
+pIdx := hdr.savedPlyr
+iPlyrCnt := hdr.plyrCount
+IF pIdx < 1 OR pIdx > iPlyrCnt THEN
+  PRINT "readTurnPlyrType: invalid savedPlyr"
+  END
+ENDIF
+
+iMaxYr := hdr.maxYears
+iDeckCnt := iMaxYr + 1
+IF iDeckCnt > 36 THEN
+  iDeckCnt := 36
+ENDIF
+FOR i := 1 TO iDeckCnt
+  GET #path, deckByt
+NEXT i
+
+FOR i := 1 TO pIdx
+  GET #path, plyr
+NEXT i
+
+plyrType := plyr.plyrType
+readOK := TRUE
+
+CLOSE #path
+pathOpen := FALSE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "readTurnPlyrType error ("; ERR; ")"
+    readOK := FALSE
 END
 
 PROCEDURE promptBondQty

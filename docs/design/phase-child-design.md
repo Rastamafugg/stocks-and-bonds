@@ -22,8 +22,8 @@ It runs this process sequence:
 3. For each game year, fork these child entries in order:
    - `snbDividend`
    - `snbMarket`
-   - `snbSell`
-   - `snbBuy`
+   - `snbSell` or `snbSellAI`
+   - `snbBuy` or `snbBuyAI`
 4. If the configured final year has just completed, fork one extra
    `snbMarket` pass for the closing-price draw.
 5. Fork `snbEndGame`.
@@ -52,8 +52,8 @@ All inter-process state handoff is done through `SNBSTATE`.
 After that increment:
 
 - `snbMarket` reads the active year
-- `snbSell` reads the active year
-- `snbBuy` reads the active year
+- `snbSell` and `snbSellAI` read the active year
+- `snbBuy` and `snbBuyAI` read the active year
 
 | State | `currYear` value |
 |-------|------------------|
@@ -102,27 +102,28 @@ value and distinguishes itself by running after `GS_DONE`.
   - Runs once per normal year, plus one extra closing-price draw after the
     final year ends
 
-### 4.4 `snbSell`
-- File: `src/basic/snbSell.b09`
-- Entry procedure: `snbSell`
+### 4.4 `snbSell` and `snbSellAI`
+- Files: `src/basic/snbSell.b09`, `src/basic/snbSellAI.b09`
+- Entry procedures: `snbSell`, `snbSellAI`
 - Writes: `gameStage = GS_YEAR`
 - Responsibility:
-  - Runs the sell phase for each non-bankrupt player
-  - Skips the entire sell pass in Year 1
-  - Uses `scrSell` for humans
-  - Uses `aiSell` plus `scrAISellTurn` for AI players
+  - Runs the sell phase for one current saved-turn player
+  - Skips the sell editor in Year 1
+  - `snbSell` handles human turns with `scrSell`
+  - `snbSellAI` handles AI turns with `aiSell` plus `scrAISellTurn`
   - Applies sell orders to `SNBSTATE`
+  - Advances `savedPlyr` within sell phase or transitions to buy phase
 
-### 4.5 `snbBuy`
-- File: `src/basic/snbBuy.b09`
-- Entry procedure: `snbBuy`
+### 4.5 `snbBuy` and `snbBuyAI`
+- Files: `src/basic/snbBuy.b09`, `src/basic/snbBuyAI.b09`
+- Entry procedures: `snbBuy`, `snbBuyAI`
 - Writes: `gameStage = GS_YEAR` or `GS_DONE`
 - Responsibility:
-  - Runs the buy phase for each non-bankrupt player
-  - Uses `scrBuy` for humans
-  - Uses `aiBuy` plus `scrAIBuyTurn` for AI players
+  - Runs the buy phase for one current saved-turn player
+  - `snbBuy` handles human turns with `scrBuy`
+  - `snbBuyAI` handles AI turns with `aiBuy` plus `scrAIBuyTurn`
   - Applies margin repayment and buy orders to `SNBSTATE`
-  - Determines whether the main year loop is complete
+  - Determines whether the main year loop is complete when buy phase ends
   - Writes `GS_DONE` when:
     - `currYear >= maxYears`, or
     - multiplayer game has one or zero non-bankrupt players left
@@ -146,8 +147,8 @@ Normal year flow:
 snbSetup
   -> snbDividend
   -> snbMarket
-  -> snbSell
-  -> snbBuy
+  -> snbSell or snbSellAI
+  -> snbBuy or snbBuyAI
 ```
 
 Final-year completion flow:
@@ -170,8 +171,8 @@ LOOP
 
   fork snbDividend -> readHdr
   fork snbMarket   -> readHdr
-  fork snbSell     -> readHdr
-  fork snbBuy      -> readHdr
+  fork snbSell*    -> readHdr
+  fork snbBuy*     -> readHdr
 
   apply safety nets
 ENDLOOP
@@ -202,8 +203,10 @@ Notes:
 | `snbSetup.b09` | `snbSetup`, `setup` | Pre-game setup child and setup orchestrator |
 | `snbDividend.b09` | `snbDividend` | Dividend/year-header child |
 | `snbMarket.b09` | `snbMarket` | Market-resolution child |
-| `snbSell.b09` | `snbSell` | Sell-phase child |
-| `snbBuy.b09` | `snbBuy` | Buy-phase child and game-over gate |
+| `snbSell.b09` | `snbSell` | Human sell-phase child |
+| `snbSellAI.b09` | `snbSellAI` | AI sell-phase child |
+| `snbBuy.b09` | `snbBuy` | Human buy-phase child and shared buy apply logic |
+| `snbBuyAI.b09` | `snbBuyAI` | AI buy-phase child |
 | `snbEndGame.b09` | `snbEndGame` | Endgame child |
 
 ### 6.2 Shared library/support modules
@@ -220,8 +223,10 @@ Several helpers now live inside the child module that uses them:
 - `snbSetup.b09`: `initPlayer`, `initMkt`, setup screens
 - `snbDividend.b09`: `applyDivInt`, `scrYearHdr`, `scrDivInt`
 - `snbMarket.b09`: market tables, card decoding, roll generation, market screens
-- `snbSell.b09`: `aiSell`, `applySells`, `scrAISellTurn`, `scrSell`
-- `snbBuy.b09`: `aiBuy`, `applyBuys`, `scrMgnRepay`, `scrAIBuyTurn`, `scrBuy`
+- `snbSell.b09`: `scrSell`
+- `snbSellAI.b09`: `aiSell`, `scrAISellTurn`
+- `snbBuy.b09`: `applyBuys`, `scrMgnRepay`, `scrBuy`
+- `snbBuyAI.b09`: `aiBuy`, `scrAIBuyTurn`
 - `snbEndGame.b09`: endgame screens
 
 Because of that co-location, the older module split described in earlier design
@@ -258,7 +263,9 @@ The coordinator currently calls `forkPhase(...)` with only these child names:
 - `snbDividend`
 - `snbMarket`
 - `snbSell`
+- `snbSellAI`
 - `snbBuy`
+- `snbBuyAI`
 - `snbEndGame`
 
 Any design note that lists other forked child entry names is historical.
