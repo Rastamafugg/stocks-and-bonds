@@ -265,7 +265,7 @@ PROCEDURE scrMgnRepay
 (* PARAMS    : plyr       - player record (read-only)          *)
 (*             mkt        - market state (read-only)           *)
 (*             currMgnTot - current outstanding margin total   *)
-(*             cashBal    - current available cash             *)
+(*             cashAvail  - current available cash             *)
 (*             repayStock - IN/OUT selected stock id           *)
 (*             amtToRpy   - IN/OUT staged repayment amount     *)
 (* SIDE EFX  : Clears screen. Uses INPUT.                      *)
@@ -275,7 +275,7 @@ TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 PARAM plyr      : PlyrRec
 PARAM mkt       : MktState
 PARAM currMgnTot : INTEGER
-PARAM cashBal   : INTEGER
+PARAM cashAvail : INTEGER
 PARAM repayStock : INTEGER
 PARAM amtToRpy  : INTEGER
 DIM qIn      : STRING[8]
@@ -313,7 +313,7 @@ FOR s := 1 TO 9
   ENDIF
 NEXT s
 
-IF mapCnt = 0 OR currMgnTot <= 0 OR cashBal <= 0 THEN
+IF mapCnt = 0 OR currMgnTot <= 0 OR cashAvail <= 0 THEN
   repayStock := 0
   amtToRpy := 0
   END
@@ -335,14 +335,14 @@ errTxt := ""
 
 LOOP
   maxRpy := plyr.mgnBal(repayStock)
-  IF cashBal < maxRpy THEN
-    maxRpy := cashBal
+  IF cashAvail < maxRpy THEN
+    maxRpy := cashAvail
   ENDIF
   IF amtToRpy > maxRpy THEN
     amtToRpy := maxRpy
   ENDIF
 
-  prjCash := cashBal - amtToRpy
+  prjCash := cashAvail - amtToRpy
   prjMgn  := currMgnTot - amtToRpy
 
   RUN clrScr
@@ -351,7 +351,7 @@ LOOP
   RUN fmtMoney(currMgnTot, pStr)
   RUN fmtMoney(prjMgn, pStr2)
   PRINT "  Outstanding margin : $"; pStr; " [$"; pStr2; "]"
-  RUN fmtMoney(cashBal, pStr)
+  RUN fmtMoney(cashAvail, pStr)
   RUN fmtMoney(prjCash, pStr2)
   PRINT "  Cash available     : $"; pStr; " [$"; pStr2; "]"
   PRINT
@@ -412,8 +412,8 @@ LOOP
           ELSE
             amtToRpy := prjStk
             maxRpy := plyr.mgnBal(repayStock)
-            IF cashBal < maxRpy THEN
-              maxRpy := cashBal
+            IF cashAvail < maxRpy THEN
+              maxRpy := cashAvail
             ENDIF
             IF amtToRpy > maxRpy THEN
               RUN fmtMoney(maxRpy, pStr4)
@@ -431,8 +431,8 @@ LOOP
       ELSE
         amtToRpy := prjStk
         maxRpy := plyr.mgnBal(repayStock)
-        IF cashBal < maxRpy THEN
-          maxRpy := cashBal
+        IF cashAvail < maxRpy THEN
+          maxRpy := cashAvail
         ENDIF
         IF amtToRpy > maxRpy THEN
           RUN fmtMoney(maxRpy, pStr4)
