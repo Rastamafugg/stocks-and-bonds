@@ -57,15 +57,7 @@ ENDIF
 
 iCYr  := hdr.currYear
 iPCnt := hdr.plyrCount
-sNam(1) := "Growth Corp"
-sNam(2) := "Metro Props"
-sNam(3) := "Pioneer Mut"
-sNam(4) := "Shady Brooks"
-sNam(5) := "Stryker Drlg"
-sNam(6) := "Tri-City Trn"
-sNam(7) := "United Auto"
-sNam(8) := "Uranium Ent"
-sNam(9) := "Valley Power"
+RUN initStockNames(sNam)
 startP := 1
 IF hdr.savedPhase = 1 THEN
   startP := hdr.savedPlyr
@@ -321,9 +313,7 @@ divPer(8) := 6 \ ! Uranium Ent
 divPer(9) := 3 \ ! Valley Power
 
 ! --- Bond par values ----------------------------------------
-bPar(1) := 1000
-bPar(2) := 5000
-bPar(3) := 10000
+RUN initBondPar(bPar)
 
 ! --- Init output and tracking arrays -----------------------
 ordCnt := 0
@@ -563,19 +553,8 @@ DIM s       : INTEGER
 DIM b       : INTEGER
 DIM pStr    : STRING[8]
 
-sNam(1) := "Growth Corp"
-sNam(2) := "Metro Props"
-sNam(3) := "Pioneer Mut"
-sNam(4) := "Shady Brooks"
-sNam(5) := "Stryker Drlg"
-sNam(6) := "Tri-City Trn"
-sNam(7) := "United Auto"
-sNam(8) := "Uranium Ent"
-sNam(9) := "Valley Power"
-
-bPar(1) := 1000
-bPar(2) := 5000
-bPar(3) := 10000
+RUN initStockNames(sNam)
+RUN initBondPar(bPar)
 
 RUN clrScr
 PRINT "=== COMPUTER TURN - SELL PHASE ==="
@@ -690,16 +669,7 @@ DIM baseBal(9) : INTEGER
 
 ON ERROR GOTO 900
 
-! Assign stock names matching stock IDs 1..9
-sNam(1) := "Growth Corp"
-sNam(2) := "Metro Props"
-sNam(3) := "Pioneer Mut"
-sNam(4) := "Shady Brooks"
-sNam(5) := "Stryker Drlg"
-sNam(6) := "Tri-City Trn"
-sNam(7) := "United Auto"
-sNam(8) := "Uranium Ent"
-sNam(9) := "Valley Power"
+RUN initStockNames(sNam)
 
 divRate(1) := 1
 divRate(2) := 0
@@ -712,16 +682,8 @@ divRate(8) := 6
 divRate(9) := 3
 
 ! Bond par values (= denomination for this game)
-bDen(1) := 1000
-bDen(2) := 5000
-bDen(3) := 10000
-
-ordCnt := 0
-FOR i := 1 TO 12
-  ordType(i) := 0
-  ordId(i)   := 0
-  ordQty(i)  := 0
-NEXT i
+RUN initBondPar(bDen)
+RUN clrOrders(ordType, ordId, ordQty, ordCnt)
 
 LOOP
 
@@ -1010,15 +972,7 @@ LOOP
       ENDWHILE
       IF qty = 0 THEN
         IF slotIdx > 0 THEN
-          FOR i := slotIdx TO ordCnt - 1
-            ordType(i) := ordType(i + 1)
-            ordId(i)   := ordId(i + 1)
-            ordQty(i)  := ordQty(i + 1)
-          NEXT i
-          ordType(ordCnt) := 0
-          ordId(ordCnt)   := 0
-          ordQty(ordCnt)  := 0
-          ordCnt := ordCnt - 1
+          RUN dropOrderAt(ordType, ordId, ordQty, ordCnt, slotIdx)
         ENDIF
       ELSE
         IF slotIdx = 0 THEN
