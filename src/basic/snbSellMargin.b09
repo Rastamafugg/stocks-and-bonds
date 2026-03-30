@@ -1,17 +1,17 @@
-PROCEDURE snbMargin
+PROCEDURE snbSellMargin
 (* ================================================== *)
-(* PROCEDURE: snbMargin                               *)
-(* PURPOSE:   README entry for snbMargin module.      *)
-(*            Lists all procedures in this module.   *)
+(* PROCEDURE: snbSellMargin                           *)
+(* PURPOSE:   README entry for snbSellMargin module.  *)
+(*            Lists all procedures in this module.    *)
 (* PARAMS:    None                                    *)
 (* ================================================== *)
-PRINT "snbMargin"
+PRINT "snbSellMargin"
+PRINT "  applySells"
 PRINT "  scrMgnCall"
+PRINT "  scrMgnClr"
 PRINT "  scrBankrupt"
 PRINT "  aiLiqOrdr"
 PRINT "  scrForceLiq"
-PRINT "  applySells"
-PRINT "  scrMgnClr"
 END
 
 PROCEDURE scrMgnCall

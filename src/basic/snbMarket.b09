@@ -15,8 +15,8 @@ PROCEDURE snbMarket
 (*             mkt.stckPrice, mkt.divSuspnd, and               *)
 (*             plyrs(p).stckShrs (on splits) via applyMktYear. *)
 (*             Modifies plyrs(p).cashBal for Card 1 bonus.     *)
-(* NOTE      : snbUtil and snbMarket must be pre-loaded by     *)
-(*             coordinator.                                    *)
+(* NOTE      : snbPhaseCore, snbGameData, and snbMarket must   *)
+(*             be pre-loaded by coordinator.                   *)
 (* ============================================================ *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE

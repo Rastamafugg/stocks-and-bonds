@@ -1,28 +1,25 @@
-PROCEDURE snbUtil
+PROCEDURE snbPhaseCore
 (* ================================================== *)
-(* PROCEDURE: snbUtil                                 *)
-(* PURPOSE:   README entry for snbUtil module.        *)
-(*            Lists all procedures in this module.   *)
+(* PROCEDURE: snbPhaseCore                            *)
+(* PURPOSE:   README entry for snbPhaseCore module.   *)
+(*            Lists all procedures in this module.    *)
 (* PARAMS:    None                                    *)
 (* ================================================== *)
-PRINT "snbUtil"
+PRINT "snbPhaseCore"
+PRINT "  loadGame"
+PRINT "  saveGame"
+PRINT "  quitToMenu"
+PRINT "  saveQuitToMenu"
+PRINT "  readTurnPlyrType"
+PRINT "  waitKey"
 PRINT "  clrScr"
 PRINT "  fmtMoney"
+PRINT "  padNumber"
 PRINT "  fmtPlyrName"
-PRINT "  calcMgnTot"
-PRINT "  calcSaleMgnRpy"
-PRINT "  applyCashMgnRepay"
-PRINT "  applyStockMgnRepay"
 PRINT "  getMenuKey"
 PRINT "  getPhaseNav"
 PRINT "  getSaveQuitAct"
-PRINT "  quitToMenu"
-PRINT "  saveQuitToMenu"
-PRINT "  waitKey"
 PRINT "  getNumIn"
-PRINT "  saveGame"
-PRINT "  loadGame"
-PRINT "  initAIProf"
 END
 
 PROCEDURE waitKey
@@ -156,130 +153,6 @@ IF plyrType = 2 THEN
     dispName := plyrName + " MEDIUM"
   ENDIF \ENDIF
 ENDIF
-END
-
-PROCEDURE calcMgnTot
-(* ================================================== *)
-(* PROCEDURE: calcMgnTot                              *)
-(* PURPOSE:   Sum per-company margin balances into a  *)
-(*            total outstanding margin value.         *)
-(* PARAMS:    plyr   - player record to inspect       *)
-(*            mgnTot - receives total margin balance  *)
-(* EFFECTS:   None beyond output PARAM assignment.    *)
-(* ================================================== *)
-! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
-PARAM plyr   : PlyrRec
-PARAM mgnTot : INTEGER
-DIM s        : INTEGER
-
-mgnTot := 0
-FOR s := 1 TO 9
-  mgnTot := mgnTot + plyr.mgnBal(s)
-NEXT s
-END
-
-PROCEDURE calcSaleMgnRpy
-(* ================================================== *)
-(* PROCEDURE: calcSaleMgnRpy                           *)
-(* PURPOSE:   Return the company-margin repayment due  *)
-(*            from a stock sale under the simplified   *)
-(*            rule: 50% of proceeds, clamped to the    *)
-(*            company's remaining margin balance.      *)
-(* PARAMS:    compMgn - current company margin balance *)
-(*            proceeds - sale proceeds                 *)
-(*            repay   - receives margin repayment      *)
-(* EFFECTS:   None beyond output PARAM assignment.     *)
-(* ================================================== *)
-PARAM compMgn : INTEGER
-PARAM proceeds: INTEGER
-PARAM repay   : INTEGER
-
-repay := proceeds / 2
-IF repay > compMgn THEN
-  repay := compMgn
-ENDIF
-IF repay < 0 THEN
-  repay := 0
-ENDIF
-END
-
-PROCEDURE applyCashMgnRepay
-(* ================================================== *)
-(* PROCEDURE: applyCashMgnRepay                        *)
-(* PURPOSE:   Apply a general cash repayment against   *)
-(*            per-company margin balances in ascending *)
-(*            stock-id order.                          *)
-(* PARAMS:    plyr      - player record (modified)     *)
-(*            repayReq  - requested cash repayment     *)
-(*            actualRpy - receives applied amount      *)
-(* EFFECTS:   Reduces cashBal and mgnBal(1..9).        *)
-(* ================================================== *)
-! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
-PARAM plyr      : PlyrRec
-PARAM repayReq  : INTEGER
-PARAM actualRpy : INTEGER
-DIM remAmt      : INTEGER
-DIM totMgn      : INTEGER
-DIM takeAmt     : INTEGER
-DIM s           : INTEGER
-
-RUN calcMgnTot(plyr, totMgn)
-actualRpy := repayReq
-IF actualRpy > plyr.cashBal THEN
-  actualRpy := plyr.cashBal
-ENDIF
-IF actualRpy > totMgn THEN
-  actualRpy := totMgn
-ENDIF
-IF actualRpy < 0 THEN
-  actualRpy := 0
-ENDIF
-plyr.cashBal := plyr.cashBal - actualRpy
-remAmt := actualRpy
-FOR s := 1 TO 9
-  IF remAmt > 0 THEN
-    takeAmt := plyr.mgnBal(s)
-    IF takeAmt > remAmt THEN
-      takeAmt := remAmt
-    ENDIF
-    plyr.mgnBal(s) := plyr.mgnBal(s) - takeAmt
-    remAmt := remAmt - takeAmt
-  ENDIF
-NEXT s
-END
-
-PROCEDURE applyStockMgnRepay
-(* ================================================== *)
-(* PROCEDURE: applyStockMgnRepay                       *)
-(* PURPOSE:   Apply a cash repayment against one      *)
-(*            company's margin balance.               *)
-(* PARAMS:    plyr      - player record (modified)    *)
-(*            stockId   - company index 1..9          *)
-(*            repayReq  - requested repayment         *)
-(*            actualRpy - receives applied amount     *)
-(* EFFECTS:   Reduces cashBal and mgnBal(stockId).    *)
-(* ================================================== *)
-! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
-PARAM plyr      : PlyrRec
-PARAM stockId   : INTEGER
-PARAM repayReq  : INTEGER
-PARAM actualRpy : INTEGER
-
-actualRpy := repayReq
-IF actualRpy > plyr.cashBal THEN
-  actualRpy := plyr.cashBal
-ENDIF
-IF actualRpy > plyr.mgnBal(stockId) THEN
-  actualRpy := plyr.mgnBal(stockId)
-ENDIF
-IF actualRpy < 0 THEN
-  actualRpy := 0
-ENDIF
-plyr.cashBal := plyr.cashBal - actualRpy
-plyr.mgnBal(stockId) := plyr.mgnBal(stockId) - actualRpy
 END
 
 PROCEDURE getMenuKey
@@ -717,118 +590,93 @@ END
     loadOK := FALSE
 END
 
-PROCEDURE initAIProf
-(* ================================================= *)
-(* PROCEDURE: initAIProf                             *)
-(* PURPOSE  : Initialize an AIProfile record with   *)
-(*            tier-specific parameter values per     *)
-(*            ai-difficulty-tiers.md Section 4.      *)
-(*            Tier 1=Easy, 2=Medium, 3=Hard.         *)
-(*            Invalid tier prints a diagnostic and   *)
-(*            ENDs locally.                          *)
-(* PARAMS   : tier - difficulty tier (1/2/3)         *)
-(*            prof - AIProfile to populate (by ref)  *)
-(* SIDE FX  : Modifies prof in place.                *)
-(* ================================================= *)
-
+PROCEDURE readTurnPlyrType
+(* ============================================================ *)
+(* PROCEDURE : readTurnPlyrType                                 *)
+(* PURPOSE   : Read the current saved-turn player type from     *)
+(*             SNBSTATE without loading the full game state.    *)
+(* PARAMS    : turnType - receives current player's plyrType    *)
+(*             readOK   - TRUE on success, FALSE on any error   *)
+(* SIDE EFX  : Reads SNBSTATE. Prints a diagnostic on failure.  *)
+(* ============================================================ *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE AIProfile = tier,concenCap,spltSlPct,distSlPrc,mgnMaxExpo,mgnBuffer,mgnResvPct,repayFrac,mgnClrYear,endgameYr,spltSlPcE,repayFrcE:BYTE;bondIdlCsh,bndIdlCsE:INTEGER;zeroDivEl,useYldScr,useMargin,bondPriory:BOOLEAN
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+PARAM turnType : INTEGER
+PARAM readOK   : BOOLEAN
+DIM hdr        : SaveHdr
+DIM turnPlyr   : PlyrRec
+DIM deckByt    : BYTE
+DIM path       : BYTE
+DIM pathOpen   : BOOLEAN
+DIM chkExp     : INTEGER
+DIM iMaxYr     : INTEGER
+DIM iDeckCnt   : INTEGER
+DIM iPlyrCnt   : INTEGER
+DIM i          : INTEGER
+DIM pIdx       : INTEGER
 
-PARAM tNum: INTEGER
-PARAM prof: AIProfile
+ON ERROR GOTO 900
 
-IF tNum = 1 THEN \ ! Easy
-    prof.tier       := 1
-    prof.concenCap  := 70
-    prof.spltSlPct  := 20
-    prof.distSlPrc  := 50
-    prof.mgnMaxExpo := 0
-    prof.mgnBuffer  := 0
-    prof.mgnResvPct := 20
-    prof.repayFrac  := 25
-    prof.mgnClrYear := 9
-    prof.endgameYr  := 0
-    prof.spltSlPcE  := 20
-    prof.repayFrcE  := 25
-    prof.bondIdlCsh := 1000
-    prof.bndIdlCsE  := 1000
-    prof.zeroDivEl  := TRUE
-    prof.useYldScr  := FALSE
-    prof.useMargin  := FALSE
-    prof.bondPriory := TRUE
-ELSE IF tNum = 2 THEN \ ! Medium
-    prof.tier       := 2
-    prof.concenCap  := 40
-    prof.spltSlPct  := 50
-    prof.distSlPrc  := 50
-    prof.mgnMaxExpo := 0
-    prof.mgnBuffer  := 0
-    prof.mgnResvPct := 10
-    prof.repayFrac  := 50
-    prof.mgnClrYear := 9
-    prof.endgameYr  := 0
-    prof.spltSlPcE  := 50
-    prof.repayFrcE  := 50
-    prof.bondIdlCsh := 5000
-    prof.bndIdlCsE  := 5000
-    prof.zeroDivEl  := TRUE
-    prof.useYldScr  := TRUE
-    prof.useMargin  := FALSE
-    prof.bondPriory := FALSE
-ELSE IF tNum = 3 THEN \ ! Hard
-    prof.tier       := 3
-    prof.concenCap  := 25
-    prof.spltSlPct  := 30
-    prof.distSlPrc  := 60
-    prof.mgnMaxExpo := 30
-    prof.mgnBuffer  := 30
-    prof.mgnResvPct := 5
-    prof.repayFrac  := 75
-    prof.mgnClrYear := 8
-    prof.endgameYr  := 7
-    prof.spltSlPcE  := 70
-    prof.repayFrcE  := 90
-    prof.bondIdlCsh := 10000
-    prof.bndIdlCsE  := 5000
-    prof.zeroDivEl  := FALSE
-    prof.useYldScr  := TRUE
-    prof.useMargin  := TRUE
-    prof.bondPriory := FALSE
-ELSE
-    PRINT "initAIProf error (invalid tier)"
-    END
-ENDIF \ENDIF \ENDIF
+pathOpen := FALSE
+readOK   := FALSE
+turnType := 0
 
+OPEN #path, "SNBSTATE":READ
+pathOpen := TRUE
+GET #path, hdr
+
+IF hdr.magic <> $53 THEN
+  PRINT "readTurnPlyrType: not a valid save file"
+  END
+ENDIF
+IF hdr.fmtVersion <> 2 THEN
+  PRINT "readTurnPlyrType: incompatible save file version"
+  END
+ENDIF
+
+chkExp := hdr.magic      + hdr.fmtVersion + hdr.maxYears
+chkExp := chkExp + hdr.plyrCount  + hdr.rollMode
+chkExp := chkExp + hdr.mgnRule    + hdr.currYear
+chkExp := chkExp + hdr.savedPhase + hdr.savedPlyr
+chkExp := chkExp + hdr.gameStage  + hdr.bnkrFlgs
+chkExp := LAND(chkExp, 255)
+IF chkExp <> hdr.checksum THEN
+  PRINT "readTurnPlyrType: save file is corrupt"
+  END
+ENDIF
+
+pIdx := hdr.savedPlyr
+iPlyrCnt := hdr.plyrCount
+IF pIdx < 1 OR pIdx > iPlyrCnt THEN
+  PRINT "readTurnPlyrType: invalid savedPlyr"
+  END
+ENDIF
+
+iMaxYr := hdr.maxYears
+iDeckCnt := iMaxYr + 1
+IF iDeckCnt > 36 THEN
+  iDeckCnt := 36
+ENDIF
+FOR i := 1 TO iDeckCnt
+  GET #path, deckByt
+NEXT i
+
+FOR i := 1 TO pIdx
+  GET #path, turnPlyr
+NEXT i
+
+turnType := turnPlyr.plyrType
+readOK := TRUE
+
+CLOSE #path
+pathOpen := FALSE
 END
 
-PROCEDURE shuffleDeck
-(* ============================================================ *)
-(* PROCEDURE : shuffleDeck                                      *)
-(* PURPOSE   : Populate deckOrd with card IDs 1..36 then apply *)
-(*             a Fisher-Yates in-place shuffle. All index       *)
-(*             arithmetic is INTEGER. RND must be seeded by the *)
-(*             caller before the first call.                    *)
-(* PARAMS    : deckOrd(36) - receives the shuffled deck order   *)
-(*             (modified in place, passed by reference)         *)
-(* SIDE EFX  : Modifies deckOrd. Advances the RND sequence.    *)
-(* ============================================================ *)
-PARAM deckOrd(36) : BYTE
-DIM i   : INTEGER
-DIM j   : INTEGER
-DIM tmp : BYTE
-
-! Step 1: populate deck with sequential card IDs 1..36
-FOR i := 1 TO 36
-  deckOrd(i) := i
-NEXT i
-
-! Step 2: Fisher-Yates shuffle
-! For each position i from 36 down to 2, pick a random j in [1..i]
-! and swap deckOrd(i) with deckOrd(j).
-FOR i := 36 TO 2 STEP -1
-  j := INT(RND(i)) + 1
-  tmp := deckOrd(j)
-  deckOrd(j) := deckOrd(i)
-  deckOrd(i) := tmp
-NEXT i
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "readTurnPlyrType error ("; ERR; ")"
+    readOK := FALSE
 END

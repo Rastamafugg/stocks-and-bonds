@@ -15,9 +15,9 @@ PROCEDURE snbEndGame
 (* PARAMS    : None (child process; no PARAM handoff)          *)
 (* SIDE EFX  : Reads SNBSTATE. Displays screens. Writes       *)
 (*             SNBSTATE for menu return or quit.              *)
-(* NOTE      : snbUtil and snbEndGame must be pre-loaded by    *)
-(*             coordinator. All four screen procedures are in  *)
-(*             this same packed file.                          *)
+(* NOTE      : snbPhaseCore and snbEndGame must be             *)
+(*             pre-loaded by coordinator. All four screen      *)
+(*             procedures are in this same packed file.        *)
 (* ============================================================ *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE

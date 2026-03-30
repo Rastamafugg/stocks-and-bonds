@@ -9,6 +9,9 @@ PROCEDURE snbSetup
 (*            nothing and ENDs.                      *)
 (* PARAMS:    None                                    *)
 (* SIDE EFX  : Writes SNBSTATE on normal exit.       *)
+(* NOTE      : snbPhaseCore, snbGameData, and        *)
+(*             snbSetup must be pre-loaded by the    *)
+(*             coordinator before fork.              *)
 (* ================================================== *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
