@@ -416,288 +416,6 @@ END
 900 PRINT "scrForceLiq error ("; ERR; ")"
 END
 
-PROCEDURE scrMgnClr
-(* ============================================================ *)
-(* PROCEDURE : scrMgnClr                                        *)
-(* PURPOSE   : S23 Year 10 Margin Clearance Required screen.   *)
-(*             Enforced at the Year 10 boundary for any player *)
-(*             with total margin > 0. Uses a persistent keyed  *)
-(*             editor for per-asset sells plus M for cash      *)
-(*             repayment. Enter confirms pending sells and     *)
-(*             repayment.                                      *)
-(*             D declares bankruptcy. Caller re-enters this    *)
-(*             screen if total margin > 0 after return.        *)
-(* PARAMS    : plyr   - player record (modified)               *)
-(*             mkt    - market state (read-only)               *)
-(*             action - OUT: 1=SUBMIT 2=DECLARE_BANKRUPTCY     *)
-(* SIDE EFX  : Clears screen. Uses INPUT.                      *)
-(*             Modifies plyr via applyLiqOrdr and repayment.   *)
-(* ============================================================ *)
-! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
-TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
-PARAM plyr        : PlyrRec
-PARAM mkt         : MktState
-PARAM action      : BYTE
-DIM sNam(9)    : STRING[14]
-DIM bPar(3)    : INTEGER
-DIM ordType(12): INTEGER
-DIM ordId(12)  : INTEGER
-DIM ordQty(12) : INTEGER
-DIM ordCnt     : INTEGER
-DIM oblgRem    : INTEGER
-DIM repay      : INTEGER
-DIM actualRpy  : INTEGER
-DIM maxRpy     : INTEGER
-DIM i          : INTEGER
-DIM s          : INTEGER
-DIM b          : INTEGER
-DIM qty        : INTEGER
-DIM qIn        : STRING[8]
-DIM pStr       : STRING[8]
-DIM pStr2      : STRING[8]
-DIM valid      : BOOLEAN
-DIM numOk      : BOOLEAN
-DIM keyCode    : INTEGER
-DIM mapCnt     : INTEGER
-DIM mapType(12): INTEGER
-DIM mapId(12)  : INTEGER
-DIM mapKey(12) : INTEGER
-DIM mapQty(12) : INTEGER
-DIM stockCnt   : INTEGER
-DIM bondCnt    : INTEGER
-DIM keyLbl     : STRING[1]
-DIM j          : INTEGER
-DIM slotIdx    : INTEGER
-DIM slotQty    : INTEGER
-DIM selIdx     : INTEGER
-DIM kIn        : STRING[1]
-DIM simCash    : INTEGER
-DIM simMgn     : INTEGER
-DIM prcd       : INTEGER
-DIM doneClr    : BOOLEAN
-DIM baseCash   : INTEGER
-DIM baseMgn    : INTEGER
-DIM ordModeVal : INTEGER
-DIM currMgnTot : INTEGER
-DIM simBal(9)  : INTEGER
-DIM baseBal(9) : INTEGER
-
-ON ERROR GOTO 900
-
-RUN initStockNames(sNam)
-RUN initBondPar(bPar)
-repay  := 0
-doneClr := FALSE
-RUN clrOrders(ordType, ordId, ordQty, ordCnt)
-
-LOOP
-
-  simCash := plyr.cashBal
-  FOR s := 1 TO 9
-    simBal(s) := plyr.mgnBal(s)
-  NEXT s
-  simMgn  := 0
-  FOR i := 1 TO ordCnt
-    IF ordType(i) = 1 THEN
-      prcd := ordQty(i) * mkt.stckPrice(ordId(i))
-      RUN calcSaleMgnRpy(simBal(ordId(i)), prcd, actualRpy)
-      simBal(ordId(i)) := simBal(ordId(i)) - actualRpy
-      simCash := simCash + (prcd - actualRpy)
-    ELSE
-      prcd := ordQty(i) * bPar(ordId(i))
-      simCash := simCash + prcd
-    ENDIF
-  NEXT i
-  FOR s := 1 TO 9
-    simMgn := simMgn + simBal(s)
-  NEXT s
-  actualRpy := repay
-  IF actualRpy > simMgn THEN
-    actualRpy := simMgn
-  ENDIF
-  IF actualRpy > simCash THEN
-    actualRpy := simCash
-  ENDIF
-  IF actualRpy < 0 THEN
-    actualRpy := 0
-  ENDIF
-  simCash := simCash - actualRpy
-  simMgn  := simMgn - actualRpy
-  RUN calcMgnTot(plyr, currMgnTot)
-
-  RUN clrScr
-  PRINT "=== YEAR 10 - MARGIN CLEARANCE REQUIRED ==="
-  PRINT "  Player: "; plyr.plyrName
-  PRINT
-  RUN fmtMoney(currMgnTot, pStr)
-  RUN fmtMoney(simMgn, pStr2)
-  PRINT "  Margin outstanding : $"; pStr; " [$"; pStr2; "]"
-  RUN fmtMoney(plyr.cashBal, pStr)
-  RUN fmtMoney(simCash, pStr2)
-  PRINT "  Current cash       : $"; pStr; " [$"; pStr2; "]"
-  PRINT "  All margin must be cleared before the buy phase."
-  PRINT
-
-  RUN prepAssetMaps(plyr, mkt, 2, ordType, ordId, ordQty, ordCnt, mapType, mapId, mapKey, mapQty, mapCnt, stockCnt, bondCnt)
-
-  PRINT "  STOCKS:";
-  IF stockCnt = 1 THEN
-    PRINT " press 1"
-  ELSE IF stockCnt > 1 THEN
-    PRINT " press 1-"; stockCnt
-  ELSE
-    PRINT
-  ENDIF \ENDIF
-  FOR i := 1 TO mapCnt
-    IF mapType(i) = 1 THEN
-      s := mapId(i)
-      slotQty := mapQty(i)
-      keyLbl := CHR$(mapKey(i))
-      ! Line exceeds 79 chars; PRINT USING row format requires single line.
-      PRINT USING "'  ',S1<,' ',S12<,I5>,' shrs @ $',I4>", keyLbl, sNam(s), plyr.stckShrs(s), mkt.stckPrice(s);
-      IF plyr.mgnBal(s) > 0 THEN
-        PRINT " [M]";
-      ENDIF
-      IF slotQty > 0 THEN
-        PRINT "  [Sell "; slotQty; "]";
-      ENDIF
-      PRINT
-    ENDIF
-  NEXT i
-  PRINT
-  PRINT "  BONDS:";
-  IF bondCnt = 1 THEN
-    PRINT " press A"
-  ELSE IF bondCnt > 1 THEN
-    PRINT " press A-"; CHR$(ASC("A") + bondCnt - 1)
-  ELSE
-    PRINT
-  ENDIF \ENDIF
-  FOR i := 1 TO mapCnt
-    IF mapType(i) = 2 THEN
-      b := mapId(i)
-      slotQty := mapQty(i)
-      keyLbl := CHR$(mapKey(i))
-      ! Line exceeds 79 chars; PRINT USING row format requires single line.
-      PRINT USING "'  ',S1<,' $',I6>,' bond  ',I3>,' unit(s)'", keyLbl, bPar(b), plyr.bondUnts(b);
-      IF slotQty > 0 THEN
-        PRINT "  [Sell "; slotQty; "]";
-      ENDIF
-      PRINT
-    ENDIF
-  NEXT i
-  PRINT
-  PRINT "  M=repay with cash  Enter=confirm  D=bankrupt"
-  GET #0, kIn
-  PRINT
-  doneClr := FALSE
-
-  RUN resolveOrderEditSel(kIn, mapType, mapId, mapKey, mapCnt, ordType, ordId, ordQty, ordCnt, keyCode, selIdx, slotIdx, slotQty)
-
-  IF keyCode = ASC("D") THEN
-    action := 2
-    END
-  ELSE IF keyCode = 13 THEN
-    action := 1
-    doneClr := TRUE
-  ELSE IF keyCode = ASC("M") THEN
-    maxRpy := currMgnTot
-      IF simCash < maxRpy THEN
-        maxRpy := simCash
-    ENDIF
-    IF maxRpy < 0 THEN
-      maxRpy := 0
-    ENDIF
-    IF maxRpy > 0 THEN
-      RUN fmtMoney(maxRpy, pStr)
-      PRINT "Cash repayment (0.."; pStr; "):"
-      valid := FALSE
-      WHILE NOT valid DO
-        INPUT "  Amount (0/Enter=none): ", qIn
-        IF qIn = "" THEN
-          repay := 0
-          valid := TRUE
-        ELSE
-          RUN getNumIn(qIn, repay, numOk)
-          IF NOT numOk THEN
-            PRINT "  Invalid: enter a number."
-          ELSE IF repay < 0 THEN
-            PRINT "  Invalid: enter 0 or a positive amount."
-          ELSE IF repay > maxRpy THEN
-            RUN fmtMoney(maxRpy, pStr)
-            PRINT "  Invalid: maximum repayment is $"; pStr
-          ELSE
-            valid := TRUE
-          ENDIF \ENDIF \ENDIF
-        ENDIF
-      ENDWHILE
-    ELSE
-      PRINT "No cash repayment available."
-      RUN waitKey
-    ENDIF
-  ELSE
-    IF selIdx > 0 THEN
-      s := mapId(selIdx)
-      b := mapId(selIdx)
-      baseCash := plyr.cashBal
-      FOR j := 1 TO 9
-        baseBal(j) := plyr.mgnBal(j)
-      NEXT j
-      FOR i := 1 TO ordCnt
-        IF i <> slotIdx THEN
-          IF ordType(i) = 1 THEN
-            prcd := ordQty(i) * mkt.stckPrice(ordId(i))
-            RUN calcSaleMgnRpy(baseBal(ordId(i)), prcd, actualRpy)
-            baseBal(ordId(i)) := baseBal(ordId(i)) - actualRpy
-            baseCash := baseCash + (prcd - actualRpy)
-          ELSE
-            prcd := ordQty(i) * bPar(ordId(i))
-            baseCash := baseCash + prcd
-          ENDIF
-        ENDIF
-      NEXT i
-      baseMgn := 0
-      FOR j := 1 TO 9
-        baseMgn := baseMgn + baseBal(j)
-      NEXT j
-      actualRpy := repay
-      IF actualRpy > baseMgn THEN
-        actualRpy := baseMgn
-      ENDIF
-      IF actualRpy > baseCash THEN
-        actualRpy := baseCash
-      ENDIF
-      IF actualRpy < 0 THEN
-        actualRpy := 0
-      ENDIF
-      baseCash := baseCash - actualRpy
-      baseMgn  := baseMgn - actualRpy
-      ordModeVal := 0
-      IF plyr.mgnBal(s) > 0 THEN
-        ordModeVal := 2
-      ENDIF
-      RUN promptEditOrderQty("=== YEAR 10 - MARGIN CLEARANCE REQUIRED ===", mapType(selIdx), sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), ordModeVal, baseCash, baseMgn, baseBal(s), bPar(b), plyr.bondUnts(b), 0, slotIdx, ordQty, qty, keyCode)
-      RUN commitOrderQty(ordType, ordId, ordQty, ordCnt, slotIdx, mapType(selIdx), mapId(selIdx), qty)
-    ENDIF
-  ENDIF \ENDIF \ENDIF
-
-  EXITIF doneClr THEN
-  ENDEXIT
-
-ENDLOOP
-
-IF ordCnt > 0 THEN
-  RUN applySells(plyr, mkt, ordType, ordId, ordQty, ordCnt)
-ENDIF
-RUN applyCashMgnRepay(plyr, repay, actualRpy)
-
-action := 1
-END
-
-900 PRINT "scrMgnClr error ("; ERR; ")"
-END
-
 PROCEDURE commitOrderQty
 (* ============================================================ *)
 (* PROCEDURE : commitOrderQty                                   *)
@@ -724,10 +442,19 @@ PARAM slotIdx     : INTEGER
 PARAM assetType   : INTEGER
 PARAM assetId     : INTEGER
 PARAM qty         : INTEGER
+DIM i            : INTEGER
 
 IF qty = 0 THEN
-  IF slotIdx > 0 THEN
-    RUN dropOrderAt(ordType, ordId, ordQty, ordCnt, slotIdx)
+  IF slotIdx > 0 AND slotIdx <= ordCnt THEN
+    FOR i := slotIdx TO ordCnt - 1
+      ordType(i) := ordType(i + 1)
+      ordId(i)   := ordId(i + 1)
+      ordQty(i)  := ordQty(i + 1)
+    NEXT i
+    ordType(ordCnt) := 0
+    ordId(ordCnt)   := 0
+    ordQty(ordCnt)  := 0
+    ordCnt := ordCnt - 1
   ENDIF
 ELSE
   IF slotIdx = 0 THEN
@@ -758,12 +485,12 @@ PROCEDURE promptEditOrderQty
 (*             baseStkMgn - projected stock margin or -1       *)
 (*             bondPar    - bond par value                     *)
 (*             bondQty    - bond units currently held          *)
-(*             bondNav    - promptBondQty allowNav flag        *)
+(*             bondNav    - bond prompt allowNav flag          *)
 (*             slotIdx    - existing order slot or 0           *)
 (*             ordQty     - active order quantity array        *)
 (*             qty        - edited quantity out                *)
 (*             action     - prompt action/status out           *)
-(* SIDE EFX  : Invokes getLotQty or promptBondQty.             *)
+(* SIDE EFX  : Invokes getLotQty or inline bond prompt logic.  *)
 (* ============================================================ *)
 PARAM title       : STRING
 PARAM assetType   : INTEGER
@@ -781,6 +508,12 @@ PARAM slotIdx     : INTEGER
 PARAM ordQty(12)  : INTEGER
 PARAM qty         : INTEGER
 PARAM action      : INTEGER
+DIM qIn          : STRING[8]
+DIM pStr         : STRING[8]
+DIM numOk        : BOOLEAN
+DIM valid        : BOOLEAN
+
+ON ERROR GOTO 900
 
 action := 0
 qty := 0
@@ -792,9 +525,39 @@ IF assetType = 1 THEN
   ! Line exceeds 79 chars; getLotQty call requires full arguments.
   RUN getLotQty(title, stockNm, stockQty, stockPrice, qty, stockMode, 0, stockQty, baseCash, baseMgn, baseStkMgn, 0, action)
 ELSE
-  RUN promptBondQty(bondPar, bondQty, bondNav, qty, action)
+  valid := FALSE
+  WHILE NOT valid DO
+    RUN fmtMoney(bondPar, pStr)
+    PRINT "$"; pStr; " bond  "; bondQty; " unit(s) held"
+    INPUT "  Sell units (0/Enter=clear): ", qIn
+    IF qIn = "" THEN
+      qty := 0
+      valid := TRUE
+    ELSE
+      IF bondNav <> 0 THEN
+        RUN getSaveQuitAct(qIn, action)
+        IF action = 3 OR action = 4 THEN
+          END
+        ENDIF
+      ENDIF
+      RUN getNumIn(qIn, qty, numOk)
+      IF NOT numOk THEN
+        PRINT "  Invalid: enter a number."
+      ELSE IF qty < 0 THEN
+        PRINT "  Invalid: enter 0 or a positive amount."
+      ELSE IF qty > bondQty THEN
+        PRINT "  Invalid: you hold only ";
+        PRINT bondQty; " unit(s)."
+      ELSE
+        valid := TRUE
+      ENDIF \ENDIF \ENDIF
+    ENDIF
+  ENDWHILE
 ENDIF
 
+END
+
+900 PRINT "promptEditOrderQty error ("; ERR; ")"
 END
 
 PROCEDURE resolveOrderEditSel
@@ -831,6 +594,7 @@ PARAM keyCode    : INTEGER
 PARAM selIdx     : INTEGER
 PARAM slotIdx    : INTEGER
 PARAM slotQty    : INTEGER
+DIM i           : INTEGER
 
 selIdx  := 0
 slotIdx := 0
@@ -845,7 +609,11 @@ ELSE
   keyCode := 0
 ENDIF
 
-RUN findMapSel(mapKey, mapCnt, keyCode, selIdx)
+FOR i := 1 TO mapCnt
+  IF mapKey(i) = keyCode THEN
+    selIdx := i
+  ENDIF
+NEXT i
 IF selIdx > 0 THEN
   RUN findOrderSlot(ordType, ordId, ordQty, ordCnt, mapType(selIdx), mapId(selIdx), slotIdx, slotQty)
 ENDIF
