@@ -41,6 +41,8 @@ DIM tInt       : INTEGER
 DIM actualRpy  : INTEGER
 DIM aiTierVal  : INTEGER
 DIM pTypeVal   : INTEGER
+DIM savePhaseVal : INTEGER
+DIM savePlyrVal  : INTEGER
 DIM p          : INTEGER
 DIM nextP      : INTEGER
 
@@ -108,8 +110,11 @@ IF NOT plyrs(p).isBankrupt THEN
   navAct := 1
   RUN scrAIBuyTurn(pNam, decAct, ordTyp, ordId, ordQty, decCnt, navAct)
   IF navAct = 2 THEN
+    savePhaseVal := 0
+    savePlyrVal  := 1
     IF nextP > 0 THEN
-      RUN saveQuitToMenu(2, nextP, hdr, deckOrd, plyrs, mkt)
+      savePhaseVal := 2
+      savePlyrVal  := nextP
     ELSE
       hdr.savedPhase := 0
       hdr.savedPlyr  := 1
@@ -118,8 +123,8 @@ IF NOT plyrs(p).isBankrupt THEN
       ELSE
         hdr.gameStage := 2
       ENDIF
-      RUN saveQuitToMenu(0, 1, hdr, deckOrd, plyrs, mkt)
     ENDIF
+    RUN saveQuitToMenu(savePhaseVal, savePlyrVal, hdr, deckOrd, plyrs, mkt)
     END
   ELSE IF navAct = 3 THEN
     RUN quitToMenu(hdr, deckOrd, plyrs, mkt)
