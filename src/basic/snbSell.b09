@@ -458,14 +458,7 @@ LOOP
     END
   ENDIF \ENDIF
 
-  IF kIn <> "" THEN
-    keyCode := ASC(kIn)
-    IF keyCode >= ASC("a") AND keyCode <= ASC("z") THEN
-      keyCode := keyCode - 32
-    ENDIF
-  ELSE
-    keyCode := 0
-  ENDIF
+  RUN resolveOrderEditSel(kIn, mapType, mapId, mapKey, mapCnt, ordType, ordId, ordQty, ordCnt, keyCode, selIdx, slotIdx, slotQty)
 
   IF keyCode = ASC("P") THEN
     IF ordCnt > 0 OR prjRpyTot > 0 THEN
@@ -502,12 +495,9 @@ LOOP
       RUN waitKey
     ENDIF
   ELSE
-    RUN findMapSel(mapKey, mapCnt, keyCode, selIdx)
-
     IF selIdx > 0 THEN
       s := mapId(selIdx)
       b := mapId(selIdx)
-      RUN findOrderSlot(ordType, ordId, ordQty, ordCnt, mapType(selIdx), mapId(selIdx), slotIdx, slotQty)
       baseCash := plyr.cashBal - prjRpyTot
       FOR j := 1 TO 9
         baseBal(j) := prjMgnBal(j)

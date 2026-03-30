@@ -8,6 +8,7 @@ PROCEDURE snbSellMargin
 PRINT "snbSellMargin"
 PRINT "  applySells"
 PRINT "  commitOrderQty"
+PRINT "  resolveOrderEditSel"
 PRINT "  scrMgnCall"
 PRINT "  scrMgnClr"
 PRINT "  scrBankrupt"
@@ -370,14 +371,7 @@ LOOP
   GET #0, kIn
   PRINT
 
-  IF kIn <> "" THEN
-    keyCode := ASC(kIn)
-    IF keyCode >= ASC("a") AND keyCode <= ASC("z") THEN
-      keyCode := keyCode - 32
-    ENDIF
-  ELSE
-    keyCode := 0
-  ENDIF
+  RUN resolveOrderEditSel(kIn, mapType, mapId, mapKey, mapCnt, ordType, ordId, ordQty, ordCnt, keyCode, selIdx, slotIdx, slotQty)
 
   IF keyCode = ASC("D") THEN
     action := 2
@@ -387,12 +381,9 @@ LOOP
     action := 1
     END
   ELSE
-    RUN findMapSel(mapKey, mapCnt, keyCode, selIdx)
-
     IF selIdx > 0 THEN
       s := mapId(selIdx)
       b := mapId(selIdx)
-      RUN findOrderSlot(ordType, ordId, ordQty, ordCnt, mapType(selIdx), mapId(selIdx), slotIdx, slotQty)
       baseCash := plyr.cashBal
       baseMgn  := currMgnTot
       baseOblg := oblgRem
@@ -623,14 +614,7 @@ LOOP
   PRINT
   doneClr := FALSE
 
-  IF kIn <> "" THEN
-    keyCode := ASC(kIn)
-    IF keyCode >= ASC("a") AND keyCode <= ASC("z") THEN
-      keyCode := keyCode - 32
-    ENDIF
-  ELSE
-    keyCode := 0
-  ENDIF
+  RUN resolveOrderEditSel(kIn, mapType, mapId, mapKey, mapCnt, ordType, ordId, ordQty, ordCnt, keyCode, selIdx, slotIdx, slotQty)
 
   IF keyCode = ASC("D") THEN
     action := 2
@@ -674,12 +658,9 @@ LOOP
       RUN waitKey
     ENDIF
   ELSE
-    RUN findMapSel(mapKey, mapCnt, keyCode, selIdx)
-
     IF selIdx > 0 THEN
       s := mapId(selIdx)
       b := mapId(selIdx)
-      RUN findOrderSlot(ordType, ordId, ordQty, ordCnt, mapType(selIdx), mapId(selIdx), slotIdx, slotQty)
       baseCash := plyr.cashBal
       FOR j := 1 TO 9
         baseBal(j) := plyr.mgnBal(j)
@@ -795,6 +776,61 @@ ELSE
   ordType(slotIdx) := assetType
   ordId(slotIdx)   := assetId
   ordQty(slotIdx)  := qty
+ENDIF
+
+END
+
+PROCEDURE resolveOrderEditSel
+(* ============================================================ *)
+(* PROCEDURE : resolveOrderEditSel                              *)
+(* PURPOSE   : Normalize a raw keypress and resolve the        *)
+(*             selected asset row plus any existing order slot *)
+(*             for sell/liquidation editor screens.            *)
+(* PARAMS    : keyIn     - raw keypress string                 *)
+(*             mapType   - asset type per visible row          *)
+(*             mapId     - asset id per visible row            *)
+(*             mapKey    - key code per visible row            *)
+(*             mapCnt    - number of visible rows              *)
+(*             ordType   - active order type array             *)
+(*             ordId     - active order id array               *)
+(*             ordQty    - active order quantity array         *)
+(*             ordCnt    - number of active orders             *)
+(*             keyCode   - normalized uppercase key code       *)
+(*             selIdx    - selected visible row, or 0          *)
+(*             slotIdx   - matching order slot, or 0           *)
+(*             slotQty   - matching order qty, or 0            *)
+(* SIDE EFX  : None beyond output PARAM values.                *)
+(* ============================================================ *)
+PARAM keyIn      : STRING[1]
+PARAM mapType(12): INTEGER
+PARAM mapId(12)  : INTEGER
+PARAM mapKey(12) : INTEGER
+PARAM mapCnt     : INTEGER
+PARAM ordType(12): INTEGER
+PARAM ordId(12)  : INTEGER
+PARAM ordQty(12) : INTEGER
+PARAM ordCnt     : INTEGER
+PARAM keyCode    : INTEGER
+PARAM selIdx     : INTEGER
+PARAM slotIdx    : INTEGER
+PARAM slotQty    : INTEGER
+
+selIdx  := 0
+slotIdx := 0
+slotQty := 0
+
+IF keyIn <> "" THEN
+  keyCode := ASC(keyIn)
+  IF keyCode >= ASC("a") AND keyCode <= ASC("z") THEN
+    keyCode := keyCode - 32
+  ENDIF
+ELSE
+  keyCode := 0
+ENDIF
+
+RUN findMapSel(mapKey, mapCnt, keyCode, selIdx)
+IF selIdx > 0 THEN
+  RUN findOrderSlot(ordType, ordId, ordQty, ordCnt, mapType(selIdx), mapId(selIdx), slotIdx, slotQty)
 ENDIF
 
 END
