@@ -88,22 +88,17 @@ IF NOT plyrs(p).isBankrupt THEN
     END
   ENDIF \ENDIF
 
-  FOR pTypeVal := 1 TO 9
-    IF prjMgnBal(pTypeVal) < plyrs(p).mgnBal(pTypeVal) THEN
-      actualRpy := plyrs(p).mgnBal(pTypeVal) - prjMgnBal(pTypeVal)
-      RUN applyStockMgnRepay(plyrs(p), pTypeVal, actualRpy, actualRpy)
-    ENDIF
-  NEXT pTypeVal
   IF ordCnt > 0 THEN
     RUN applyBuys(plyrs(p), mkt, ordTyp, ordId, ordQty, ordPur, ordCnt)
   ENDIF
+  plyrs(p).obligation := 0
 ENDIF
 
 IF nextP > 0 THEN
   hdr.savedPhase := 2
   hdr.savedPlyr  := nextP
 ELSE
-  hdr.savedPhase := 0
+  hdr.savedPhase := 5
   hdr.savedPlyr  := 1
 ENDIF
 
@@ -113,13 +108,7 @@ FOR p := 1 TO iPCnt
     activePlrs := activePlrs + 1
   ENDIF
 NEXT p
-IF iCYr >= iMaxYr THEN
-  hdr.gameStage := 3
-ELSE IF iPCnt > 1 AND activePlrs <= 1 THEN
-  hdr.gameStage := 3
-ELSE
-  hdr.gameStage := 2
-ENDIF \ENDIF
+hdr.gameStage := 2
 RUN saveGame("SNBSTATE", hdr, deckOrd, plyrs, mkt)
 END
 
@@ -137,7 +126,6 @@ PROCEDURE scrBuy
 (*             only that one security, then returns to the     *)
 (*             main buy screen. P passes and Enter confirms    *)
 (*             orders.                                         *)
-(*             M edits margin repayment.                       *)
 (*             Stock quantity is entered first, then 1=CASH    *)
 (*             or 2=MARGIN when margin is eligible. Validates  *)
 (*             all orders against simulated cash. Does NOT     *)
@@ -157,8 +145,7 @@ PROCEDURE scrBuy
 (*             prjMgnBal  - IN/OUT projected company margins   *)
 (*             action     - output: 1=CONFIRM 2=PASS           *)
 (*                          3=SAVE+EXIT 4=QUIT                *)
-(* SIDE EFX  : Clears screen. Calls scrMgnRepay if repayment   *)
-(*             selected. Uses GET and INPUT.                   *)
+(* SIDE EFX  : Clears screen. Uses GET and INPUT.              *)
 (* ============================================================ *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
@@ -406,15 +393,15 @@ LOOP
   NEXT b
 
   PRINT
-  IF ordCnt > 0 OR prjRpyTot > 0 THEN
+  IF ordCnt > 0 THEN
     IF mgnYrOk AND currMgnTot > 0 THEN
-      PRINT "  Enter=confirm orders  P=pass  M=repay margin  S=save+exit  Q=quit"
+      PRINT "  Enter=confirm orders  P=pass  S=save+exit  Q=quit"
     ELSE
       PRINT "  Enter=confirm orders  P=pass  S=save+exit  Q=quit"
     ENDIF
   ELSE
     IF mgnYrOk AND currMgnTot > 0 THEN
-      PRINT "  P=pass  M=repay margin  S=save+exit  Q=quit"
+      PRINT "  P=pass  S=save+exit  Q=quit"
     ELSE
       PRINT "  P=pass  S=save+exit  Q=quit"
     ENDIF
@@ -449,7 +436,7 @@ LOOP
   ENDIF
 
   IF keyCode = ASC("P") THEN
-    IF ordCnt > 0 OR prjRpyTot > 0 THEN
+    IF ordCnt > 0 THEN
       PRINT "Pending orders will be discarded. Press Y to pass."
       GET #0, cnfIn
       PRINT
@@ -466,21 +453,9 @@ LOOP
       END
     ENDIF
   ELSE IF keyCode = 13 THEN
-    IF ordCnt > 0 OR prjRpyTot > 0 THEN
+    IF ordCnt > 0 THEN
       action := 1
       END
-    ENDIF
-  ELSE IF keyCode = ASC("M") AND mgnYrOk AND currMgnTot > 0 THEN
-    baseCash := simCash + prjRpyTot
-    maxRpy := currMgnTot
-    IF baseCash < maxRpy THEN
-      maxRpy := baseCash
-    ENDIF
-    IF maxRpy > 0 THEN
-      RUN scrMgnRepay(plyr, baseCash, prjMgnBal)
-    ELSE
-      PRINT "No margin repayment available."
-      RUN waitKey
     ENDIF
   ELSE
     selIdx := 0
@@ -665,7 +640,7 @@ LOOP
         ENDIF
       ENDIF
     ENDIF
-  ENDIF \ENDIF \ENDIF
+  ENDIF \ENDIF
 
 ENDLOOP
 

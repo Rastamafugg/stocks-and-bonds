@@ -86,12 +86,10 @@ IF NOT plyrs(p).isBankrupt THEN
     prof.useMargin := FALSE
   ENDIF
   RUN aiBuy(iCYr, plyrs(p), mkt, prof, ordTyp, ordId, ordQty, ordPur, ordCnt, mgnRpy)
-  IF mgnRpy > 0 THEN
-    RUN applyCashMgnRepay(plyrs(p), mgnRpy, actualRpy)
-  ENDIF
   IF ordCnt > 0 THEN
     RUN applyBuys(plyrs(p), mkt, ordTyp, ordId, ordQty, ordPur, ordCnt)
   ENDIF
+  plyrs(p).obligation := mgnRpy
 
   FOR tInt := 1 TO ordCnt
     decAct(tInt) := 2
@@ -116,13 +114,9 @@ IF NOT plyrs(p).isBankrupt THEN
       savePhaseVal := 2
       savePlyrVal  := nextP
     ELSE
-      hdr.savedPhase := 0
+      hdr.savedPhase := 5
       hdr.savedPlyr  := 1
-      IF iCYr >= iMaxYr THEN
-        hdr.gameStage := 3
-      ELSE
-        hdr.gameStage := 2
-      ENDIF
+      hdr.gameStage := 2
     ENDIF
     RUN saveQuitToMenu(savePhaseVal, savePlyrVal, hdr, deckOrd, plyrs, mkt)
     END
@@ -136,7 +130,7 @@ IF nextP > 0 THEN
   hdr.savedPhase := 2
   hdr.savedPlyr  := nextP
 ELSE
-  hdr.savedPhase := 0
+  hdr.savedPhase := 5
   hdr.savedPlyr  := 1
 ENDIF
 
@@ -146,13 +140,7 @@ FOR p := 1 TO iPCnt
     activePlrs := activePlrs + 1
   ENDIF
 NEXT p
-IF iCYr >= iMaxYr THEN
-  hdr.gameStage := 3
-ELSE IF iPCnt > 1 AND activePlrs <= 1 THEN
-  hdr.gameStage := 3
-ELSE
-  hdr.gameStage := 2
-ENDIF \ENDIF
+hdr.gameStage := 2
 RUN saveGame("SNBSTATE", hdr, deckOrd, plyrs, mkt)
 END
 

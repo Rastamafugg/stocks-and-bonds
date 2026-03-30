@@ -21,8 +21,11 @@ PROCEDURE snb
 (*              snbYear10Clear       - optional       *)
 (*                                      year-10 clear *)
 (*              snbBuy or snbBuyAI   - buy phase      *)
-(*            After the configured final year buy    *)
-(*            phase, forks one closing snbMarket     *)
+(*              snbMarginPay         - post-buy       *)
+(*                                      margin repay  *)
+(*            After the configured final year         *)
+(*            snbMarginPay phase, forks one closing  *)
+(*            snbMarket                              *)
 (*            pass to determine final prices, then   *)
 (*            forks snbEndGame (end-game screens).   *)
 (*            Before each fork: ensures required     *)
@@ -44,8 +47,8 @@ PROCEDURE snb
 (*              2 = GS_YEAR  : phase complete, ok    *)
 (*              3 = GS_DONE  : game over             *)
 (*                                                   *)
-(*            On GS_DONE from snbBuy in the final    *)
-(*            year: exits the year loop, runs one    *)
+(*            On GS_DONE from snbMarginPay in the    *)
+(*            final year: exits the year loop, runs  *)
 (*            closing market pass, then forks        *)
 (*            snbEndGame.                            *)
 (*            On GS_DONE from any other child: exits *)
@@ -577,6 +580,53 @@ LOOP
         ENDIF
         IF NOT gameOver THEN
           RUN forkPhase(modNam, debugLog, exitStat)
+          GOSUB 100
+        ENDIF
+      ENDIF
+    ENDIF
+
+    IF NOT gameOver THEN
+      IF iSavPh = 5 THEN \ ! MARGIN_PAY
+        modNam := "snbPhaseCore"
+        RUN ensureModule(modNam, TRUE, debugLog, ok)
+        IF NOT ok THEN
+          PRINT "SNB: failed to ensure snbPhaseCore (snbMarginPay)"
+          gameOver := TRUE
+        ENDIF
+        IF NOT gameOver THEN
+          modNam := "snbTradeShared"
+          RUN ensureModule(modNam, TRUE, debugLog, ok)
+          IF NOT ok THEN
+            PRINT "SNB: failed to ensure snbTradeShared (snbMarginPay)"
+            gameOver := TRUE
+          ENDIF
+        ENDIF
+        IF NOT gameOver THEN
+          modNam := "snbTradeAI"
+          RUN ensureModule(modNam, TRUE, debugLog, ok)
+          IF NOT ok THEN
+            PRINT "SNB: failed to ensure snbTradeAI (snbMarginPay)"
+            gameOver := TRUE
+          ENDIF
+        ENDIF
+        IF NOT gameOver THEN
+          modNam := "snbGameData"
+          RUN ensureModule(modNam, TRUE, debugLog, ok)
+          IF NOT ok THEN
+            PRINT "SNB: failed to ensure snbGameData (snbMarginPay)"
+            gameOver := TRUE
+          ENDIF
+        ENDIF
+        IF NOT gameOver THEN
+          modNam := "snbMarginPay"
+          RUN ensureModule(modNam, TRUE, debugLog, ok)
+          IF NOT ok THEN
+            PRINT "SNB: failed to ensure snbMarginPay"
+            gameOver := TRUE
+          ENDIF
+        ENDIF
+        IF NOT gameOver THEN
+          RUN forkPhase("snbMarginPay", debugLog, exitStat)
           GOSUB 100
         ENDIF
       ENDIF

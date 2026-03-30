@@ -1,0 +1,302 @@
+PROCEDURE snbMarginPay
+(* ============================================================ *)
+(* PROCEDURE : snbMarginPay                                     *)
+(* PURPOSE   : Post-buy margin repayment child process. Runs   *)
+(*             after the full buy phase for the year. Processes *)
+(*             the current saved-turn player only, then writes  *)
+(*             the next checkpoint back to SNBSTATE. Human      *)
+(*             players may target repayments by stock. AI       *)
+(*             players apply any repayment plan staged during   *)
+(*             snbBuyAI in plyr.obligation.                     *)
+(* PARAMS    : None (child process; no PARAM handoff)          *)
+(* SIDE EFX  : Reads and writes SNBSTATE. May reduce player    *)
+(*             cash and margin balances.                        *)
+(* NOTE      : snbPhaseCore, snbTradeShared, snbTradeAI,       *)
+(*             snbGameData, and snbMarginPay must be           *)
+(*             pre-loaded by the coordinator before fork.      *)
+(* ============================================================ *)
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+DIM hdr        : SaveHdr
+DIM deckOrd(36): BYTE
+DIM plyrs(6)   : PlyrRec
+DIM mkt        : MktState
+DIM loadOK     : BOOLEAN
+DIM iCYr       : INTEGER
+DIM iMaxYr     : INTEGER
+DIM iPCnt      : INTEGER
+DIM activePlrs : INTEGER
+DIM prjMgnBal(9): INTEGER
+DIM currMgnTot : INTEGER
+DIM actualRpy  : INTEGER
+DIM repay      : INTEGER
+DIM pTypeVal   : INTEGER
+DIM p          : INTEGER
+DIM s          : INTEGER
+DIM nextP      : INTEGER
+
+ON ERROR GOTO 900
+
+RUN loadGame("SNBSTATE", hdr, deckOrd, plyrs, mkt, loadOK)
+IF NOT loadOK THEN
+  PRINT "snbMarginPay: loadGame failed"
+  END
+ENDIF
+
+iCYr   := hdr.currYear
+iMaxYr := hdr.maxYears
+iPCnt  := hdr.plyrCount
+p := 1
+IF hdr.savedPhase = 5 THEN
+  p := hdr.savedPlyr
+ENDIF
+IF p < 1 OR p > iPCnt THEN
+  PRINT "snbMarginPay: invalid savedPlyr"
+  END
+ENDIF
+
+RUN findNextActivePlyr(plyrs, iPCnt, p, nextP)
+
+IF NOT plyrs(p).isBankrupt THEN
+  pTypeVal := plyrs(p).plyrType
+  IF hdr.mgnRule = 1 AND iCYr < iMaxYr THEN
+    IF pTypeVal = 2 THEN
+      repay := plyrs(p).obligation
+      IF repay > 0 THEN
+        RUN applyCashMgnRepay(plyrs(p), repay, actualRpy)
+      ENDIF
+      plyrs(p).obligation := 0
+    ELSE
+      RUN calcMgnTot(plyrs(p), currMgnTot)
+      IF currMgnTot > 0 AND plyrs(p).cashBal > 0 THEN
+        FOR s := 1 TO 9
+          prjMgnBal(s) := plyrs(p).mgnBal(s)
+        NEXT s
+        RUN scrMgnRepay(plyrs(p), plyrs(p).cashBal, prjMgnBal)
+        FOR s := 1 TO 9
+          IF prjMgnBal(s) < plyrs(p).mgnBal(s) THEN
+            actualRpy := plyrs(p).mgnBal(s) - prjMgnBal(s)
+            RUN applyStockMgnRepay(plyrs(p), s, actualRpy, actualRpy)
+          ENDIF
+        NEXT s
+      ENDIF
+    ENDIF
+  ELSE
+    plyrs(p).obligation := 0
+  ENDIF
+ENDIF
+
+IF nextP > 0 THEN
+  hdr.savedPhase := 5
+  hdr.savedPlyr  := nextP
+ELSE
+  hdr.savedPhase := 0
+  hdr.savedPlyr  := 1
+ENDIF
+
+activePlrs := 0
+FOR p := 1 TO iPCnt
+  IF NOT plyrs(p).isBankrupt THEN
+    activePlrs := activePlrs + 1
+  ENDIF
+NEXT p
+IF iCYr >= iMaxYr THEN
+  hdr.gameStage := 3
+ELSE IF iPCnt > 1 AND activePlrs <= 1 THEN
+  hdr.gameStage := 3
+ELSE
+  hdr.gameStage := 2
+ENDIF \ENDIF
+
+RUN saveGame("SNBSTATE", hdr, deckOrd, plyrs, mkt)
+END
+
+900 PRINT "snbMarginPay error ("; ERR; ")"
+RUN waitKey
+END
+
+PROCEDURE scrMgnRepay
+(* ============================================================ *)
+(* PROCEDURE : scrMgnRepay                                      *)
+(* PURPOSE   : S18 Margin Repayment sub-screen.                *)
+(*             Lists stocks with company margin debt and edits *)
+(*             the caller-owned projected margin array.        *)
+(*             Projected stock margins are shown only when the *)
+(*             projected value remains above zero. Confirm is  *)
+(*             Enter from the menu state; pass is P.           *)
+(* PARAMS    : plyr       - player record (read-only)          *)
+(*             cashAvail  - current available cash             *)
+(*             prjMgnBal  - IN/OUT projected company margins   *)
+(* SIDE EFX  : Clears screen. Uses INPUT.                      *)
+(* ============================================================ *)
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+PARAM plyr      : PlyrRec
+PARAM cashAvail : INTEGER
+PARAM prjMgnBal(9): INTEGER
+DIM qIn      : STRING[8]
+DIM numOk    : BOOLEAN
+DIM cashNowTxt : STRING[8]
+DIM cashPrjTxt : STRING[8]
+DIM mgnNowTxt  : STRING[8]
+DIM mgnPrjTxt  : STRING[8]
+DIM stkPrjTxt  : STRING[8]
+DIM maxAmtTxt  : STRING[8]
+DIM sNam(9)  : STRING[14]
+DIM mapId(9) : INTEGER
+DIM mapKey(9): INTEGER
+DIM mapCnt   : INTEGER
+DIM i        : INTEGER
+DIM s        : INTEGER
+DIM keyCode  : INTEGER
+DIM maxRpy   : INTEGER
+DIM prjCash  : INTEGER
+DIM currMgnTot : INTEGER
+DIM prjMgnTot  : INTEGER
+DIM keyLbl   : STRING[1]
+DIM errTxt   : STRING[48]
+DIM selStock : INTEGER
+DIM editOpen : BOOLEAN
+DIM hasPrj   : BOOLEAN
+DIM repayAmt : INTEGER
+
+ON ERROR GOTO 900
+
+RUN initStockNames(sNam)
+
+mapCnt := 0
+FOR s := 1 TO 9
+  IF plyr.mgnBal(s) > 0 THEN
+    mapCnt := mapCnt + 1
+    mapId(mapCnt) := s
+    mapKey(mapCnt) := ASC("0") + mapCnt
+  ENDIF
+NEXT s
+
+RUN calcMgnTot(plyr, currMgnTot)
+IF mapCnt = 0 OR currMgnTot <= 0 OR cashAvail <= 0 THEN
+  END
+ENDIF
+
+selStock := 0
+editOpen := FALSE
+errTxt := ""
+
+LOOP
+  prjMgnTot := 0
+  hasPrj := FALSE
+  FOR s := 1 TO 9
+    IF prjMgnBal(s) < 0 THEN
+      prjMgnBal(s) := 0
+    ENDIF
+    prjMgnTot := prjMgnTot + prjMgnBal(s)
+    IF prjMgnBal(s) < plyr.mgnBal(s) THEN
+      hasPrj := TRUE
+    ENDIF
+  NEXT s
+  prjCash := cashAvail - (currMgnTot - prjMgnTot)
+
+  maxRpy := 0
+  IF selStock > 0 THEN
+    maxRpy := plyr.mgnBal(selStock)
+    IF cashAvail < maxRpy THEN
+      maxRpy := cashAvail
+    ENDIF
+  ENDIF
+
+  RUN clrScr
+  PRINT "=== MARGIN REPAYMENT ==="
+  PRINT
+  RUN fmtMoney(currMgnTot, mgnNowTxt)
+  RUN fmtMoney(prjMgnTot, mgnPrjTxt)
+  PRINT "  Outstanding margin : $"; mgnNowTxt; " [$"; mgnPrjTxt; "]"
+  RUN fmtMoney(cashAvail, cashNowTxt)
+  RUN fmtMoney(prjCash, cashPrjTxt)
+  PRINT "  Cash available     : $"; cashNowTxt; " [$"; cashPrjTxt; "]"
+  PRINT
+  PRINT "  Stocks:";
+  IF mapCnt = 1 THEN
+    PRINT " press 1"
+  ELSE
+    PRINT " press 1-"; mapCnt
+  ENDIF
+  FOR i := 1 TO mapCnt
+    s := mapId(i)
+    keyLbl := CHR$(mapKey(i))
+    IF prjMgnBal(s) > 0 THEN
+      RUN fmtMoney(prjMgnBal(s), stkPrjTxt)
+      PRINT USING "'  ',S1<,' ',S12<,' $',I4>,'  [$',S7<,']'", keyLbl, sNam(s), plyr.mgnBal(s), stkPrjTxt
+    ELSE
+      PRINT USING "'  ',S1<,' ',S12<,' $',I4>", keyLbl, sNam(s), plyr.mgnBal(s)
+    ENDIF
+  NEXT i
+  PRINT
+  IF selStock > 0 THEN
+    PRINT "Selected stock: "; sNam(selStock)
+  ELSE
+    PRINT "Selected stock:"
+  ENDIF
+  IF editOpen THEN
+    PRINT "P=pass"
+  ELSE IF hasPrj THEN
+    PRINT "Enter=confirm P=pass"
+  ELSE
+    PRINT "P=pass"
+  ENDIF \ENDIF
+  IF editOpen THEN
+    PRINT "Enter repayment amount (0 to "; maxRpy; ", 0=none):"
+  ENDIF
+  IF errTxt <> "" THEN
+    PRINT errTxt
+  ENDIF
+  IF editOpen THEN
+    INPUT "> ", qIn
+    errTxt := ""
+    IF qIn = "" THEN
+      editOpen := FALSE
+    ELSE
+      RUN getNumIn(qIn, repayAmt, numOk)
+      IF NOT numOk THEN
+        errTxt := "Invalid: enter a number."
+      ELSE IF repayAmt < 0 THEN
+        errTxt := "Invalid: amount cannot be negative."
+      ELSE
+        IF repayAmt > maxRpy THEN
+          RUN fmtMoney(maxRpy, maxAmtTxt)
+          errTxt := "Invalid: maximum repayable is $" + maxAmtTxt + "."
+        ELSE
+          prjMgnBal(selStock) := plyr.mgnBal(selStock) - repayAmt
+          editOpen := FALSE
+        ENDIF
+      ENDIF \ENDIF
+    ENDIF
+  ELSE
+    GET #0, qIn
+    errTxt := ""
+    IF qIn <> "" THEN
+      keyCode := ASC(qIn)
+      IF keyCode >= ASC("a") AND keyCode <= ASC("z") THEN
+        keyCode := keyCode - 32
+      ENDIF
+      IF keyCode = 13 AND hasPrj THEN
+        END
+      ELSE IF keyCode = ASC("P") THEN
+        FOR s := 1 TO 9
+          prjMgnBal(s) := plyr.mgnBal(s)
+        NEXT s
+        END
+      ELSE
+        FOR i := 1 TO mapCnt
+          IF mapKey(i) = keyCode THEN
+            selStock := mapId(i)
+            editOpen := TRUE
+          ENDIF
+        NEXT i
+      ENDIF \ENDIF
+    ENDIF
+  ENDIF
+ENDLOOP
+END
+
+900 PRINT "scrMgnRepay error ("; ERR; ")"
+END

@@ -9,8 +9,7 @@ PROCEDURE snbSell
 (* PARAMS    : None (child process; no PARAM handoff)          *)
 (* SIDE EFX  : Reads and writes SNBSTATE. Modifies player      *)
 (*             cash, margin, holdings, and margin flags via    *)
-(*             applySells, applyCashMgnRepay, and              *)
-(*             applyStockMgnRepay.                             *)
+(*             applySells and applyStockMgnRepay.              *)
 (* NOTE      : snbPhaseCore, snbTradeShared, snbGameData,      *)
 (*             snbTradeHumanUI, snbSellMargin, and snbSell     *)
 (*             must be pre-loaded by the coordinator before    *)
@@ -38,10 +37,7 @@ DIM pTypeVal   : INTEGER
 DIM pNam       : STRING[27]
 DIM sNam(9)    : STRING[14]
 DIM bPar(3)    : INTEGER
-DIM payAmt     : INTEGER
 DIM repay      : INTEGER
-DIM actualRpy  : INTEGER
-DIM maxRpy     : INTEGER
 DIM loopIdx    : INTEGER \ ! Loop counter
 DIM s          : INTEGER \ ! Securities index
 DIM qty        : INTEGER
@@ -80,8 +76,6 @@ DIM divPrj     : INTEGER
 DIM projTxt    : STRING[8]
 DIM mgnTxt     : STRING[7]
 DIM ordTxt     : STRING[24]
-DIM prjRpyTot  : INTEGER
-
 ON ERROR GOTO 900
 
 RUN loadGame("SNBSTATE", hdr, deckOrd, plyrs, mkt, loadOK)
@@ -107,10 +101,6 @@ IF NOT plyrs(p).isBankrupt THEN
   aiTierVal := plyrs(p).aiTier
   RUN fmtPlyrName(plyrs(p).plyrName, pTypeVal, aiTierVal, pNam)
   ordCnt := 0
-  FOR pTypeVal := 1 TO 9
-    prjMgnBal(pTypeVal) := plyrs(p).mgnBal(pTypeVal)
-  NEXT pTypeVal
-
   IF iCYr > 1 THEN
     divRate(1) := 1
     divRate(2) := 0
@@ -126,17 +116,10 @@ IF NOT plyrs(p).isBankrupt THEN
 
     LOOP
 
-      prjRpyTot := 0
-      FOR s := 1 TO 9
-        IF prjMgnBal(s) < plyrs(p).mgnBal(s) THEN
-          prjRpyTot := prjRpyTot + (plyrs(p).mgnBal(s) - prjMgnBal(s))
-        ENDIF
-      NEXT s
       workCash := plyrs(p).cashBal
       FOR s := 1 TO 9
-        workBal(s) := prjMgnBal(s)
+        workBal(s) := plyrs(p).mgnBal(s)
       NEXT s
-      workCash := workCash - prjRpyTot
       workMgn := 0
       hasSell := FALSE
       FOR loopIdx := 1 TO ordCnt
@@ -263,18 +246,10 @@ IF NOT plyrs(p).isBankrupt THEN
       ENDIF
 
       PRINT
-      IF ordCnt > 0 OR prjRpyTot > 0 THEN
-        IF currMgnTot > 0 THEN
-          PRINT "  Enter=confirm orders  P=pass  M=repay margin  S=save+exit  Q=quit"
-        ELSE
-          PRINT "  Enter=confirm orders  P=pass  S=save+exit  Q=quit"
-        ENDIF
+      IF ordCnt > 0 THEN
+        PRINT "  Enter=confirm orders  P=pass  S=save+exit  Q=quit"
       ELSE
-        IF currMgnTot > 0 THEN
-          PRINT "  P=pass  M=repay margin  S=save+exit  Q=quit"
-        ELSE
-          PRINT "  P=pass  S=save+exit  Q=quit"
-        ENDIF
+        PRINT "  P=pass  S=save+exit  Q=quit"
       ENDIF
       GET #0, kIn
       PRINT
@@ -295,15 +270,12 @@ IF NOT plyrs(p).isBankrupt THEN
       RUN resolveOrderEditSel(kIn, mapType, mapId, mapKey, mapCnt, ordTyp, ordId, ordQty, ordCnt, keyCode, selIdx, slotIdx, slotQty)
 
       IF keyCode = ASC("P") THEN
-        IF ordCnt > 0 OR prjRpyTot > 0 THEN
+        IF ordCnt > 0 THEN
           PRINT "Pending orders will be discarded. Press Y to pass."
           GET #0, cnfIn
           PRINT
           IF cnfIn = "Y" OR cnfIn = "y" THEN
             ordCnt := 0
-            FOR s := 1 TO 9
-              prjMgnBal(s) := plyrs(p).mgnBal(s)
-            NEXT s
             usrAct := 2
             EXITIF TRUE THEN
             ENDEXIT
@@ -314,29 +286,17 @@ IF NOT plyrs(p).isBankrupt THEN
           ENDEXIT
         ENDIF
       ELSE IF keyCode = 13 THEN
-        IF ordCnt > 0 OR prjRpyTot > 0 THEN
+        IF ordCnt > 0 THEN
           usrAct := 1
           EXITIF TRUE THEN
           ENDEXIT
         ENDIF
-      ELSE IF keyCode = ASC("M") AND currMgnTot > 0 THEN
-        workCash := workCash + prjRpyTot
-        maxRpy := currMgnTot
-        IF workCash < maxRpy THEN
-          maxRpy := workCash
-        ENDIF
-        IF maxRpy > 0 THEN
-          RUN scrMgnRepay(plyrs(p), workCash, prjMgnBal)
-        ELSE
-          PRINT "No margin repayment available."
-          RUN waitKey
-        ENDIF
       ELSE
         IF selIdx > 0 THEN
           s := mapId(selIdx)
-          workCash := plyrs(p).cashBal - prjRpyTot
+          workCash := plyrs(p).cashBal
           FOR loopIdx := 1 TO 9
-            workBal(loopIdx) := prjMgnBal(loopIdx)
+            workBal(loopIdx) := plyrs(p).mgnBal(loopIdx)
           NEXT loopIdx
           FOR loopIdx := 1 TO ordCnt
             IF loopIdx <> slotIdx THEN
@@ -377,7 +337,7 @@ IF NOT plyrs(p).isBankrupt THEN
           ENDIF \ENDIF
           RUN commitOrderQty(ordTyp, ordId, ordQty, ordCnt, slotIdx, mapType(selIdx), mapId(selIdx), qty)
         ENDIF
-      ENDIF \ENDIF \ENDIF
+      ENDIF \ENDIF
 
     ENDLOOP
 
@@ -391,12 +351,6 @@ IF NOT plyrs(p).isBankrupt THEN
     IF ordCnt > 0 THEN
       RUN applySells(plyrs(p), mkt, ordTyp, ordId, ordQty, ordCnt)
     ENDIF
-    FOR pTypeVal := 1 TO 9
-      IF plyrs(p).mgnBal(pTypeVal) > prjMgnBal(pTypeVal) THEN
-        payAmt := plyrs(p).mgnBal(pTypeVal) - prjMgnBal(pTypeVal)
-        RUN applyStockMgnRepay(plyrs(p), pTypeVal, payAmt, payAmt)
-      ENDIF
-    NEXT pTypeVal
   ENDIF
 
   IF hdr.mgnRule = 1 THEN
