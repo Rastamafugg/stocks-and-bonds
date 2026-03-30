@@ -249,10 +249,8 @@ DIM i       : INTEGER
 DIM s       : INTEGER
 DIM b       : INTEGER
 DIM qty     : INTEGER
-DIM qIn     : STRING[8]
 DIM pStr    : STRING[8]
 DIM pStr2   : STRING[8]
-DIM numOk   : BOOLEAN
 DIM keyCode : INTEGER
 DIM mapCnt  : INTEGER
 DIM mapType(12): INTEGER
@@ -267,12 +265,10 @@ DIM slotQty : INTEGER
 DIM selIdx  : INTEGER
 DIM kIn     : STRING[1]
 DIM simCash : INTEGER
-DIM simMgn  : INTEGER
 DIM simOblg : INTEGER
 DIM repay   : INTEGER
 DIM prcd    : INTEGER
 DIM baseCash : INTEGER
-DIM baseMgn  : INTEGER
 DIM baseOblg : INTEGER
 DIM currMgnTot : INTEGER
 
@@ -286,7 +282,6 @@ LOOP
 
   simCash := plyr.cashBal
   RUN calcMgnTot(plyr, currMgnTot)
-  simMgn  := currMgnTot
   simOblg := oblgRem
   FOR i := 1 TO ordCnt
     IF ordType(i) = 1 THEN
@@ -383,7 +378,6 @@ LOOP
       s := mapId(selIdx)
       b := mapId(selIdx)
       baseCash := plyr.cashBal
-      baseMgn  := currMgnTot
       baseOblg := oblgRem
       FOR i := 1 TO ordCnt
         IF i <> slotIdx THEN

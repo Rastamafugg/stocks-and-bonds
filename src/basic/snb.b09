@@ -6,7 +6,8 @@ PROCEDURE snb
 (*            resident.                              *)
 (*            Deletes stale SNBSTATE if present.     *)
 (*            Forks snbSetup (pre-game setup).       *)
-(*            Year loop: forks four phase children   *)
+(*            Year loop: forks four core phase       *)
+(*            children, plus optional year-10 clear  *)
 (*            per year in sequence:                  *)
 (*              snbDividend - year increment; dividend *)
 (*                           and bond interest        *)
@@ -15,6 +16,8 @@ PROCEDURE snb
 (*                           years for increment)     *)
 (*              snbMarket  - market resolution        *)
 (*              snbSell or snbSellAI - sell phase     *)
+(*              snbYear10Clear       - optional       *)
+(*                                      year-10 clear *)
 (*              snbBuy or snbBuyAI   - buy phase      *)
 (*            After the configured final year buy    *)
 (*            phase, forks one closing snbMarket     *)
@@ -307,6 +310,61 @@ LOOP
         ENDIF
         IF NOT gameOver THEN
           RUN forkPhase(modNam, debugLog, exitStat)
+          GOSUB 100
+        ENDIF
+      ENDIF
+    ENDIF
+
+    IF NOT gameOver THEN
+      IF iSavPh = 3 THEN \ ! YEAR10_CLEAR
+        modNam := "snbPhaseCore"
+        RUN ensureModule(modNam, TRUE, debugLog, ok)
+        IF NOT ok THEN
+          PRINT "SNB: failed to ensure snbPhaseCore (snbYear10Clear)"
+          gameOver := TRUE
+        ENDIF
+        IF NOT gameOver THEN
+          modNam := "snbTradeShared"
+          RUN ensureModule(modNam, TRUE, debugLog, ok)
+          IF NOT ok THEN
+            PRINT "SNB: failed to ensure snbTradeShared (snbYear10Clear)"
+            gameOver := TRUE
+          ENDIF
+        ENDIF
+        IF NOT gameOver THEN
+          modNam := "snbGameData"
+          RUN ensureModule(modNam, TRUE, debugLog, ok)
+          IF NOT ok THEN
+            PRINT "SNB: failed to ensure snbGameData (snbYear10Clear)"
+            gameOver := TRUE
+          ENDIF
+        ENDIF
+        IF NOT gameOver THEN
+          modNam := "snbTradeHumanUI"
+          RUN ensureModule(modNam, TRUE, debugLog, ok)
+          IF NOT ok THEN
+            PRINT "SNB: failed to ensure snbTradeHumanUI (snbYear10Clear)"
+            gameOver := TRUE
+          ENDIF
+        ENDIF
+        IF NOT gameOver THEN
+          modNam := "snbSellMargin"
+          RUN ensureModule(modNam, TRUE, debugLog, ok)
+          IF NOT ok THEN
+            PRINT "SNB: failed to ensure snbSellMargin (snbYear10Clear)"
+            gameOver := TRUE
+          ENDIF
+        ENDIF
+        IF NOT gameOver THEN
+          modNam := "snbYear10Clear"
+          RUN ensureModule(modNam, TRUE, debugLog, ok)
+          IF NOT ok THEN
+            PRINT "SNB: failed to ensure snbYear10Clear"
+            gameOver := TRUE
+          ENDIF
+        ENDIF
+        IF NOT gameOver THEN
+          RUN forkPhase("snbYear10Clear", debugLog, exitStat)
           GOSUB 100
         ENDIF
       ENDIF
