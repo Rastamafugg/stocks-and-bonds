@@ -14,6 +14,13 @@ These instructions apply to all work in this repository.
   same task.
 - Place durable behavior-change rules near the top of the AGENTS file so they
   govern later task-specific instructions.
+- When two Basic09 branches differ only by one or a small number of call
+  arguments, prefer assigning those differing values in a preceding
+  `IF`/`ELSE` block and then making one shared procedure call instead of
+  duplicating the full call in each branch.
+- Favor this staged-argument pattern as an early duplication-reduction step
+  when working under the project's memory constraints, unless it would make the
+  code less clear or require additional risky restructuring.
 - Before any completion response for a Basic09 edit, explicitly audit each
   edited procedure for `TYPE` field collisions against all `PARAM` and `DIM`
   names in that same procedure.

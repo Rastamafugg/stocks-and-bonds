@@ -8,6 +8,7 @@ PROCEDURE snbSellMargin
 PRINT "snbSellMargin"
 PRINT "  applySells"
 PRINT "  commitOrderQty"
+PRINT "  promptEditOrderQty"
 PRINT "  resolveOrderEditSel"
 PRINT "  scrMgnCall"
 PRINT "  scrMgnClr"
@@ -251,7 +252,6 @@ DIM qty     : INTEGER
 DIM qIn     : STRING[8]
 DIM pStr    : STRING[8]
 DIM pStr2   : STRING[8]
-DIM valid   : BOOLEAN
 DIM numOk   : BOOLEAN
 DIM keyCode : INTEGER
 DIM mapCnt  : INTEGER
@@ -271,8 +271,6 @@ DIM simMgn  : INTEGER
 DIM simOblg : INTEGER
 DIM repay   : INTEGER
 DIM prcd    : INTEGER
-DIM editTxt : STRING[48]
-DIM qtyAct  : INTEGER
 DIM baseCash : INTEGER
 DIM baseMgn  : INTEGER
 DIM baseOblg : INTEGER
@@ -405,25 +403,7 @@ LOOP
           ENDIF
         ENDIF
       NEXT i
-      valid := FALSE
-      WHILE NOT valid DO
-        IF mapType(selIdx) = 1 THEN
-          RUN fmtMoney(mkt.stckPrice(s), pStr)
-          editTxt := "  " + sNam(s) + "  " + TRIM$(STR$(plyr.stckShrs(s)))
-          editTxt := editTxt + " shrs @ $" + pStr
-          qty := 0
-          IF slotIdx > 0 THEN
-            qty := ordQty(slotIdx)
-          ENDIF
-          qtyAct := 1
-          ! Line exceeds 79 chars; getLotQty call requires full arguments.
-          RUN getLotQty("=== FORCED LIQUIDATION ===", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, 3, 0, plyr.stckShrs(s), baseCash, baseOblg, -1, 0, qtyAct) \ ! ordMode=LIQ allowNav=0
-          valid := TRUE
-        ELSE
-          RUN promptBondQty(bPar(b), plyr.bondUnts(b), 0, qty, keyCode)
-          valid := TRUE
-        ENDIF
-      ENDWHILE
+      RUN promptEditOrderQty("=== FORCED LIQUIDATION ===", mapType(selIdx), sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), 3, baseCash, baseOblg, -1, bPar(b), plyr.bondUnts(b), 0, slotIdx, ordQty, qty, keyCode)
       RUN commitOrderQty(ordType, ordId, ordQty, ordCnt, slotIdx, mapType(selIdx), mapId(selIdx), qty)
     ENDIF
   ENDIF \ENDIF
@@ -495,11 +475,10 @@ DIM kIn        : STRING[1]
 DIM simCash    : INTEGER
 DIM simMgn     : INTEGER
 DIM prcd       : INTEGER
-DIM editTxt    : STRING[48]
-DIM qtyAct     : INTEGER
 DIM doneClr    : BOOLEAN
 DIM baseCash   : INTEGER
 DIM baseMgn    : INTEGER
+DIM ordModeVal : INTEGER
 DIM currMgnTot : INTEGER
 DIM simBal(9)  : INTEGER
 DIM baseBal(9) : INTEGER
@@ -694,29 +673,11 @@ LOOP
       ENDIF
       baseCash := baseCash - actualRpy
       baseMgn  := baseMgn - actualRpy
-      valid := FALSE
-      WHILE NOT valid DO
-        IF mapType(selIdx) = 1 THEN
-          RUN fmtMoney(mkt.stckPrice(s), pStr)
-          editTxt := "  " + sNam(s) + "  " + TRIM$(STR$(plyr.stckShrs(s)))
-          editTxt := editTxt + " shrs @ $" + pStr
-          qty := 0
-          IF slotIdx > 0 THEN
-            qty := ordQty(slotIdx)
-          ENDIF
-          qtyAct := 1
-          ! Line exceeds 79 chars; getLotQty call requires full arguments.
-          IF plyr.mgnBal(s) > 0 THEN
-            RUN getLotQty("=== YEAR 10 - MARGIN CLEARANCE REQUIRED ===", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, 2, 0, plyr.stckShrs(s), baseCash, baseMgn, baseBal(s), 0, qtyAct) \ ! ordMode=MARG allowNav=0
-          ELSE
-            RUN getLotQty("=== YEAR 10 - MARGIN CLEARANCE REQUIRED ===", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, 0, 0, plyr.stckShrs(s), baseCash, baseMgn, baseBal(s), 0, qtyAct) \ ! ordMode=SELL allowNav=0
-          ENDIF
-          valid := TRUE
-        ELSE
-          RUN promptBondQty(bPar(b), plyr.bondUnts(b), 0, qty, keyCode)
-          valid := TRUE
-        ENDIF
-      ENDWHILE
+      ordModeVal := 0
+      IF plyr.mgnBal(s) > 0 THEN
+        ordModeVal := 2
+      ENDIF
+      RUN promptEditOrderQty("=== YEAR 10 - MARGIN CLEARANCE REQUIRED ===", mapType(selIdx), sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), ordModeVal, baseCash, baseMgn, baseBal(s), bPar(b), plyr.bondUnts(b), 0, slotIdx, ordQty, qty, keyCode)
       RUN commitOrderQty(ordType, ordId, ordQty, ordCnt, slotIdx, mapType(selIdx), mapId(selIdx), qty)
     ENDIF
   ENDIF \ENDIF \ENDIF
@@ -776,6 +737,62 @@ ELSE
   ordType(slotIdx) := assetType
   ordId(slotIdx)   := assetId
   ordQty(slotIdx)  := qty
+ENDIF
+
+END
+
+PROCEDURE promptEditOrderQty
+(* ============================================================ *)
+(* PROCEDURE : promptEditOrderQty                               *)
+(* PURPOSE   : Preload the current edited quantity and dispatch *)
+(*             to the stock or bond quantity editor for        *)
+(*             sell/liquidation screens.                       *)
+(* PARAMS    : title      - screen title for stock editor      *)
+(*             assetType  - 1=stock 2=bond                     *)
+(*             stockNm    - stock display name                 *)
+(*             stockQty   - shares currently held              *)
+(*             stockPrice - current stock price                *)
+(*             stockMode  - getLotQty ordMode                  *)
+(*             baseCash   - projected cash baseline            *)
+(*             baseMgn    - projected margin/obligation base   *)
+(*             baseStkMgn - projected stock margin or -1       *)
+(*             bondPar    - bond par value                     *)
+(*             bondQty    - bond units currently held          *)
+(*             bondNav    - promptBondQty allowNav flag        *)
+(*             slotIdx    - existing order slot or 0           *)
+(*             ordQty     - active order quantity array        *)
+(*             qty        - edited quantity out                *)
+(*             action     - prompt action/status out           *)
+(* SIDE EFX  : Invokes getLotQty or promptBondQty.             *)
+(* ============================================================ *)
+PARAM title       : STRING
+PARAM assetType   : INTEGER
+PARAM stockNm     : STRING[14]
+PARAM stockQty    : INTEGER
+PARAM stockPrice  : INTEGER
+PARAM stockMode   : INTEGER
+PARAM baseCash    : INTEGER
+PARAM baseMgn     : INTEGER
+PARAM baseStkMgn  : INTEGER
+PARAM bondPar     : INTEGER
+PARAM bondQty     : INTEGER
+PARAM bondNav     : INTEGER
+PARAM slotIdx     : INTEGER
+PARAM ordQty(12)  : INTEGER
+PARAM qty         : INTEGER
+PARAM action      : INTEGER
+
+action := 0
+qty := 0
+IF slotIdx > 0 THEN
+  qty := ordQty(slotIdx)
+ENDIF
+
+IF assetType = 1 THEN
+  ! Line exceeds 79 chars; getLotQty call requires full arguments.
+  RUN getLotQty(title, stockNm, stockQty, stockPrice, qty, stockMode, 0, stockQty, baseCash, baseMgn, baseStkMgn, 0, action)
+ELSE
+  RUN promptBondQty(bondPar, bondQty, bondNav, qty, action)
 ENDIF
 
 END
