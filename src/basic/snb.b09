@@ -129,10 +129,16 @@ LOOP
       PRINT "SNB: failed to ensure snbPhaseCore for snbSetup"
       END
     ENDIF
-    modNam := "snbGameData"
+    modNam := "snbDeckUtil"
     RUN ensureModule(modNam, TRUE, debugLog, ok)
     IF NOT ok THEN
-      PRINT "SNB: failed to ensure snbGameData for snbSetup"
+      PRINT "SNB: failed to ensure snbDeckUtil for snbSetup"
+      END
+    ENDIF
+    modNam := "snbMenuUtil"
+    RUN ensureModule(modNam, TRUE, debugLog, ok)
+    IF NOT ok THEN
+      PRINT "SNB: failed to ensure snbMenuUtil for snbSetup"
       END
     ENDIF
     modNam := "snbSetup"
@@ -265,10 +271,10 @@ LOOP
           gameOver := TRUE
         ENDIF
         IF NOT gameOver THEN
-          modNam := "snbGameData"
+          modNam := "snbDeckUtil"
           RUN ensureModule(modNam, TRUE, debugLog, ok)
           IF NOT ok THEN
-            PRINT "SNB: failed to ensure snbGameData (snbMarket)"
+            PRINT "SNB: failed to ensure snbDeckUtil (snbMarket)"
             gameOver := TRUE
           ENDIF
         ENDIF
@@ -356,6 +362,14 @@ LOOP
               ENDIF
             ENDIF
             IF NOT gameOver THEN
+              modNam := "snbTradeMgn"
+              RUN ensureModule(modNam, TRUE, debugLog, ok)
+              IF NOT ok THEN
+                PRINT "SNB: failed to ensure snbTradeMgn (snbSellAI)"
+                gameOver := TRUE
+              ENDIF
+            ENDIF
+            IF NOT gameOver THEN
               modNam := "snbSellAI"
             ENDIF
           ELSE
@@ -421,6 +435,14 @@ LOOP
           RUN ensureModule(modNam, TRUE, debugLog, ok)
           IF NOT ok THEN
             PRINT "SNB: failed to ensure snbSellForceUI (snbSellForceLiq)"
+            gameOver := TRUE
+          ENDIF
+        ENDIF
+        IF NOT gameOver THEN
+          modNam := "snbTradeMgn"
+          RUN ensureModule(modNam, TRUE, debugLog, ok)
+          IF NOT ok THEN
+            PRINT "SNB: failed to ensure snbTradeMgn (snbSellForceLiq)"
             gameOver := TRUE
           ENDIF
         ENDIF
@@ -618,6 +640,14 @@ LOOP
           ENDIF
         ENDIF
         IF NOT gameOver THEN
+          modNam := "snbTradeMgn"
+          RUN ensureModule(modNam, TRUE, debugLog, ok)
+          IF NOT ok THEN
+            PRINT "SNB: failed to ensure snbTradeMgn (snbMarginPay)"
+            gameOver := TRUE
+          ENDIF
+        ENDIF
+        IF NOT gameOver THEN
           modNam := "snbMarginPay"
           RUN ensureModule(modNam, TRUE, debugLog, ok)
           IF NOT ok THEN
@@ -675,10 +705,10 @@ LOOP
         PRINT "SNB: failed to ensure snbPhaseCore (closing snbMarket)"
         END
       ENDIF
-      modNam := "snbGameData"
+      modNam := "snbDeckUtil"
       RUN ensureModule(modNam, TRUE, debugLog, ok)
       IF NOT ok THEN
-        PRINT "SNB: failed to ensure snbGameData (closing snbMarket)"
+        PRINT "SNB: failed to ensure snbDeckUtil (closing snbMarket)"
         END
       ENDIF
       modNam := "snbMarket"
@@ -698,6 +728,12 @@ LOOP
     RUN ensureModule(modNam, TRUE, debugLog, ok)
     IF NOT ok THEN
       PRINT "SNB: failed to ensure snbPhaseCore for snbEndGame"
+      END
+    ENDIF
+    modNam := "snbMenuUtil"
+    RUN ensureModule(modNam, TRUE, debugLog, ok)
+    IF NOT ok THEN
+      PRINT "SNB: failed to ensure snbMenuUtil for snbEndGame"
       END
     ENDIF
     modNam := "snbEndGame"
@@ -761,6 +797,97 @@ ENDLOOP
     RETURN
 
 900 PRINT "SNB error ("; ERR; ")"
+END
+
+PROCEDURE readTurnPlyrType
+(* ============================================================ *)
+(* PROCEDURE : readTurnPlyrType                                 *)
+(* PURPOSE   : Read the current saved-turn player type from     *)
+(*             SNBSTATE without loading the full game state.    *)
+(* PARAMS    : turnType - receives current player's plyrType    *)
+(*             readOK   - TRUE on success, FALSE on any error   *)
+(* SIDE EFX  : Reads SNBSTATE. Prints a diagnostic on failure.  *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+PARAM turnType : INTEGER
+PARAM readOK   : BOOLEAN
+DIM hdr        : SaveHdr
+DIM turnPlyr   : PlyrRec
+DIM deckByt    : BYTE
+DIM path       : BYTE
+DIM pathOpen   : BOOLEAN
+DIM chkExp     : INTEGER
+DIM iMaxYr     : INTEGER
+DIM iDeckCnt   : INTEGER
+DIM iPlyrCnt   : INTEGER
+DIM i          : INTEGER
+DIM pIdx       : INTEGER
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+readOK   := FALSE
+turnType := 0
+
+OPEN #path, "SNBSTATE":READ
+pathOpen := TRUE
+GET #path, hdr
+
+IF hdr.magic <> $53 THEN
+  PRINT "readTurnPlyrType: not a valid save file"
+  END
+ENDIF
+IF hdr.fmtVersion <> 2 THEN
+  PRINT "readTurnPlyrType: incompatible save file version"
+  END
+ENDIF
+
+chkExp := hdr.magic      + hdr.fmtVersion + hdr.maxYears
+chkExp := chkExp + hdr.plyrCount  + hdr.rollMode
+chkExp := chkExp + hdr.mgnRule    + hdr.currYear
+chkExp := chkExp + hdr.savedPhase + hdr.savedPlyr
+chkExp := chkExp + hdr.gameStage  + hdr.bnkrFlgs
+chkExp := LAND(chkExp, 255)
+IF chkExp <> hdr.checksum THEN
+  PRINT "readTurnPlyrType: save file is corrupt"
+  END
+ENDIF
+
+pIdx := hdr.savedPlyr
+iPlyrCnt := hdr.plyrCount
+IF pIdx < 1 OR pIdx > iPlyrCnt THEN
+  PRINT "readTurnPlyrType: invalid savedPlyr"
+  END
+ENDIF
+
+iMaxYr := hdr.maxYears
+iDeckCnt := iMaxYr + 1
+IF iDeckCnt > 36 THEN
+  iDeckCnt := 36
+ENDIF
+FOR i := 1 TO iDeckCnt
+  GET #path, deckByt
+NEXT i
+
+FOR i := 1 TO pIdx
+  GET #path, turnPlyr
+NEXT i
+
+turnType := turnPlyr.plyrType
+readOK := TRUE
+
+CLOSE #path
+pathOpen := FALSE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "readTurnPlyrType error ("; ERR; ")"
+    readOK := FALSE
 END
 
 PROCEDURE chkStale

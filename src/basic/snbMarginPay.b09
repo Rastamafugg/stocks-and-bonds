@@ -12,8 +12,9 @@ PROCEDURE snbMarginPay
 (* SIDE EFX  : Reads and writes SNBSTATE. May reduce player    *)
 (*             cash and margin balances.                        *)
 (* NOTE      : snbPhaseCore, snbTradeShared, snbTradeAI,       *)
-(*             snbGameData, and snbMarginPay must be           *)
-(*             pre-loaded by the coordinator before fork.      *)
+(*             snbTradeMgn, snbGameData, and snbMarginPay      *)
+(*             must be pre-loaded by the coordinator before    *)
+(*             fork.                                           *)
 (* ============================================================ *)
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER

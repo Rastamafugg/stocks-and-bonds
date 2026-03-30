@@ -8,9 +8,9 @@ PROCEDURE snbSellForceLiq
 (* PARAMS    : None (child process; no PARAM handoff)            *)
 (* SIDE EFX  : Reads and writes SNBSTATE. May modify player      *)
 (*             cash, margin, holdings, and bankruptcy state.     *)
-(* NOTE      : snbPhaseCore, snbTradeShared, snbGameData,        *)
-(*             snbTradeHumanUI, snbSellMargin, and               *)
-(*             snbSellForceLiq must be pre-loaded by the         *)
+(* NOTE      : snbPhaseCore, snbTradeShared, snbTradeMgn,        *)
+(*             snbGameData, snbTradeHumanUI, snbSellMargin,      *)
+(*             and snbSellForceLiq must be pre-loaded by the     *)
 (*             coordinator before fork.                          *)
 (* ============================================================ *)
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE

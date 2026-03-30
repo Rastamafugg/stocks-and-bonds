@@ -8,7 +8,6 @@ PROCEDURE snbGameData
 PRINT "snbGameData"
 PRINT "  initStockNames"
 PRINT "  initBondPar"
-PRINT "  shuffleDeck"
 END
 
 PROCEDURE initStockNames
@@ -43,36 +42,4 @@ PARAM bPar(3) : INTEGER
 bPar(1) := 1000
 bPar(2) := 5000
 bPar(3) := 10000
-END
-
-PROCEDURE shuffleDeck
-(* ============================================================ *)
-(* PROCEDURE : shuffleDeck                                      *)
-(* PURPOSE   : Populate deckOrd with card IDs 1..36 then apply *)
-(*             a Fisher-Yates in-place shuffle. All index       *)
-(*             arithmetic is INTEGER. RND must be seeded by the *)
-(*             caller before the first call.                    *)
-(* PARAMS    : deckOrd(36) - receives the shuffled deck order   *)
-(*             (modified in place, passed by reference)         *)
-(* SIDE EFX  : Modifies deckOrd. Advances the RND sequence.    *)
-(* ============================================================ *)
-PARAM deckOrd(36) : BYTE
-DIM i   : INTEGER
-DIM j   : INTEGER
-DIM tmp : BYTE
-
-! Step 1: populate deck with sequential card IDs 1..36
-FOR i := 1 TO 36
-  deckOrd(i) := i
-NEXT i
-
-! Step 2: Fisher-Yates shuffle
-! For each position i from 36 down to 2, pick a random j in [1..i]
-! and swap deckOrd(i) with deckOrd(j).
-FOR i := 36 TO 2 STEP -1
-  j := INT(RND(i)) + 1
-  tmp := deckOrd(j)
-  deckOrd(j) := deckOrd(i)
-  deckOrd(i) := tmp
-NEXT i
 END

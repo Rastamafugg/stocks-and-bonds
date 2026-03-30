@@ -1,0 +1,42 @@
+PROCEDURE snbTradeMgn
+(* ================================================== *)
+(* PROCEDURE: snbTradeMgn                             *)
+(* PURPOSE:   README entry for snbTradeMgn module.    *)
+(*            Lists all procedures in this module.    *)
+(* PARAMS:    None                                    *)
+(* ================================================== *)
+PRINT "snbTradeMgn"
+PRINT "  applyStockMgnRepay"
+END
+
+PROCEDURE applyStockMgnRepay
+(* ================================================== *)
+(* PROCEDURE: applyStockMgnRepay                       *)
+(* PURPOSE:   Apply a cash repayment against one      *)
+(*            company's margin balance.               *)
+(* PARAMS:    plyr      - player record (modified)    *)
+(*            stockId   - company index 1..9          *)
+(*            repayReq  - requested repayment         *)
+(*            actualRpy - receives applied amount     *)
+(* EFFECTS:   Reduces cashBal and mgnBal(stockId).    *)
+(* ================================================== *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+PARAM plyr      : PlyrRec
+PARAM stockId   : INTEGER
+PARAM repayReq  : INTEGER
+PARAM actualRpy : INTEGER
+
+actualRpy := repayReq
+IF actualRpy > plyr.cashBal THEN
+  actualRpy := plyr.cashBal
+ENDIF
+IF actualRpy > plyr.mgnBal(stockId) THEN
+  actualRpy := plyr.mgnBal(stockId)
+ENDIF
+IF actualRpy < 0 THEN
+  actualRpy := 0
+ENDIF
+plyr.cashBal := plyr.cashBal - actualRpy
+plyr.mgnBal(stockId) := plyr.mgnBal(stockId) - actualRpy
+END

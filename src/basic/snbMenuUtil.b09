@@ -1,0 +1,48 @@
+PROCEDURE snbMenuUtil
+(* ================================================== *)
+(* PROCEDURE: snbMenuUtil                             *)
+(* PURPOSE:   README entry for snbMenuUtil module.    *)
+(*            Lists all procedures in this module.    *)
+(* PARAMS:    None                                    *)
+(* ================================================== *)
+PRINT "snbMenuUtil"
+PRINT "  getMenuKey"
+END
+
+PROCEDURE getMenuKey
+(* ================================================== *)
+(* PROCEDURE: getMenuKey                              *)
+(* PURPOSE:   Block until a key in [minKey,maxKey]   *)
+(*            is pressed. Returns its numeric value. *)
+(* PARAMS:    minKey - lowest valid choice (INTEGER) *)
+(*            maxKey - highest valid choice (INTEGER)*)
+(*            choice - receives validated value      *)
+(* EFFECTS:   Waits on stdin until a valid digit key *)
+(*            is pressed. Invalid keys are discarded.*)
+(* NOTE:      minKey/maxKey are INTEGER per          *)
+(*            bestPractices; callers pass literals.  *)
+(* ================================================== *)
+PARAM minKey, maxKey, choice:INTEGER
+
+DIM k:STRING[1]
+DIM kVal:INTEGER
+
+ON ERROR GOTO 900
+
+kVal := 0
+
+REPEAT
+  GET #0, k
+  IF k >= "1" AND k <= "9" THEN \ ! guard: digits only, skip VAL on other input
+    kVal := VAL(k)
+  ELSE
+    kVal := 0 \ ! non-digit: force fail, loop continues silently
+  ENDIF
+UNTIL kVal >= minKey AND kVal <= maxKey
+
+choice := kVal
+END
+
+900 \ ! Error handler
+PRINT "getMenuKey error ("; ERR; ")"
+END

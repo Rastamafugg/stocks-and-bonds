@@ -10,13 +10,11 @@ PRINT "  loadGame"
 PRINT "  saveGame"
 PRINT "  quitToMenu"
 PRINT "  saveQuitToMenu"
-PRINT "  readTurnPlyrType"
 PRINT "  waitKey"
 PRINT "  clrScr"
 PRINT "  fmtMoney"
 PRINT "  padNumber"
 PRINT "  fmtPlyrName"
-PRINT "  getMenuKey"
 PRINT "  getPhaseNav"
 PRINT "  getSaveQuitAct"
 PRINT "  getNumIn"
@@ -153,44 +151,6 @@ IF plyrType = 2 THEN
     dispName := plyrName + " MEDIUM"
   ENDIF \ENDIF
 ENDIF
-END
-
-PROCEDURE getMenuKey
-(* ================================================== *)
-(* PROCEDURE: getMenuKey                              *)
-(* PURPOSE:   Block until a key in [minKey,maxKey]   *)
-(*            is pressed. Returns its numeric value. *)
-(* PARAMS:    minKey - lowest valid choice (INTEGER) *)
-(*            maxKey - highest valid choice (INTEGER)*)
-(*            choice - receives validated value      *)
-(* EFFECTS:   Waits on stdin until a valid digit key *)
-(*            is pressed. Invalid keys are discarded.*)
-(* NOTE:      minKey/maxKey are INTEGER per          *)
-(*            bestPractices; callers pass literals.  *)
-(* ================================================== *)
-PARAM minKey, maxKey, choice:INTEGER
-
-DIM k:STRING[1]
-DIM kVal:INTEGER
-
-ON ERROR GOTO 900
-
-kVal := 0
-
-REPEAT
-  GET #0, k
-  IF k >= "1" AND k <= "9" THEN \ ! guard: digits only, skip VAL on other input
-    kVal := VAL(k)
-  ELSE
-    kVal := 0 \ ! non-digit: force fail, loop continues silently
-  ENDIF
-UNTIL kVal >= minKey AND kVal <= maxKey
-
-choice := kVal
-END
-
-900 \ ! Error handler
-PRINT "getMenuKey error ("; ERR; ")"
 END
 
 PROCEDURE getPhaseNav
@@ -588,95 +548,4 @@ END
     ENDIF
     PRINT "loadGame error ("; ERR; ") reading: "; savePath
     loadOK := FALSE
-END
-
-PROCEDURE readTurnPlyrType
-(* ============================================================ *)
-(* PROCEDURE : readTurnPlyrType                                 *)
-(* PURPOSE   : Read the current saved-turn player type from     *)
-(*             SNBSTATE without loading the full game state.    *)
-(* PARAMS    : turnType - receives current player's plyrType    *)
-(*             readOK   - TRUE on success, FALSE on any error   *)
-(* SIDE EFX  : Reads SNBSTATE. Prints a diagnostic on failure.  *)
-(* ============================================================ *)
-! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
-! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
-PARAM turnType : INTEGER
-PARAM readOK   : BOOLEAN
-DIM hdr        : SaveHdr
-DIM turnPlyr   : PlyrRec
-DIM deckByt    : BYTE
-DIM path       : BYTE
-DIM pathOpen   : BOOLEAN
-DIM chkExp     : INTEGER
-DIM iMaxYr     : INTEGER
-DIM iDeckCnt   : INTEGER
-DIM iPlyrCnt   : INTEGER
-DIM i          : INTEGER
-DIM pIdx       : INTEGER
-
-ON ERROR GOTO 900
-
-pathOpen := FALSE
-readOK   := FALSE
-turnType := 0
-
-OPEN #path, "SNBSTATE":READ
-pathOpen := TRUE
-GET #path, hdr
-
-IF hdr.magic <> $53 THEN
-  PRINT "readTurnPlyrType: not a valid save file"
-  END
-ENDIF
-IF hdr.fmtVersion <> 2 THEN
-  PRINT "readTurnPlyrType: incompatible save file version"
-  END
-ENDIF
-
-chkExp := hdr.magic      + hdr.fmtVersion + hdr.maxYears
-chkExp := chkExp + hdr.plyrCount  + hdr.rollMode
-chkExp := chkExp + hdr.mgnRule    + hdr.currYear
-chkExp := chkExp + hdr.savedPhase + hdr.savedPlyr
-chkExp := chkExp + hdr.gameStage  + hdr.bnkrFlgs
-chkExp := LAND(chkExp, 255)
-IF chkExp <> hdr.checksum THEN
-  PRINT "readTurnPlyrType: save file is corrupt"
-  END
-ENDIF
-
-pIdx := hdr.savedPlyr
-iPlyrCnt := hdr.plyrCount
-IF pIdx < 1 OR pIdx > iPlyrCnt THEN
-  PRINT "readTurnPlyrType: invalid savedPlyr"
-  END
-ENDIF
-
-iMaxYr := hdr.maxYears
-iDeckCnt := iMaxYr + 1
-IF iDeckCnt > 36 THEN
-  iDeckCnt := 36
-ENDIF
-FOR i := 1 TO iDeckCnt
-  GET #path, deckByt
-NEXT i
-
-FOR i := 1 TO pIdx
-  GET #path, turnPlyr
-NEXT i
-
-turnType := turnPlyr.plyrType
-readOK := TRUE
-
-CLOSE #path
-pathOpen := FALSE
-END
-
-900 IF pathOpen THEN
-      CLOSE #path
-    ENDIF
-    PRINT "readTurnPlyrType error ("; ERR; ")"
-    readOK := FALSE
 END

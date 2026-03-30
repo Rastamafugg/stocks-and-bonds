@@ -8,8 +8,8 @@ PROCEDURE snbSell
 (*             back to SNBSTATE.                               *)
 (* PARAMS    : None (child process; no PARAM handoff)          *)
 (* SIDE EFX  : Reads and writes SNBSTATE. Modifies player      *)
-(*             cash, margin, holdings, and margin flags via    *)
-(*             applySells and applyStockMgnRepay.              *)
+(*             cash, holdings, and margin state via            *)
+(*             applySells.                                     *)
 (* NOTE      : snbPhaseCore, snbTradeShared, snbGameData,      *)
 (*             snbTradeHumanUI, snbSellMargin, and snbSell     *)
 (*             must be pre-loaded by the coordinator before    *)
@@ -30,7 +30,6 @@ DIM ordId(12)  : INTEGER
 DIM ordQty(12) : INTEGER
 DIM ordCnt     : INTEGER
 DIM usrAct     : INTEGER
-DIM prjMgnBal(9): INTEGER
 DIM navAct     : BYTE
 DIM aiTierVal  : INTEGER
 DIM pTypeVal   : INTEGER
