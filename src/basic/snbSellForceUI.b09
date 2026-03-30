@@ -1,0 +1,321 @@
+PROCEDURE snbSellForceUI
+(* ================================================== *)
+(* PROCEDURE: snbSellForceUI                          *)
+(* PURPOSE:   README entry for snbSellForceUI module. *)
+(*            Lists all procedures in this module.    *)
+(* PARAMS:    None                                    *)
+(* ================================================== *)
+PRINT "snbSellForceUI"
+PRINT "  scrMgnCall"
+PRINT "  scrBankrupt"
+PRINT "  scrForceLiq"
+END
+
+PROCEDURE scrMgnCall
+(* ============================================================ *)
+(* PROCEDURE : scrMgnCall                                       *)
+(* PURPOSE   : S20 Margin Call Alert screen.                   *)
+(*             Displays the margin call condition for a single *)
+(*             stock: player name, stock name, current price,  *)
+(*             margin call threshold, and amount due.          *)
+(*             Display-only. No player choice at this screen.  *)
+(*             Routes unconditionally to S21 (forced           *)
+(*             liquidation) after waitKey. The caller is       *)
+(*             responsible for routing to scrForceLiq on       *)
+(*             return.                                         *)
+(*             Triggered when currentPrice <= MarginCallPrice  *)
+(*             (spec constant $25) for a margin-held stock.    *)
+(* PARAMS    : plyrNam   - player name                         *)
+(*             stckNam   - name of stock triggering the call   *)
+(*             curPrice  - current price of the stock          *)
+(*             callPrice - margin call threshold (spec: $25)   *)
+(*             amtDue    - total obligation due immediately    *)
+(* SIDE EFX  : Clears screen. Waits for keypress via waitKey.  *)
+(* ============================================================ *)
+PARAM plyrNam   : STRING[20]
+PARAM stckNam   : STRING[14]
+PARAM curPrice  : INTEGER
+PARAM callPrice : INTEGER
+PARAM amtDue    : INTEGER
+DIM pStr : STRING[8]
+
+RUN clrScr
+PRINT "*** MARGIN CALL ***"
+PRINT
+PRINT "Player  : "; plyrNam
+PRINT "Stock   : "; stckNam
+PRINT
+RUN fmtMoney(curPrice, pStr)
+PRINT "Current price     : $"; pStr
+RUN fmtMoney(callPrice, pStr)
+PRINT "Margin call at    : $"; pStr
+PRINT
+RUN fmtMoney(amtDue, pStr)
+PRINT "Amount due        : $"; pStr
+PRINT
+PRINT "You must immediately liquidate assets to meet"
+PRINT "this obligation."
+PRINT
+RUN waitKey
+
+END
+
+PROCEDURE scrBankrupt
+(* ============================================================ *)
+(* PROCEDURE : scrBankrupt                                      *)
+(* PURPOSE   : S22 Bankruptcy Declaration screen.              *)
+(*             Sets plyr.isBankrupt := TRUE, then displays     *)
+(*             the elimination notice: player name, reason,    *)
+(*             year, and final cash balance.                   *)
+(*             Returns after waitKey. Caller is responsible    *)
+(*             for removing the player from the active turn    *)
+(*             order; this procedure only marks the record.   *)
+(*             Triggered when forced liquidation cannot        *)
+(*             satisfy the outstanding obligation, or when     *)
+(*             cashBal remains negative after all assets are   *)
+(*             sold (spec Section 12).                         *)
+(* PARAMS    : plyr      - player record; isBankrupt set TRUE  *)
+(*             finalCash - cash balance at time of elimination *)
+(*             reason    - 1=MARGIN_INTEREST 2=MARGIN_CALL     *)
+(*             currYear  - game year in which bankruptcy occurs*)
+(* SIDE EFX  : Sets plyr.isBankrupt := TRUE.                  *)
+(*             Clears screen. Waits for keypress via waitKey.  *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+PARAM plyr      : PlyrRec
+PARAM finalCash : INTEGER
+PARAM reason    : BYTE
+PARAM currYear  : INTEGER
+DIM pStr : STRING[8]
+
+plyr.isBankrupt := TRUE
+
+RUN clrScr
+PRINT "=== BANKRUPTCY ==="
+PRINT "  Player  : "; plyr.plyrName
+PRINT "  Year    : "; currYear; " of 10"
+PRINT
+IF reason = 1 THEN
+  PRINT "  Reason  : Margin interest charge"
+  PRINT "            Cash balance went negative after annual"
+  PRINT "            margin interest was deducted."
+ELSE
+  PRINT "  Reason  : Margin call"
+  PRINT "            Insufficient assets to meet the margin"
+  PRINT "            call obligation."
+ENDIF
+PRINT
+RUN fmtMoney(finalCash, pStr)
+PRINT "  Final cash : $"; pStr
+PRINT
+PRINT "  "; plyr.plyrName; " has been eliminated from the game."
+PRINT
+RUN waitKey
+
+END
+
+PROCEDURE scrForceLiq
+(* ============================================================ *)
+(* PROCEDURE : scrForceLiq                                      *)
+(* PURPOSE   : S21 Forced Liquidation screen.                  *)
+(*             Displays outstanding obligation, current cash,  *)
+(*             and all held assets in a persistent keyed       *)
+(*             editor. Selecting an asset key edits only that  *)
+(*             one pending sell order, then returns to the     *)
+(*             main screen. Enter confirms current orders. D   *)
+(*             declares bankruptcy.                            *)
+(*             Stock qty: mult of 10, <=stckShrs. Bond qty:    *)
+(*             positive integer <=bondUnts. Zero/Enter clears  *)
+(*             the pending order for that asset.               *)
+(*             Does NOT modify plyr or oblgRem; caller handles *)
+(*             via applyLiqOrdr.                               *)
+(* PARAMS    : plyrNam    - player name for display            *)
+(*             oblgRem    - current obligation remaining       *)
+(*             plyr       - player record (read-only)          *)
+(*             mkt        - market state (read-only)           *)
+(*             ordType    - OUT: 1=STOCK 2=BOND per order      *)
+(*             ordId      - OUT: asset index per order         *)
+(*             ordQty     - OUT: quantity per order            *)
+(*             ordCnt     - OUT: number of orders (0..12)      *)
+(*             action     - OUT: 1=SUBMIT 2=DECLARE_BANKRUPTCY *)
+(* SIDE EFX  : Clears screen. Uses INPUT for order quantities. *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+PARAM plyrNam     : STRING[20]
+PARAM oblgRem     : INTEGER
+PARAM plyr        : PlyrRec
+PARAM mkt         : MktState
+PARAM ordType(12) : INTEGER
+PARAM ordId(12)   : INTEGER
+PARAM ordQty(12)  : INTEGER
+PARAM ordCnt      : INTEGER
+PARAM action      : BYTE
+DIM sNam(9) : STRING[14]
+DIM bPar(3) : INTEGER
+DIM i       : INTEGER
+DIM s       : INTEGER
+DIM b       : INTEGER
+DIM qty     : INTEGER
+DIM pStr    : STRING[8]
+DIM pStr2   : STRING[8]
+DIM keyCode : INTEGER
+DIM mapCnt  : INTEGER
+DIM mapType(12): INTEGER
+DIM mapId(12)  : INTEGER
+DIM mapKey(12) : INTEGER
+DIM mapQty(12) : INTEGER
+DIM stockCnt : INTEGER
+DIM bondCnt  : INTEGER
+DIM keyLbl   : STRING[1]
+DIM slotIdx : INTEGER
+DIM slotQty : INTEGER
+DIM selIdx  : INTEGER
+DIM kIn     : STRING[1]
+DIM simCash : INTEGER
+DIM simOblg : INTEGER
+DIM repay   : INTEGER
+DIM prcd    : INTEGER
+DIM baseCash : INTEGER
+DIM baseOblg : INTEGER
+DIM currMgnTot : INTEGER
+
+ON ERROR GOTO 900
+
+RUN initStockNames(sNam)
+RUN initBondPar(bPar)
+RUN clrOrders(ordType, ordId, ordQty, ordCnt)
+
+LOOP
+
+  simCash := plyr.cashBal
+  RUN calcMgnTot(plyr, currMgnTot)
+  simOblg := oblgRem
+  FOR i := 1 TO ordCnt
+    IF ordType(i) = 1 THEN
+      prcd := ordQty(i) * mkt.stckPrice(ordId(i))
+      simCash := simCash + prcd
+    ELSE
+      prcd := ordQty(i) * bPar(ordId(i))
+      simCash := simCash + prcd
+    ENDIF
+    simOblg := simOblg - prcd
+    IF simOblg < 0 THEN
+      simOblg := 0
+    ENDIF
+  NEXT i
+
+  RUN clrScr
+  PRINT "=== FORCED LIQUIDATION ==="
+  PRINT "  Player: "; plyrNam
+  PRINT
+  RUN fmtMoney(plyr.cashBal, pStr)
+  RUN fmtMoney(simCash, pStr2)
+  PRINT "  Current cash         : $"; pStr; " [$"; pStr2; "]"
+  RUN fmtMoney(currMgnTot, pStr)
+  PRINT "  Current margin       : $"; pStr
+  RUN fmtMoney(oblgRem, pStr)
+  RUN fmtMoney(simOblg, pStr2)
+  PRINT "  Obligation remaining : $"; pStr; " [$"; pStr2; "]"
+  PRINT
+
+  RUN prepAssetMaps(plyr, mkt, 2, ordType, ordId, ordQty, ordCnt, mapType, mapId, mapKey, mapQty, mapCnt, stockCnt, bondCnt)
+
+  PRINT "  STOCKS:";
+  IF stockCnt = 1 THEN
+    PRINT " press 1"
+  ELSE IF stockCnt > 1 THEN
+    PRINT " press 1-"; stockCnt
+  ELSE
+    PRINT
+  ENDIF \ENDIF
+  FOR i := 1 TO mapCnt
+    IF mapType(i) = 1 THEN
+      s := mapId(i)
+      slotQty := mapQty(i)
+      keyLbl := CHR$(mapKey(i))
+      ! Line exceeds 79 chars; PRINT USING row format requires single line.
+      PRINT USING "'  ',S1<,' ',S12<,I5>,' shrs @ $',I4>", keyLbl, sNam(s), plyr.stckShrs(s), mkt.stckPrice(s);
+      IF plyr.mgnBal(s) > 0 THEN
+        PRINT " [M]";
+      ENDIF
+      IF slotQty > 0 THEN
+        PRINT "  [Sell "; slotQty; "]";
+      ENDIF
+      PRINT
+    ENDIF
+  NEXT i
+  PRINT
+  PRINT "  BONDS:";
+  IF bondCnt = 1 THEN
+    PRINT " press A"
+  ELSE IF bondCnt > 1 THEN
+    PRINT " press A-"; CHR$(ASC("A") + bondCnt - 1)
+  ELSE
+    PRINT
+  ENDIF \ENDIF
+  FOR i := 1 TO mapCnt
+    IF mapType(i) = 2 THEN
+      b := mapId(i)
+      slotQty := mapQty(i)
+      keyLbl := CHR$(mapKey(i))
+      ! Line exceeds 79 chars; PRINT USING row format requires single line.
+      PRINT USING "'  ',S1<,' $',I6>,' bond  ',I3>,' unit(s)'", keyLbl, bPar(b), plyr.bondUnts(b);
+      IF slotQty > 0 THEN
+        PRINT "  [Sell "; slotQty; "]";
+      ENDIF
+      PRINT
+    ENDIF
+  NEXT i
+  PRINT
+  PRINT "  Enter=confirm  D=bankrupt"
+  GET #0, kIn
+  PRINT
+
+  RUN resolveOrderEditSel(kIn, mapType, mapId, mapKey, mapCnt, ordType, ordId, ordQty, ordCnt, keyCode, selIdx, slotIdx, slotQty)
+
+  IF keyCode = ASC("D") THEN
+    action := 2
+    ordCnt := 0
+    END
+  ELSE IF keyCode = 13 THEN
+    action := 1
+    END
+  ELSE
+    IF selIdx > 0 THEN
+      s := mapId(selIdx)
+      b := mapId(selIdx)
+      baseCash := plyr.cashBal
+      baseOblg := oblgRem
+      FOR i := 1 TO ordCnt
+        IF i <> slotIdx THEN
+          IF ordType(i) = 1 THEN
+            prcd := ordQty(i) * mkt.stckPrice(ordId(i))
+          ELSE
+            prcd := ordQty(i) * bPar(ordId(i))
+          ENDIF
+          repay := baseOblg
+          IF prcd < repay THEN
+            repay := prcd
+          ENDIF
+          baseOblg := baseOblg - repay
+          baseCash := baseCash + (prcd - repay)
+          IF baseOblg < 0 THEN
+            baseOblg := 0
+          ENDIF
+        ENDIF
+      NEXT i
+      RUN promptEditOrderQty("=== FORCED LIQUIDATION ===", mapType(selIdx), sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), 3, baseCash, baseOblg, -1, bPar(b), plyr.bondUnts(b), 0, slotIdx, ordQty, qty, keyCode)
+      RUN commitOrderQty(ordType, ordId, ordQty, ordCnt, slotIdx, mapType(selIdx), mapId(selIdx), qty)
+    ENDIF
+  ENDIF \ENDIF
+
+ENDLOOP
+
+action := 1
+END
+
+900 PRINT "scrForceLiq error ("; ERR; ")"
+END

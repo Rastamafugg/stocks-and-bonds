@@ -8,9 +8,7 @@ PROCEDURE snbTradeShared
 PRINT "snbTradeShared"
 PRINT "  calcMgnTot"
 PRINT "  calcSaleMgnRpy"
-PRINT "  applyCashMgnRepay"
 PRINT "  applyStockMgnRepay"
-PRINT "  initAIProf"
 PRINT "  findNextActivePlyr"
 END
 
@@ -60,52 +58,6 @@ IF repay < 0 THEN
 ENDIF
 END
 
-PROCEDURE applyCashMgnRepay
-(* ================================================== *)
-(* PROCEDURE: applyCashMgnRepay                        *)
-(* PURPOSE:   Apply a general cash repayment against   *)
-(*            per-company margin balances in ascending *)
-(*            stock-id order.                          *)
-(* PARAMS:    plyr      - player record (modified)     *)
-(*            repayReq  - requested cash repayment     *)
-(*            actualRpy - receives applied amount      *)
-(* EFFECTS:   Reduces cashBal and mgnBal(1..9).        *)
-(* ================================================== *)
-! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
-PARAM plyr      : PlyrRec
-PARAM repayReq  : INTEGER
-PARAM actualRpy : INTEGER
-DIM remAmt      : INTEGER
-DIM totMgn      : INTEGER
-DIM takeAmt     : INTEGER
-DIM s           : INTEGER
-
-RUN calcMgnTot(plyr, totMgn)
-actualRpy := repayReq
-IF actualRpy > plyr.cashBal THEN
-  actualRpy := plyr.cashBal
-ENDIF
-IF actualRpy > totMgn THEN
-  actualRpy := totMgn
-ENDIF
-IF actualRpy < 0 THEN
-  actualRpy := 0
-ENDIF
-plyr.cashBal := plyr.cashBal - actualRpy
-remAmt := actualRpy
-FOR s := 1 TO 9
-  IF remAmt > 0 THEN
-    takeAmt := plyr.mgnBal(s)
-    IF takeAmt > remAmt THEN
-      takeAmt := remAmt
-    ENDIF
-    plyr.mgnBal(s) := plyr.mgnBal(s) - takeAmt
-    remAmt := remAmt - takeAmt
-  ENDIF
-NEXT s
-END
-
 PROCEDURE applyStockMgnRepay
 (* ================================================== *)
 (* PROCEDURE: applyStockMgnRepay                       *)
@@ -136,87 +88,6 @@ IF actualRpy < 0 THEN
 ENDIF
 plyr.cashBal := plyr.cashBal - actualRpy
 plyr.mgnBal(stockId) := plyr.mgnBal(stockId) - actualRpy
-END
-
-PROCEDURE initAIProf
-(* ================================================= *)
-(* PROCEDURE: initAIProf                             *)
-(* PURPOSE  : Initialize an AIProfile record with   *)
-(*            tier-specific parameter values per     *)
-(*            ai-difficulty-tiers.md Section 4.      *)
-(*            Tier 1=Easy, 2=Medium, 3=Hard.         *)
-(*            Invalid tier prints a diagnostic and   *)
-(*            ENDs locally.                          *)
-(* PARAMS   : tier - difficulty tier (1/2/3)         *)
-(*            prof - AIProfile to populate (by ref)  *)
-(* SIDE FX  : Modifies prof in place.                *)
-(* ================================================= *)
-! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE AIProfile = tier,concenCap,spltSlPct,distSlPrc,mgnMaxExpo,mgnBuffer,mgnResvPct,repayFrac,mgnClrYear,endgameYr,spltSlPcE,repayFrcE:BYTE;bondIdlCsh,bndIdlCsE:INTEGER;zeroDivEl,useYldScr,useMargin,bondPriory:BOOLEAN
-PARAM tNum: INTEGER
-PARAM prof: AIProfile
-
-IF tNum = 1 THEN \ ! Easy
-    prof.tier       := 1
-    prof.concenCap  := 70
-    prof.spltSlPct  := 20
-    prof.distSlPrc  := 50
-    prof.mgnMaxExpo := 0
-    prof.mgnBuffer  := 0
-    prof.mgnResvPct := 20
-    prof.repayFrac  := 25
-    prof.mgnClrYear := 9
-    prof.endgameYr  := 0
-    prof.spltSlPcE  := 20
-    prof.repayFrcE  := 25
-    prof.bondIdlCsh := 1000
-    prof.bndIdlCsE  := 1000
-    prof.zeroDivEl  := TRUE
-    prof.useYldScr  := FALSE
-    prof.useMargin  := FALSE
-    prof.bondPriory := TRUE
-ELSE IF tNum = 2 THEN \ ! Medium
-    prof.tier       := 2
-    prof.concenCap  := 40
-    prof.spltSlPct  := 50
-    prof.distSlPrc  := 50
-    prof.mgnMaxExpo := 0
-    prof.mgnBuffer  := 0
-    prof.mgnResvPct := 10
-    prof.repayFrac  := 50
-    prof.mgnClrYear := 9
-    prof.endgameYr  := 0
-    prof.spltSlPcE  := 50
-    prof.repayFrcE  := 50
-    prof.bondIdlCsh := 5000
-    prof.bndIdlCsE  := 5000
-    prof.zeroDivEl  := TRUE
-    prof.useYldScr  := TRUE
-    prof.useMargin  := FALSE
-    prof.bondPriory := FALSE
-ELSE IF tNum = 3 THEN \ ! Hard
-    prof.tier       := 3
-    prof.concenCap  := 25
-    prof.spltSlPct  := 30
-    prof.distSlPrc  := 60
-    prof.mgnMaxExpo := 30
-    prof.mgnBuffer  := 30
-    prof.mgnResvPct := 5
-    prof.repayFrac  := 75
-    prof.mgnClrYear := 8
-    prof.endgameYr  := 7
-    prof.spltSlPcE  := 70
-    prof.repayFrcE  := 90
-    prof.bondIdlCsh := 10000
-    prof.bndIdlCsE  := 5000
-    prof.zeroDivEl  := FALSE
-    prof.useYldScr  := TRUE
-    prof.useMargin  := TRUE
-    prof.bondPriory := FALSE
-ELSE
-    PRINT "initAIProf error (invalid tier)"
-    END
-ENDIF \ENDIF \ENDIF
 END
 
 PROCEDURE findNextActivePlyr
