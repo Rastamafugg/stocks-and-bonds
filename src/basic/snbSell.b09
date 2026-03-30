@@ -564,19 +564,7 @@ LOOP
           valid := TRUE
         ENDIF
       ENDWHILE
-      IF qty = 0 THEN
-        IF slotIdx > 0 THEN
-          RUN dropOrderAt(ordType, ordId, ordQty, ordCnt, slotIdx)
-        ENDIF
-      ELSE
-        IF slotIdx = 0 THEN
-          ordCnt := ordCnt + 1
-          slotIdx := ordCnt
-        ENDIF
-        ordType(slotIdx) := mapType(selIdx)
-        ordId(slotIdx)   := mapId(selIdx)
-        ordQty(slotIdx)  := qty
-      ENDIF
+      RUN commitOrderQty(ordType, ordId, ordQty, ordCnt, slotIdx, mapType(selIdx), mapId(selIdx), qty)
     ENDIF
   ENDIF \ENDIF \ENDIF
 

@@ -7,6 +7,7 @@ PROCEDURE snbSellMargin
 (* ================================================== *)
 PRINT "snbSellMargin"
 PRINT "  applySells"
+PRINT "  commitOrderQty"
 PRINT "  scrMgnCall"
 PRINT "  scrMgnClr"
 PRINT "  scrBankrupt"
@@ -432,19 +433,7 @@ LOOP
           valid := TRUE
         ENDIF
       ENDWHILE
-      IF qty = 0 THEN
-        IF slotIdx > 0 THEN
-          RUN dropOrderAt(ordType, ordId, ordQty, ordCnt, slotIdx)
-        ENDIF
-      ELSE
-        IF slotIdx = 0 THEN
-          ordCnt := ordCnt + 1
-          slotIdx := ordCnt
-        ENDIF
-        ordType(slotIdx) := mapType(selIdx)
-        ordId(slotIdx)   := mapId(selIdx)
-        ordQty(slotIdx)  := qty
-      ENDIF
+      RUN commitOrderQty(ordType, ordId, ordQty, ordCnt, slotIdx, mapType(selIdx), mapId(selIdx), qty)
     ENDIF
   ENDIF \ENDIF
 
@@ -747,19 +736,7 @@ LOOP
           valid := TRUE
         ENDIF
       ENDWHILE
-      IF qty = 0 THEN
-        IF slotIdx > 0 THEN
-          RUN dropOrderAt(ordType, ordId, ordQty, ordCnt, slotIdx)
-        ENDIF
-      ELSE
-        IF slotIdx = 0 THEN
-          ordCnt := ordCnt + 1
-          slotIdx := ordCnt
-        ENDIF
-        ordType(slotIdx) := mapType(selIdx)
-        ordId(slotIdx)   := mapId(selIdx)
-        ordQty(slotIdx)  := qty
-      ENDIF
+      RUN commitOrderQty(ordType, ordId, ordQty, ordCnt, slotIdx, mapType(selIdx), mapId(selIdx), qty)
     ENDIF
   ENDIF \ENDIF \ENDIF
 
@@ -777,6 +754,49 @@ action := 1
 END
 
 900 PRINT "scrMgnClr error ("; ERR; ")"
+END
+
+PROCEDURE commitOrderQty
+(* ============================================================ *)
+(* PROCEDURE : commitOrderQty                                   *)
+(* PURPOSE   : Apply a single edited order quantity into the   *)
+(*             order arrays shared by sell/liquidation screens.*)
+(*             qty=0 removes the existing slot if present.     *)
+(*             qty>0 updates the existing slot or appends a    *)
+(*             new order when slotIdx=0.                       *)
+(* PARAMS    : ordType   - order asset type array              *)
+(*             ordId     - order asset id array                *)
+(*             ordQty    - order quantity array                *)
+(*             ordCnt    - number of active orders             *)
+(*             slotIdx   - existing slot index or 0            *)
+(*             assetType - asset type to write                 *)
+(*             assetId   - asset id to write                   *)
+(*             qty       - edited quantity                     *)
+(* SIDE EFX  : Modifies ordType/ordId/ordQty/ordCnt in place.  *)
+(* ============================================================ *)
+PARAM ordType(12) : INTEGER
+PARAM ordId(12)   : INTEGER
+PARAM ordQty(12)  : INTEGER
+PARAM ordCnt      : INTEGER
+PARAM slotIdx     : INTEGER
+PARAM assetType   : INTEGER
+PARAM assetId     : INTEGER
+PARAM qty         : INTEGER
+
+IF qty = 0 THEN
+  IF slotIdx > 0 THEN
+    RUN dropOrderAt(ordType, ordId, ordQty, ordCnt, slotIdx)
+  ENDIF
+ELSE
+  IF slotIdx = 0 THEN
+    ordCnt := ordCnt + 1
+    slotIdx := ordCnt
+  ENDIF
+  ordType(slotIdx) := assetType
+  ordId(slotIdx)   := assetId
+  ordQty(slotIdx)  := qty
+ENDIF
+
 END
 
 PROCEDURE applySells
