@@ -39,6 +39,8 @@ DIM sNam(9)    : STRING[14]
 DIM oblgRem    : INTEGER
 DIM payAmt     : INTEGER
 DIM totalMgn   : INTEGER
+DIM savePhaseVal : INTEGER
+DIM savePlyrVal  : INTEGER
 DIM s          : INTEGER
 DIM p          : INTEGER
 DIM nextP      : INTEGER
@@ -86,11 +88,13 @@ IF NOT plyrs(p).isBankrupt THEN
     navAct := 1
     RUN scrAISellTurn(pNam, ordTyp, ordId, ordQty, ordCnt, navAct)
     IF navAct = 2 THEN
+      savePhaseVal := 2
+      savePlyrVal  := 1
       IF nextP > 0 THEN
-        RUN saveQuitToMenu(1, nextP, hdr, deckOrd, plyrs, mkt)
-      ELSE
-        RUN saveQuitToMenu(2, 1, hdr, deckOrd, plyrs, mkt)
+        savePhaseVal := 1
+        savePlyrVal  := nextP
       ENDIF
+      RUN saveQuitToMenu(savePhaseVal, savePlyrVal, hdr, deckOrd, plyrs, mkt)
       END
     ELSE IF navAct = 3 THEN
       RUN quitToMenu(hdr, deckOrd, plyrs, mkt)
