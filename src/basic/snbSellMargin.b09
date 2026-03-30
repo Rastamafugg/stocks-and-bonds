@@ -623,7 +623,7 @@ END
 PROCEDURE applySells
 (* ============================================================ *)
 (* PROCEDURE : applySells                                       *)
-(* PURPOSE   : Apply validated sell orders from scrSell to a   *)
+(* PURPOSE   : Apply validated sell orders from the sell phase *)
 (*             single player record (spec Sections 11.1-11.3). *)
 (*             Stock sell: proceeds = qty * currentPrice.      *)
 (*             Margin-backed stock: repay 50% of proceeds,     *)
