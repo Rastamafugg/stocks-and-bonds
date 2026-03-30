@@ -32,14 +32,12 @@ DIM ordQty(12) : INTEGER
 DIM ordCnt     : INTEGER
 DIM usrAct     : INTEGER
 DIM prjMgnBal(9): INTEGER
-DIM liqAct     : BYTE
 DIM navAct     : BYTE
 DIM aiTierVal  : INTEGER
 DIM pTypeVal   : INTEGER
 DIM pNam       : STRING[27]
 DIM sNam(9)    : STRING[14]
 DIM bPar(3)    : INTEGER
-DIM oblgRem    : INTEGER
 DIM payAmt     : INTEGER
 DIM repay      : INTEGER
 DIM actualRpy  : INTEGER
@@ -408,29 +406,11 @@ IF NOT plyrs(p).isBankrupt THEN
           IF NOT plyrs(p).isBankrupt THEN
             IF plyrs(p).mgnBal(s) > 0 THEN
               IF plyrs(p).stckShrs(s) = 0 OR mkt.stckPrice(s) <= 25 THEN
-                oblgRem := plyrs(p).mgnBal(s)
-                IF plyrs(p).stckShrs(s) > 0 THEN
-                  ! Line exceeds 79 chars; RUN statement cannot be split.
-                  RUN scrMgnCall(plyrs(p).plyrName, sNam(s), mkt.stckPrice(s), 25, oblgRem)
-                ENDIF
-                LOOP
-                  plyrs(p).obligation := oblgRem
-                  liqAct := 1
-                  ! Line exceeds 79 chars; RUN statement cannot be split.
-                  RUN scrForceLiq(plyrs(p).plyrName, oblgRem, plyrs(p), mkt, ordTyp, ordId, ordQty, ordCnt, liqAct)
-                  IF liqAct = 2 OR ordCnt = 0 THEN
-                    RUN scrBankrupt(plyrs(p), plyrs(p).cashBal, 2, iCYr)
-                    plyrs(p).obligation := 0
-                    EXITIF TRUE THEN
-                    ENDEXIT
-                  ENDIF
-                  RUN applySells(plyrs(p), mkt, ordTyp, ordId, ordQty, ordCnt)
-                  RUN applyStockMgnRepay(plyrs(p), s, plyrs(p).cashBal, payAmt)
-                  oblgRem := plyrs(p).mgnBal(s)
-                  EXITIF oblgRem <= 0 THEN
-                  ENDEXIT
-                ENDLOOP
-                plyrs(p).obligation := 0
+                hdr.savedPhase := 4
+                hdr.savedPlyr  := p
+                hdr.gameStage := 2
+                RUN saveGame("SNBSTATE", hdr, deckOrd, plyrs, mkt)
+                END
               ENDIF
             ENDIF
           ENDIF
