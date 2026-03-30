@@ -80,6 +80,7 @@ DIM simBal(9)  : INTEGER
 DIM baseBal(9) : INTEGER
 DIM p          : INTEGER
 DIM nextP      : INTEGER
+DIM title      : STRING[43]
 
 ON ERROR GOTO 900
 
@@ -383,8 +384,9 @@ IF NOT plyrs(p).isBankrupt THEN
                   IF plyrs(p).mgnBal(s) > 0 THEN
                     ordModeVal := 2
                   ENDIF
+                  title := "=== YEAR 10 - MARGIN CLEARANCE REQUIRED ==="
                   ! Line exceeds 79 chars; RUN statement cannot be split.
-                  RUN promptEditOrderQty("=== YEAR 10 - MARGIN CLEARANCE REQUIRED ===", mapType(selIdx), sNam(s), plyrs(p).stckShrs(s), mkt.stckPrice(s), ordModeVal, baseCash, baseMgn, baseBal(s), bPar(b), plyrs(p).bondUnts(b), 0, slotIdx, ordQty, qty, keyCode)
+                  RUN promptEditOrderQty(title, mapType(selIdx), sNam(s), plyrs(p).stckShrs(s), mkt.stckPrice(s), ordModeVal, baseCash, baseMgn, baseBal(s), bPar(b), plyrs(p).bondUnts(b), 0, slotIdx, ordQty, qty, keyCode)
                   IF qty = 0 THEN
                     IF slotIdx > 0 AND slotIdx <= ordCnt THEN
                       FOR i := slotIdx TO ordCnt - 1
