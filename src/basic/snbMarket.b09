@@ -3,8 +3,7 @@ PROCEDURE snbMarket
 (* PROCEDURE : snbMarket                                        *)
 (* PURPOSE   : Market resolution phase child. Runs every year. *)
 (*             Draws the situation card, generates dice rolls,  *)
-(*             resolves all stock prices, applies Card 1        *)
-(*             dividend bonus (Years 2-9), and displays         *)
+(*             resolves all stock prices, and displays          *)
 (*             S11-S15. When called after final-year GS_DONE,  *)
 (*             it performs the one closing-price draw using    *)
 (*             the next card slot beyond the last played year. *)
@@ -12,28 +11,26 @@ PROCEDURE snbMarket
 (*             Called by the SNB coordinator via forkPhase.    *)
 (* PARAMS    : None (child process; no PARAM handoff)          *)
 (* SIDE EFX  : Reads and writes SNBSTATE. Modifies             *)
-(*             mkt.stckPrice, mkt.divSuspnd, and               *)
-(*             plyrs(p).stckShrs (on splits) via applyMktYear. *)
-(*             Modifies plyrs(p).cashBal for Card 1 bonus.     *)
-(* NOTE      : snbPhaseCore, snbGameData, and snbMarket must   *)
-(*             be pre-loaded by coordinator.                   *)
+(*             mkt.stckPrice, mkt.divSuspnd, and split         *)
+(*             stock holdings in player records.               *)
+(* NOTE      : snbDeckUtil and snbMarket must be pre-loaded    *)
+(*             by coordinator.                                 *)
 (* ============================================================ *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
-TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE CardRec = crdType:INTEGER;efxCnt:INTEGER;efxStk(4):INTEGER;efxDlt(4):INTEGER;divBonus:INTEGER
 DIM hdr        : SaveHdr
 DIM deckOrd(36): BYTE
-DIM plyrs(6)   : PlyrRec
 DIM mkt        : MktState
 DIM crd        : CardRec
 DIM loadOK     : BOOLEAN
+DIM saveOK     : BOOLEAN
 DIM iCYr       : INTEGER  \ ! staged hdr.currYear BYTE
 DIM iMaxYr     : INTEGER  \ ! staged hdr.maxYears BYTE
-DIM iPCnt      : INTEGER  \ ! staged hdr.plyrCount BYTE
 DIM iRMode     : INTEGER  \ ! staged hdr.rollMode BYTE
 DIM iDkPos     : INTEGER  \ ! staged deck position within deckOrd
 DIM wasDone    : BOOLEAN  \ ! TRUE on closing-price pass after GS_DONE
@@ -52,32 +49,33 @@ DIM dvSusp(9)  : BOOLEAN  \ ! TRUE if dividends newly suspended
 DIM dvRnst(9)  : BOOLEAN  \ ! TRUE if dividends reinstated
 DIM flavTxt    : STRING[160] \ ! flavour text (stub; empty for now)
 DIM sNam       : STRING[12]  \ ! stock name for split/divflag display
-DIM pNames(6)  : STRING[27]  \ ! display names for scrSplit
-DIM shrBf(6)   : INTEGER     \ ! shares before split per player
-DIM shrAf(6)   : INTEGER     \ ! shares after split per player
+DIM pNames(6)  : STRING[27]  \ ! empty arrays for scrSplit
+DIM shrBf(6)   : INTEGER
+DIM shrAf(6)   : INTEGER
 DIM evTyp      : INTEGER     \ ! 1=suspended 2=reinstated
 DIM oDPrc      : INTEGER     \ ! pre-split price for scrSplit display
 DIM actByt     : BYTE     \ ! action return from screens (discarded)
 DIM iSeed      : INTEGER  \ ! per-year RNG seed for child-process roll variance
 DIM tInt       : INTEGER  \ ! reused loop counter / staging variable
+DIM iPlyrCnt   : INTEGER  \ ! staged hdr.plyrCount BYTE
+DIM plyr       : PlyrRec
+DIM plyrOK     : BOOLEAN
+DIM plyrDirty  : BOOLEAN
 DIM p          : INTEGER
 DIM s          : INTEGER
-DIM pTypeVal   : INTEGER
-DIM aiTierVal  : INTEGER
 
 ON ERROR GOTO 900
 
-! Load full game state from coordinator IPC file.
-RUN loadGame("SNBSTATE", hdr, deckOrd, plyrs, mkt, loadOK)
+RUN loadMktState("SNBSTATE", hdr, deckOrd, mkt, loadOK)
 IF NOT loadOK THEN
-  PRINT "snbMarket: loadGame failed"
+  PRINT "snbMarket: loadMktState failed"
   END
 ENDIF
 
 iCYr   := hdr.currYear   \ ! stage BYTE
 iMaxYr := hdr.maxYears   \ ! stage BYTE
-iPCnt  := hdr.plyrCount  \ ! stage BYTE
 iRMode := hdr.rollMode   \ ! stage BYTE
+iPlyrCnt := hdr.plyrCount \ ! stage BYTE
 wasDone := FALSE
 IF hdr.gameStage = 3 THEN
   wasDone := TRUE
@@ -101,10 +99,10 @@ RUN getCard(cardId, crd)
 flavTxt := ""
 RUN scrCard(cardId, crd, flavTxt, actByt)
 IF actByt = 2 THEN
-  RUN saveQuitToMenu(4, 1, hdr, deckOrd, plyrs, mkt)
+  RUN saveMktToMenu(4, 1, hdr, mkt, saveOK)
   END
 ELSE IF actByt = 3 THEN
-  RUN quitToMenu(hdr, deckOrd, plyrs, mkt)
+  RUN quitMktToMenu(hdr, mkt, saveOK)
   END
 ENDIF \ENDIF
 
@@ -131,41 +129,60 @@ NEXT s
 ! Display S12 dice roll results.
 RUN scrDice(crd.crdType, rCnt, dOne, dTwo, rTot, mktDlt, actByt)
 IF actByt = 2 THEN
-  RUN saveQuitToMenu(4, 1, hdr, deckOrd, plyrs, mkt)
+  RUN saveMktToMenu(4, 1, hdr, mkt, saveOK)
   END
 ELSE IF actByt = 3 THEN
-  RUN quitToMenu(hdr, deckOrd, plyrs, mkt)
+  RUN quitMktToMenu(hdr, mkt, saveOK)
   END
 ENDIF \ENDIF
 
 ! Resolve all stock prices for this year.
 ! Line exceeds 79 chars; RUN statement cannot be split.
-RUN applyMktYear(cardId, rolls, iPCnt, plyrs, mkt, prcBef, mktDlt, crdDlt, spOcc, dvSusp, dvRnst)
+RUN applyMktYear(cardId, rolls, mkt, prcBef, mktDlt, crdDlt, spOcc, dvSusp, dvRnst)
+
+! Apply all stock splits to player records before any
+! market save/quit checkpoint can be taken from S13-S15.
+FOR p := 1 TO iPlyrCnt
+  RUN loadMktPlyrRec("SNBSTATE", hdr, p, plyr, plyrOK)
+  IF NOT plyrOK THEN
+    PRINT "snbMarket: loadMktPlyrRec failed"
+    END
+  ENDIF
+  plyrDirty := FALSE
+  FOR s := 1 TO 9
+    IF spOcc(s) AND plyr.stckShrs(s) > 0 THEN
+      plyr.stckShrs(s) := plyr.stckShrs(s) * 2
+      plyrDirty := TRUE
+    ENDIF
+  NEXT s
+  IF plyrDirty THEN
+    RUN saveMktPlyrRec("SNBSTATE", hdr, p, plyr, plyrOK)
+    IF NOT plyrOK THEN
+      PRINT "snbMarket: saveMktPlyrRec failed"
+      END
+    ENDIF
+  ENDIF
+NEXT p
 
 ! Display S13 market results board.
 ! Line exceeds 79 chars; RUN statement cannot be split.
 RUN scrMktBoard(prcBef, mktDlt, crdDlt, mkt.stckPrice, spOcc, dvSusp, dvRnst, actByt)
 IF actByt = 2 THEN
-  RUN saveQuitToMenu(1, 1, hdr, deckOrd, plyrs, mkt)
+  RUN saveMktToMenu(1, 1, hdr, mkt, saveOK)
   END
 ELSE IF actByt = 3 THEN
-  RUN quitToMenu(hdr, deckOrd, plyrs, mkt)
+  RUN quitMktToMenu(hdr, mkt, saveOK)
   END
 ENDIF \ENDIF
 
 ! Display S14/S15 per stock where a notable event occurred.
 FOR s := 1 TO 9
   IF spOcc(s) THEN
-    ! Build player share arrays for scrSplit.
-    ! applyMktYear already doubled stckShrs(s) on split;
-    ! shrBf = current / 2 restores the pre-split count.
-    FOR p := 1 TO iPCnt
-      pTypeVal  := plyrs(p).plyrType
-      aiTierVal := plyrs(p).aiTier
-      RUN fmtPlyrName(plyrs(p).plyrName, pTypeVal, aiTierVal, pNames(p))
-      shrAf(p)  := plyrs(p).stckShrs(s)
-      shrBf(p)  := plyrs(p).stckShrs(s) / 2
-    NEXT p
+    FOR tInt := 1 TO 6
+      pNames(tInt) := ""
+      shrAf(tInt)  := 0
+      shrBf(tInt)  := 0
+    NEXT tInt
     ! Pre-split price = post-split price * 2.
     oDPrc := mkt.stckPrice(s) * 2
     ! Read stock name at position s from DATA 720.
@@ -173,13 +190,27 @@ FOR s := 1 TO 9
     FOR tInt := 1 TO s
       READ sNam
     NEXT tInt
+    FOR p := 1 TO iPlyrCnt
+      RUN loadMktPlyrRec("SNBSTATE", hdr, p, plyr, plyrOK)
+      IF NOT plyrOK THEN
+        PRINT "snbMarket: loadMktPlyrRec failed"
+        END
+      ENDIF
+      pNames(p) := plyr.plyrName
+      shrAf(p)  := plyr.stckShrs(s)
+      IF shrAf(p) > 0 THEN
+        shrBf(p) := shrAf(p) / 2
+      ELSE
+        shrBf(p) := 0
+      ENDIF
+    NEXT p
     ! Line exceeds 79 chars; RUN statement cannot be split.
-    RUN scrSplit(sNam, oDPrc, mkt.stckPrice(s), iPCnt, pNames, shrBf, shrAf, actByt)
+    RUN scrSplit(sNam, oDPrc, mkt.stckPrice(s), iPlyrCnt, pNames, shrBf, shrAf, actByt)
     IF actByt = 2 THEN
-      RUN saveQuitToMenu(1, 1, hdr, deckOrd, plyrs, mkt)
+      RUN saveMktToMenu(1, 1, hdr, mkt, saveOK)
       END
     ELSE IF actByt = 3 THEN
-      RUN quitToMenu(hdr, deckOrd, plyrs, mkt)
+      RUN quitMktToMenu(hdr, mkt, saveOK)
       END
     ENDIF \ENDIF
   ENDIF
@@ -196,29 +227,14 @@ FOR s := 1 TO 9
     ENDIF
     RUN scrDivFlag(sNam, evTyp, mkt.stckPrice(s), 50, actByt)
     IF actByt = 2 THEN
-      RUN saveQuitToMenu(1, 1, hdr, deckOrd, plyrs, mkt)
+      RUN saveMktToMenu(1, 1, hdr, mkt, saveOK)
       END
     ELSE IF actByt = 3 THEN
-      RUN quitToMenu(hdr, deckOrd, plyrs, mkt)
+      RUN quitMktToMenu(hdr, mkt, saveOK)
       END
     ENDIF \ENDIF
   ENDIF
 NEXT s
-
-! Apply Card 1 dividend bonus in Years 2-9 only.
-! crd.divBonus > 0 only for Card 1 (spec Section 4.3).
-IF crd.divBonus > 0 AND iCYr > 1 AND iCYr < iMaxYr THEN
-  FOR p := 1 TO iPCnt
-    IF NOT plyrs(p).isBankrupt THEN
-      FOR s := 1 TO 9
-        IF plyrs(p).stckShrs(s) > 0 THEN
-          ! Line exceeds 79 chars; arithmetic update requires single line.
-          plyrs(p).cashBal := plyrs(p).cashBal + (plyrs(p).stckShrs(s) * crd.divBonus)
-        ENDIF
-      NEXT s
-    ENDIF
-  NEXT p
-ENDIF
 
 ! Always write GS_YEAR (2); snbMarket never terminates the game.
 ! On a normal yearly market pass, advance the resume checkpoint
@@ -230,7 +246,10 @@ IF NOT wasDone THEN
   hdr.savedPlyr  := 1
 ENDIF
 
-RUN saveGame("SNBSTATE", hdr, deckOrd, plyrs, mkt)
+RUN saveHdrMktState("SNBSTATE", hdr, mkt, saveOK)
+IF NOT saveOK THEN
+  PRINT "snbMarket: saveHdrMktState failed"
+ENDIF
 END
 
 ! Stock names 1..9 for split and dividend flag screens.
@@ -239,6 +258,387 @@ END
 722 DATA "United Auto","Uranium Ent","Valley Power"
 
 900 PRINT "snbMarket error ("; ERR; ")"
+END
+
+PROCEDURE loadMktState
+(* ============================================================ *)
+(* PROCEDURE : loadMktState                                     *)
+(* PURPOSE   : Load save header, trimmed deck, and market only. *)
+(*             Player records are skipped.                      *)
+(* PARAMS    : savePath - source filename                       *)
+(*             hdr      - receives SaveHdr                      *)
+(*             deckOrd  - receives trimmed deck entries         *)
+(*             mkt      - receives market state                 *)
+(*             loadOK   - TRUE on success                       *)
+(* SIDE EFX  : Prints diagnostic on failure.                    *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+PARAM savePath   : STRING[20]
+PARAM hdr        : SaveHdr
+PARAM deckOrd(36): BYTE
+PARAM mkt        : MktState
+PARAM loadOK     : BOOLEAN
+DIM path       : BYTE
+DIM pathOpen   : BOOLEAN
+DIM chkExp     : INTEGER
+DIM iMaxYr     : INTEGER
+DIM iDeckCnt   : INTEGER
+DIM i          : INTEGER
+DIM seekPos    : INTEGER
+DIM skipPlyr   : PlyrRec
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+loadOK   := FALSE
+
+OPEN #path, savePath:READ
+pathOpen := TRUE
+GET #path, hdr
+
+IF hdr.magic <> $53 THEN
+  PRINT "loadMktState: not a valid save file: "; savePath
+  END
+ENDIF
+IF hdr.fmtVersion <> 2 THEN
+  PRINT "loadMktState: incompatible save file version: "; savePath
+  END
+ENDIF
+
+chkExp := hdr.magic      + hdr.fmtVersion + hdr.maxYears
+chkExp := chkExp + hdr.plyrCount  + hdr.rollMode
+chkExp := chkExp + hdr.mgnRule    + hdr.currYear
+chkExp := chkExp + hdr.savedPhase + hdr.savedPlyr
+chkExp := chkExp + hdr.gameStage  + hdr.bnkrFlgs
+chkExp := LAND(chkExp, 255)
+IF chkExp <> hdr.checksum THEN
+  PRINT "loadMktState: save file is corrupt: "; savePath
+  END
+ENDIF
+
+iMaxYr := hdr.maxYears
+iDeckCnt := iMaxYr + 1
+IF iDeckCnt > 36 THEN
+  iDeckCnt := 36
+ENDIF
+FOR i := 1 TO iDeckCnt
+  GET #path, deckOrd(i)
+NEXT i
+seekPos := SIZE(hdr) + iDeckCnt + (SIZE(skipPlyr) * 6)
+SEEK #path, seekPos
+GET #path, mkt
+
+CLOSE #path
+pathOpen := FALSE
+loadOK := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "loadMktState error ("; ERR; ") reading: "; savePath
+    loadOK := FALSE
+END
+
+PROCEDURE loadMktPlyrRec
+(* ============================================================ *)
+(* PROCEDURE : loadMktPlyrRec                                   *)
+(* PURPOSE   : Load one player record for market split updates  *)
+(*             without reading the full player array.           *)
+(* PARAMS    : savePath - source filename                       *)
+(*             hdr      - validated SaveHdr                     *)
+(*             plyrIdx  - player index (1..plyrCount)           *)
+(*             plyr     - receives PlyrRec                      *)
+(*             loadOK   - TRUE on success                       *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+PARAM savePath : STRING[20]
+PARAM hdr      : SaveHdr
+PARAM plyrIdx  : INTEGER
+PARAM plyr     : PlyrRec
+PARAM loadOK   : BOOLEAN
+DIM path       : BYTE
+DIM pathOpen   : BOOLEAN
+DIM iMaxYr     : INTEGER
+DIM iDeckCnt   : INTEGER
+DIM seekPos    : INTEGER
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+loadOK   := FALSE
+
+IF plyrIdx < 1 OR plyrIdx > hdr.plyrCount THEN
+  PRINT "loadMktPlyrRec: invalid player index"
+  END
+ENDIF
+
+iMaxYr := hdr.maxYears
+iDeckCnt := iMaxYr + 1
+IF iDeckCnt > 36 THEN
+  iDeckCnt := 36
+ENDIF
+seekPos := SIZE(hdr) + iDeckCnt + ((plyrIdx - 1) * SIZE(plyr))
+
+OPEN #path, savePath:READ
+pathOpen := TRUE
+SEEK #path, seekPos
+GET #path, plyr
+
+CLOSE #path
+pathOpen := FALSE
+loadOK := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "loadMktPlyrRec error ("; ERR; ") reading: "; savePath
+    loadOK := FALSE
+END
+
+PROCEDURE saveHdrMktState
+(* ============================================================ *)
+(* PROCEDURE : saveHdrMktState                                  *)
+(* PURPOSE   : Rewrite only the header and market state in an   *)
+(*             existing save file. Deck and player records are  *)
+(*             left unchanged on disk.                          *)
+(* PARAMS    : savePath - target filename                       *)
+(*             hdr      - current SaveHdr; checksum updated     *)
+(*             mkt      - current market state                  *)
+(*             saveOK   - TRUE on success                       *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+PARAM savePath : STRING[20]
+PARAM hdr      : SaveHdr
+PARAM mkt      : MktState
+PARAM saveOK   : BOOLEAN
+DIM path       : BYTE
+DIM pathOpen   : BOOLEAN
+DIM chkSum     : INTEGER
+DIM iMaxYr     : INTEGER
+DIM iDeckCnt   : INTEGER
+DIM seekPos    : INTEGER
+DIM skipPlyr   : PlyrRec
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+saveOK   := FALSE
+
+chkSum := hdr.magic      + hdr.fmtVersion + hdr.maxYears
+chkSum := chkSum + hdr.plyrCount  + hdr.rollMode
+chkSum := chkSum + hdr.mgnRule    + hdr.currYear
+chkSum := chkSum + hdr.savedPhase + hdr.savedPlyr
+chkSum := chkSum + hdr.gameStage  + hdr.bnkrFlgs
+hdr.checksum := LAND(chkSum, 255)
+
+OPEN #path, savePath:UPDATE
+pathOpen := TRUE
+SEEK #path, 0
+PUT #path, hdr
+
+iMaxYr := hdr.maxYears
+iDeckCnt := iMaxYr + 1
+IF iDeckCnt > 36 THEN
+  iDeckCnt := 36
+ENDIF
+seekPos := SIZE(hdr) + iDeckCnt + (SIZE(skipPlyr) * 6)
+SEEK #path, seekPos
+PUT #path, mkt
+
+CLOSE #path
+pathOpen := FALSE
+saveOK := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "saveHdrMktState error ("; ERR; ") writing: "; savePath
+    saveOK := FALSE
+END
+
+PROCEDURE saveMktPlyrRec
+(* ============================================================ *)
+(* PROCEDURE : saveMktPlyrRec                                   *)
+(* PURPOSE   : Save one player record after market split        *)
+(*             updates without rewriting all player records.    *)
+(* PARAMS    : savePath - target filename                       *)
+(*             hdr      - current SaveHdr                       *)
+(*             plyrIdx  - player index (1..plyrCount)           *)
+(*             plyr     - player record to write                *)
+(*             saveOK   - TRUE on success                       *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+PARAM savePath : STRING[20]
+PARAM hdr      : SaveHdr
+PARAM plyrIdx  : INTEGER
+PARAM plyr     : PlyrRec
+PARAM saveOK   : BOOLEAN
+DIM path       : BYTE
+DIM pathOpen   : BOOLEAN
+DIM iMaxYr     : INTEGER
+DIM iDeckCnt   : INTEGER
+DIM seekPos    : INTEGER
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+saveOK   := FALSE
+
+IF plyrIdx < 1 OR plyrIdx > hdr.plyrCount THEN
+  PRINT "saveMktPlyrRec: invalid player index"
+  END
+ENDIF
+
+iMaxYr := hdr.maxYears
+iDeckCnt := iMaxYr + 1
+IF iDeckCnt > 36 THEN
+  iDeckCnt := 36
+ENDIF
+seekPos := SIZE(hdr) + iDeckCnt + ((plyrIdx - 1) * SIZE(plyr))
+
+OPEN #path, savePath:UPDATE
+pathOpen := TRUE
+SEEK #path, seekPos
+PUT #path, plyr
+
+CLOSE #path
+pathOpen := FALSE
+saveOK := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "saveMktPlyrRec error ("; ERR; ") writing: "; savePath
+    saveOK := FALSE
+END
+
+PROCEDURE quitMktToMenu
+(* ============================================================ *)
+(* PROCEDURE : quitMktToMenu                                    *)
+(* PURPOSE   : Save current market/header state to SNBSTATE and *)
+(*             signal the coordinator to return to the menu.    *)
+(* PARAMS    : hdr    - current SaveHdr                         *)
+(*             mkt    - current market state                    *)
+(*             saveOK - TRUE on success                         *)
+(* ============================================================ *)
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+PARAM hdr      : SaveHdr
+PARAM mkt      : MktState
+PARAM saveOK   : BOOLEAN
+
+hdr.savedPhase := 9
+hdr.savedPlyr  := 0
+RUN saveHdrMktState("SNBSTATE", hdr, mkt, saveOK)
+END
+
+PROCEDURE saveMktToMenu
+(* ============================================================ *)
+(* PROCEDURE : saveMktToMenu                                    *)
+(* PURPOSE   : Save a resumable market checkpoint to SNBGAME,   *)
+(*             then signal the coordinator through SNBSTATE to  *)
+(*             stop and return to the menu.                     *)
+(* PARAMS    : savePhase - checkpoint phase                     *)
+(*             savePlyr  - checkpoint player                    *)
+(*             hdr       - current SaveHdr                      *)
+(*             mkt       - current market state                 *)
+(*             saveOK    - TRUE on success                      *)
+(* ============================================================ *)
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+PARAM savePhase : INTEGER
+PARAM savePlyr  : INTEGER
+PARAM hdr       : SaveHdr
+PARAM mkt       : MktState
+PARAM saveOK    : BOOLEAN
+
+hdr.savedPhase := savePhase
+hdr.savedPlyr  := savePlyr
+RUN saveHdrMktState("SNBSTATE", hdr, mkt, saveOK)
+IF NOT saveOK THEN
+  END
+ENDIF
+RUN copyMktSaveFile("SNBSTATE", "SNBGAME", saveOK)
+IF NOT saveOK THEN
+  END
+ENDIF
+RUN quitMktToMenu(hdr, mkt, saveOK)
+END
+
+PROCEDURE copyMktSaveFile
+(* ============================================================ *)
+(* PROCEDURE : copyMktSaveFile                                  *)
+(* PURPOSE   : Copy one complete save file for market-phase     *)
+(*             save-to-menu without requiring snbPhaseCore.     *)
+(* PARAMS    : srcPath - source filename                        *)
+(*             dstPath - destination filename                   *)
+(*             copyOK  - TRUE on success                        *)
+(* ============================================================ *)
+PARAM srcPath : STRING[20]
+PARAM dstPath : STRING[20]
+PARAM copyOK  : BOOLEAN
+DIM srcPathNo : BYTE
+DIM dstPathNo : BYTE
+DIM srcOpen   : BOOLEAN
+DIM dstOpen   : BOOLEAN
+DIM byt       : BYTE
+
+ON ERROR GOTO 900
+
+srcOpen := FALSE
+dstOpen := FALSE
+copyOK  := FALSE
+
+ON ERROR GOTO 100
+DELETE dstPath
+
+100 ON ERROR GOTO 900
+
+OPEN #srcPathNo, srcPath:READ
+srcOpen := TRUE
+CREATE #dstPathNo, dstPath:WRITE
+dstOpen := TRUE
+
+LOOP
+  EXITIF EOF(#srcPathNo) THEN
+  ENDEXIT
+  GET #srcPathNo, byt
+  PUT #dstPathNo, byt
+ENDLOOP
+
+CLOSE #srcPathNo
+srcOpen := FALSE
+CLOSE #dstPathNo
+dstOpen := FALSE
+copyOK := TRUE
+END
+
+900 IF srcOpen THEN
+      CLOSE #srcPathNo
+    ENDIF
+    IF dstOpen THEN
+      CLOSE #dstPathNo
+    ENDIF
+    PRINT "copyMktSaveFile error ("; ERR; ")"
+    copyOK := FALSE
 END
 
 PROCEDURE doRolls
@@ -597,15 +997,11 @@ PROCEDURE applyMktYear
 (*             stocks for one year (spec Sections 5-7).        *)
 (*             For each stock: looks up market table delta,    *)
 (*             looks up card delta, resolves price/split/flags, *)
-(*             updates mkt, doubles stckShrs on split, and     *)
-(*             surrenders worthless-stock holdings.            *)
+(*             and updates mkt.                                *)
 (*             Populates per-stock output arrays for S13-S15.  *)
 (* PARAMS    : cardId    - drawn card number (1..36)            *)
 (*             rolls     - per-stock 2d6 result (2..12);        *)
 (*                         all 9 slots populated by caller.    *)
-(*             plyrCnt   - number of active players (1..6)      *)
-(*             plyrs     - player records; stckShrs modified    *)
-(*                         on split                             *)
 (*             mkt       - market state; stckPrice and          *)
 (*                         divSuspnd updated in place           *)
 (*             prcBefCrd - prior-year price before this year's  *)
@@ -618,15 +1014,11 @@ PROCEDURE applyMktYear
 (* SIDE EFX  : Repositions DATA pointer (via getMktDelta and   *)
 (*             getCard). Card divBonus NOT applied here.        *)
 (* ============================================================ *)
-! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE CardRec = crdType:INTEGER;efxCnt:INTEGER;efxStk(4):INTEGER;efxDlt(4):INTEGER;divBonus:INTEGER
 PARAM cardId       : INTEGER
 PARAM rolls(9)     : INTEGER
-PARAM plyrCnt      : INTEGER
-PARAM plyrs(6)     : PlyrRec
 PARAM mkt          : MktState
 PARAM prcBefCrd(9) : INTEGER
 PARAM mktDlta(9)   : INTEGER
@@ -636,7 +1028,6 @@ PARAM divSuspd(9)  : BOOLEAN
 PARAM divRnstd(9)  : BOOLEAN
 DIM card   : CardRec
 DIM s      : INTEGER
-DIM p      : INTEGER
 DIM e      : INTEGER
 DIM curPrc : INTEGER
 DIM basePrc: INTEGER
@@ -692,19 +1083,6 @@ FOR s := 1 TO 9
   ! Update market state in place.
   mkt.stckPrice(s) := tmpPrc
   mkt.divSuspnd(s) := dNow
-
-  ! Worthless stock holders surrender certificates for no value.
-  IF tmpPrc = 0 THEN
-    FOR p := 1 TO plyrCnt
-      plyrs(p).stckShrs(s) := 0
-    NEXT p
-
-  ! On split: double all players' shares for this stock.
-  ELSE IF splt THEN
-    FOR p := 1 TO plyrCnt
-      plyrs(p).stckShrs(s) := plyrs(p).stckShrs(s) * 2
-    NEXT p
-  ENDIF \ENDIF
 
 NEXT s
 

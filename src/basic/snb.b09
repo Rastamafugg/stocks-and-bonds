@@ -254,19 +254,11 @@ LOOP
 
     IF NOT gameOver THEN
       IF iSavPh = 0 OR iSavPh = 7 THEN
-        modNam := "snbPhaseCore"
+        modNam := "snbDeckUtil"
         RUN ensureModule(modNam, TRUE, debugLog, ok)
         IF NOT ok THEN
-          PRINT "SNB: failed to ensure snbPhaseCore (snbMarket)"
+          PRINT "SNB: failed to ensure snbDeckUtil (snbMarket)"
           gameOver := TRUE
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbDeckUtil"
-          RUN ensureModule(modNam, TRUE, debugLog, ok)
-          IF NOT ok THEN
-            PRINT "SNB: failed to ensure snbDeckUtil (snbMarket)"
-            gameOver := TRUE
-          ENDIF
         ENDIF
         IF NOT gameOver THEN
           modNam := "snbMarket"
@@ -602,12 +594,6 @@ LOOP
     ENDIF
 
     IF doClsgMkt THEN
-      modNam := "snbPhaseCore"
-      RUN ensureModule(modNam, TRUE, debugLog, ok)
-      IF NOT ok THEN
-        PRINT "SNB: failed to ensure snbPhaseCore (closing snbMarket)"
-        END
-      ENDIF
       modNam := "snbDeckUtil"
       RUN ensureModule(modNam, TRUE, debugLog, ok)
       IF NOT ok THEN
