@@ -17,7 +17,7 @@ TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhCh
 TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
 TYPE DraftOrd = doSeq,doPhase,doPlyr,doType,doAsset,doMode,doStatus,doChk:BYTE;doQty,doPrice,doCashDl,doMgnDl,doResv1,doResv2:INTEGER
 TYPE DraftCtx = dcType,dcAsset,dcAct,dcChk:BYTE
-DIM saveHdr    : SaveHdr
+DIM savHdr     : SaveHdr
 DIM plyr       : PlyrRec
 DIM mkt        : MktState
 DIM dHdr       : DraftHdr
@@ -80,12 +80,12 @@ IF NOT draftOK THEN
   END
 ENDIF
 
-RUN loadHdrMkt("SNBSTATE", saveHdr, mkt, loadOK)
+RUN loadHdrMkt("SNBSTATE", savHdr, mkt, loadOK)
 IF NOT loadOK THEN
   PRINT "snbSellLot: loadHdrMkt failed"
   END
 ENDIF
-RUN loadPlyrRec("SNBSTATE", saveHdr, dHdr.dhPlyr, plyr, loadOK)
+RUN loadPlyrRec("SNBSTATE", savHdr, dHdr.dhPlyr, plyr, loadOK)
 IF NOT loadOK THEN
   PRINT "snbSellLot: loadPlyrRec failed"
   END
