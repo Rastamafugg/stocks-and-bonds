@@ -186,21 +186,24 @@ PARAM mgnRuleVal : INTEGER
 PARAM plyr       : PlyrRec
 PARAM mkt        : MktState
 PARAM action     : INTEGER
-DIM ordTyp(12)   : INTEGER
-DIM ordId(12)    : INTEGER
-DIM ordQty(12)   : INTEGER
-DIM ordPur(12)   : INTEGER
-DIM ordCnt       : INTEGER
-DIM prjMgnBal(9) : INTEGER
+DIM buyStkQty(9) : INTEGER
+DIM buyStkPur(9) : INTEGER
+DIM buyBndQty(3) : INTEGER
+DIM bPar(3)      : INTEGER
 DIM mgnElig      : BOOLEAN
 DIM mgnYrOk      : BOOLEAN
 DIM usrAct       : INTEGER
 DIM s            : INTEGER
+DIM b            : INTEGER
+DIM qty          : INTEGER
+DIM cost         : INTEGER
+DIM cashPay      : INTEGER
+DIM mgnPay       : INTEGER
 
 ON ERROR GOTO 900
 
 action := 1
-ordCnt := 0
+RUN initBondPar(bPar)
 mgnElig := plyr.hadCashPur
 mgnYrOk := FALSE
 IF mgnRuleVal = 1 THEN
@@ -209,11 +212,15 @@ IF mgnRuleVal = 1 THEN
   ENDIF
 ENDIF
 FOR s := 1 TO 9
-  prjMgnBal(s) := plyr.mgnBal(s)
+  buyStkQty(s) := 0
+  buyStkPur(s) := 1
 NEXT s
+FOR b := 1 TO 3
+  buyBndQty(b) := 0
+NEXT b
 
 ! Line exceeds 79 chars; RUN statement cannot be split.
-RUN scrBuy(currYear, plyr, mkt, mgnElig, mgnYrOk, ordTyp, ordId, ordQty, ordPur, ordCnt, prjMgnBal, usrAct)
+RUN scrBuy(currYear, plyr, mkt, mgnElig, mgnYrOk, buyStkQty, buyStkPur, buyBndQty, usrAct)
 IF usrAct = 3 THEN
   action := 3
   END
@@ -222,9 +229,29 @@ ELSE IF usrAct = 4 THEN
   END
 ENDIF \ENDIF
 
-IF ordCnt > 0 THEN
-  RUN applyBuys(plyr, mkt, ordTyp, ordId, ordQty, ordPur, ordCnt)
-ENDIF
+FOR s := 1 TO 9
+  qty := buyStkQty(s)
+  IF qty > 0 THEN
+    cost := qty * mkt.stckPrice(s)
+    IF buyStkPur(s) = 2 THEN
+      cashPay := cost / 2
+      mgnPay  := cost - cashPay
+      plyr.cashBal  := plyr.cashBal - cashPay
+      plyr.mgnBal(s) := plyr.mgnBal(s) + mgnPay
+    ELSE
+      plyr.cashBal    := plyr.cashBal - cost
+      plyr.hadCashPur := TRUE
+    ENDIF
+    plyr.stckShrs(s) := plyr.stckShrs(s) + qty
+  ENDIF
+NEXT s
+FOR b := 1 TO 3
+  qty := buyBndQty(b)
+  IF qty > 0 THEN
+    plyr.cashBal := plyr.cashBal - (qty * bPar(b))
+    plyr.bondUnts(b) := plyr.bondUnts(b) + qty
+  ENDIF
+NEXT b
 plyr.obligation := 0
 action := 1
 END
@@ -246,7 +273,8 @@ PROCEDURE scrBuy
 (*             Stock quantity is entered first, then 1=CASH    *)
 (*             or 2=MARGIN when margin is eligible. Validates  *)
 (*             all orders against simulated cash. Does NOT     *)
-(*             modify plyr; caller applies via applyBuys.      *)
+(*             modify plyr; caller applies staged arrays after *)
+(*             confirm.                                        *)
 (*             Bankrupt stocks (price=0) excluded from display.*)
 (* PARAMS    : currYear   - current year (1..10)               *)
 (*             plyr       - player record (read-only)          *)
@@ -254,12 +282,10 @@ PROCEDURE scrBuy
 (*             mgnElig    - margin purchase eligible           *)
 (*                          (plyr.hadCashPur from caller)      *)
 (*             mgnYrOk    - margin allowed this year           *)
-(*             ordType    - output: 1=STOCK 2=BOND per order   *)
-(*             ordId      - output: asset index per order      *)
-(*             ordQty     - output: quantity per order         *)
-(*             ordPurch   - output: 1=CASH 2=MARGIN per order  *)
-(*             ordCnt     - output: number of orders (0..12)   *)
-(*             prjMgnBal  - IN/OUT projected company margins   *)
+(*             buyStkQty  - IN/OUT staged stock qty per stock  *)
+(*             buyStkPur  - IN/OUT stock purchase mode         *)
+(*                          1=CASH 2=MARGIN by stock id        *)
+(*             buyBndQty  - IN/OUT staged bond qty per bond id *)
 (*             action     - output: 1=CONFIRM 2=PASS           *)
 (*                          3=SAVE+EXIT 4=QUIT                *)
 (* SIDE EFX  : Clears screen. Uses GET and INPUT.              *)
@@ -272,33 +298,25 @@ PARAM plyr          : PlyrRec
 PARAM mkt           : MktState
 PARAM mgnElig       : BOOLEAN
 PARAM mgnYrOk       : BOOLEAN
-PARAM ordType(12)   : INTEGER
-PARAM ordId(12)     : INTEGER
-PARAM ordQty(12)    : INTEGER
-PARAM ordPurch(12)  : INTEGER
-PARAM ordCnt        : INTEGER
-PARAM prjMgnBal(9)  : INTEGER
+PARAM buyStkQty(9)  : INTEGER
+PARAM buyStkPur(9)  : INTEGER
+PARAM buyBndQty(3)  : INTEGER
 PARAM action        : INTEGER
 DIM sNam(9)  : STRING[14]
 DIM bPar(3)  : INTEGER
 DIM simCash  : INTEGER
 DIM simMgn   : INTEGER
-DIM i        : INTEGER
 DIM s        : INTEGER
 DIM b        : INTEGER
 DIM qty      : INTEGER
 DIM purch    : INTEGER
 DIM cashCost : INTEGER
-DIM maxRpy   : INTEGER
 DIM yldPct   : INTEGER
 DIM divVal   : INTEGER
 DIM qIn      : STRING[8]
 DIM pStr     : STRING[8]
 DIM pStr2    : STRING[8]
-DIM pStr3    : STRING[8]
-DIM pStr4    : STRING[8]
 DIM dispNam  : STRING[27]
-DIM infoTxt  : STRING[80]
 DIM valid    : BOOLEAN
 DIM numOk    : BOOLEAN
 DIM canMgn   : BOOLEAN
@@ -308,16 +326,11 @@ DIM aiTierVal: INTEGER
 DIM kIn      : STRING[1]
 DIM sqAct    : INTEGER
 DIM keyCode  : INTEGER
-DIM mapCnt   : INTEGER
-DIM mapType(12): INTEGER
-DIM mapId(12)  : INTEGER
-DIM mapKey(12) : INTEGER
 DIM keyLbl   : STRING[1]
 DIM holdQty  : INTEGER
 DIM totalQty : INTEGER
-DIM slotIdx  : INTEGER
 DIM slotQty  : INTEGER
-DIM selIdx   : INTEGER
+DIM pendCnt  : INTEGER
 DIM baseCash : INTEGER
 DIM baseMgn  : INTEGER
 DIM baseStkMgn : INTEGER
@@ -325,16 +338,18 @@ DIM cost     : INTEGER
 DIM mgnPay   : INTEGER
 DIM currMgnTot : INTEGER
 DIM cnfIn    : STRING[1]
-DIM editTxt  : STRING[48]
 DIM qtyAct   : INTEGER
 DIM maxQty   : INTEGER
 DIM dispCash : INTEGER
-DIM dispMgn  : INTEGER
 DIM divPrj   : INTEGER
 DIM projTxt  : STRING[8]
 DIM mgnTxt   : STRING[7]
 DIM ordTxt   : STRING[24]
-DIM prjRpyTot : INTEGER
+DIM stockCnt : INTEGER
+DIM bondCnt  : INTEGER
+DIM dispIdx  : INTEGER
+DIM selType  : INTEGER
+DIM selId    : INTEGER
 
 ON ERROR GOTO 900
 
@@ -364,30 +379,25 @@ bPar(3) := 10000
 
 ! canMgn: TRUE only when both eligibility conditions met.
 canMgn   := mgnElig AND mgnYrOk
-ordCnt := 0
-FOR i := 1 TO 12
-  ordType(i)  := 0
-  ordId(i)    := 0
-  ordQty(i)   := 0
-  ordPurch(i) := 0
-NEXT i
+FOR s := 1 TO 9
+  buyStkQty(s) := 0
+  buyStkPur(s) := 1
+NEXT s
+FOR b := 1 TO 3
+  buyBndQty(b) := 0
+NEXT b
 
 LOOP
 
-  prjRpyTot := 0
-  FOR s := 1 TO 9
-    IF prjMgnBal(s) < plyr.mgnBal(s) THEN
-      prjRpyTot := prjRpyTot + (plyr.mgnBal(s) - prjMgnBal(s))
-    ENDIF
-  NEXT s
-  simCash := plyr.cashBal - prjRpyTot
+  simCash := plyr.cashBal
   RUN calcMgnTot(plyr, currMgnTot)
-  simMgn  := currMgnTot - prjRpyTot
-  FOR i := 1 TO ordCnt
-    IF ordType(i) = 1 THEN
-      s := ordId(i)
-      cost := ordQty(i) * mkt.stckPrice(s)
-      IF ordPurch(i) = 2 THEN
+  simMgn  := currMgnTot
+  pendCnt := 0
+  FOR s := 1 TO 9
+    IF buyStkQty(s) > 0 THEN
+      pendCnt := pendCnt + 1
+      cost := buyStkQty(s) * mkt.stckPrice(s)
+      IF buyStkPur(s) = 2 THEN
         cashCost := cost / 2
         mgnPay   := cost - cashCost
         simCash  := simCash - cashCost
@@ -395,11 +405,14 @@ LOOP
       ELSE
         simCash := simCash - cost
       ENDIF
-    ELSE
-      b := ordId(i)
-      simCash := simCash - (ordQty(i) * bPar(b))
     ENDIF
-  NEXT i
+  NEXT s
+  FOR b := 1 TO 3
+    IF buyBndQty(b) > 0 THEN
+      pendCnt := pendCnt + 1
+      simCash := simCash - (buyBndQty(b) * bPar(b))
+    ENDIF
+  NEXT b
 
   RUN clrScr
   pTypeVal  := plyr.plyrType
@@ -420,23 +433,27 @@ LOOP
   ENDIF
   PRINT
 
-  mapCnt := 0
-  PRINT "  STOCKS: press 1-9"
+  stockCnt := 0
   FOR s := 1 TO 9
     IF mkt.stckPrice(s) > 0 THEN
-      mapCnt := mapCnt + 1
-      mapType(mapCnt) := 1
-      mapId(mapCnt)   := s
-      mapKey(mapCnt)  := ASC("0") + mapCnt
-      slotQty := 0
-      purch   := 1
-      FOR i := 1 TO ordCnt
-        IF ordType(i) = 1 AND ordId(i) = s THEN
-          slotQty := ordQty(i)
-          purch   := ordPurch(i)
-        ENDIF
-      NEXT i
-      keyLbl := CHR$(mapKey(mapCnt))
+      stockCnt := stockCnt + 1
+    ENDIF
+  NEXT s
+  PRINT "  STOCKS:";
+  IF stockCnt = 1 THEN
+    PRINT " press 1"
+  ELSE IF stockCnt > 1 THEN
+    PRINT " press 1-"; stockCnt
+  ELSE
+    PRINT
+  ENDIF \ENDIF
+  stockCnt := 0
+  FOR s := 1 TO 9
+    IF mkt.stckPrice(s) > 0 THEN
+      stockCnt := stockCnt + 1
+      slotQty := buyStkQty(s)
+      purch   := buyStkPur(s)
+      keyLbl := CHR$(ASC("0") + stockCnt)
       yldPct := divRate(s)
       divVal := (mkt.stckPrice(s) * divRate(s)) / 100
       holdQty := plyr.stckShrs(s)
@@ -476,19 +493,21 @@ LOOP
   NEXT s
 
   PRINT
-  PRINT "  BONDS: press A-C"
+  bondCnt := 0
   FOR b := 1 TO 3
-    mapCnt := mapCnt + 1
-    mapType(mapCnt) := 2
-    mapId(mapCnt)   := b
-    mapKey(mapCnt)  := ASC("A") + b - 1
-    slotQty := 0
-    FOR i := 1 TO ordCnt
-      IF ordType(i) = 2 AND ordId(i) = b THEN
-        slotQty := ordQty(i)
-      ENDIF
-    NEXT i
-    keyLbl := CHR$(mapKey(mapCnt))
+    bondCnt := bondCnt + 1
+  NEXT b
+  PRINT "  BONDS:";
+  IF bondCnt = 1 THEN
+    PRINT " press A"
+  ELSE IF bondCnt > 1 THEN
+    PRINT " press A-"; CHR$(ASC("A") + bondCnt - 1)
+  ELSE
+    PRINT
+  ENDIF \ENDIF
+  FOR b := 1 TO 3
+    slotQty := buyBndQty(b)
+    keyLbl := CHR$(ASC("A") + b - 1)
     IF b = 1 THEN
       divVal := 50
     ELSE IF b = 2 THEN
@@ -510,7 +529,7 @@ LOOP
   NEXT b
 
   PRINT
-  IF ordCnt > 0 THEN
+  IF pendCnt > 0 THEN
     IF mgnYrOk AND currMgnTot > 0 THEN
       PRINT "  Enter=confirm orders  P=pass  S=save+exit  Q=quit"
     ELSE
@@ -528,17 +547,23 @@ LOOP
 
   RUN getSaveQuitAct(kIn, sqAct)
   IF sqAct = 3 THEN
-    ordCnt   := 0
     FOR s := 1 TO 9
-      prjMgnBal(s) := plyr.mgnBal(s)
+      buyStkQty(s) := 0
+      buyStkPur(s) := 1
     NEXT s
+    FOR b := 1 TO 3
+      buyBndQty(b) := 0
+    NEXT b
     action   := 3
     END
   ELSE IF sqAct = 4 THEN
-    ordCnt   := 0
     FOR s := 1 TO 9
-      prjMgnBal(s) := plyr.mgnBal(s)
+      buyStkQty(s) := 0
+      buyStkPur(s) := 1
     NEXT s
+    FOR b := 1 TO 3
+      buyBndQty(b) := 0
+    NEXT b
     action   := 4
     END
   ENDIF \ENDIF
@@ -553,15 +578,18 @@ LOOP
   ENDIF
 
   IF keyCode = ASC("P") THEN
-    IF ordCnt > 0 THEN
+    IF pendCnt > 0 THEN
       PRINT "Pending orders will be discarded. Press Y to pass."
       GET #0, cnfIn
       PRINT
       IF cnfIn = "Y" OR cnfIn = "y" THEN
-        ordCnt   := 0
         FOR s := 1 TO 9
-          prjMgnBal(s) := plyr.mgnBal(s)
+          buyStkQty(s) := 0
+          buyStkPur(s) := 1
         NEXT s
+        FOR b := 1 TO 3
+          buyBndQty(b) := 0
+        NEXT b
         action   := 2
         END
       ENDIF
@@ -570,99 +598,110 @@ LOOP
       END
     ENDIF
   ELSE IF keyCode = 13 THEN
-    IF ordCnt > 0 THEN
+    IF pendCnt > 0 THEN
       action := 1
       END
     ENDIF
   ELSE
-    selIdx := 0
-    FOR i := 1 TO mapCnt
-      IF mapKey(i) = keyCode THEN
-        selIdx := i
-      ENDIF
-    NEXT i
-
-    IF selIdx > 0 THEN
-      s := mapId(selIdx)
-      b := mapId(selIdx)
-      slotIdx := 0
-      FOR i := 1 TO ordCnt
-        IF ordType(i) = mapType(selIdx) AND ordId(i) = mapId(selIdx) THEN
-          slotIdx := i
+    selType := 0
+    selId   := 0
+    dispIdx := 0
+    FOR s := 1 TO 9
+      IF selType = 0 THEN
+        IF mkt.stckPrice(s) > 0 THEN
+          dispIdx := dispIdx + 1
+          IF keyCode = ASC("0") + dispIdx THEN
+            selType := 1
+            selId   := s
+          ENDIF
         ENDIF
-      NEXT i
+      ENDIF
+    NEXT s
+    dispIdx := 0
+    FOR b := 1 TO 3
+      IF selType = 0 THEN
+        dispIdx := dispIdx + 1
+        IF keyCode = ASC("A") + dispIdx - 1 THEN
+          selType := 2
+          selId   := b
+        ENDIF
+      ENDIF
+    NEXT b
 
+    IF selType > 0 THEN
       baseCash := simCash
       baseMgn  := simMgn
-      baseStkMgn := prjMgnBal(s)
-      IF slotIdx > 0 THEN
-        IF ordType(slotIdx) = 1 THEN
-          cost := ordQty(slotIdx) * mkt.stckPrice(ordId(slotIdx))
-          IF ordPurch(slotIdx) = 2 THEN
-            cashCost := cost / 2
-            mgnPay   := cost - cashCost
-            baseCash := baseCash + cashCost
-            baseMgn  := baseMgn - mgnPay
-            baseStkMgn := baseStkMgn - mgnPay
-          ELSE
-            baseCash := baseCash + cost
-          ENDIF
-        ELSE
-          baseCash := baseCash + (ordQty(slotIdx) * bPar(ordId(slotIdx)))
-        ENDIF
+      baseStkMgn := 0
+      IF selType = 1 THEN
+        baseStkMgn := plyr.mgnBal(selId)
       ENDIF
+      FOR s := 1 TO 9
+        IF selType <> 1 OR s <> selId THEN
+          IF buyStkQty(s) > 0 THEN
+            cost := buyStkQty(s) * mkt.stckPrice(s)
+            IF buyStkPur(s) = 2 THEN
+              cashCost := cost / 2
+              mgnPay   := cost - cashCost
+              baseCash := baseCash - cashCost
+              baseMgn  := baseMgn + mgnPay
+            ELSE
+              baseCash := baseCash - cost
+            ENDIF
+          ENDIF
+        ENDIF
+      NEXT s
+      FOR b := 1 TO 3
+        IF selType <> 2 OR b <> selId THEN
+          IF buyBndQty(b) > 0 THEN
+            baseCash := baseCash - (buyBndQty(b) * bPar(b))
+          ENDIF
+        ENDIF
+      NEXT b
 
       valid := FALSE
       WHILE NOT valid DO
-        IF mapType(selIdx) = 1 THEN
+        s := selId
+        b := selId
+        IF selType = 1 THEN
           RUN fmtMoney(mkt.stckPrice(s), pStr)
-          editTxt := "  " + sNam(s) + " @ $" + pStr
-          purch := 1
-          qty := 0
-          IF slotIdx > 0 THEN
-            qty := ordQty(slotIdx)
-            IF ordPurch(slotIdx) = 2 THEN
-              purch := 2
-            ELSE
-              purch := 1
-            ENDIF
-          ENDIF
+          purch := buyStkPur(s)
+          qty := buyStkQty(s)
           maxQty := 32760 / mkt.stckPrice(s)
           maxQty := (maxQty / 10) * 10
           dispCash := baseCash
-          dispMgn  := baseMgn
           IF qty > 0 THEN
             cost := qty * mkt.stckPrice(s)
             IF purch = 2 THEN
               cashCost := cost / 2
               mgnPay   := cost - cashCost
               dispCash := dispCash - cashCost
-              dispMgn  := dispMgn + mgnPay
             ELSE
               dispCash := dispCash - cost
             ENDIF
           ENDIF
           RUN fmtMoney(baseCash, pStr)
           RUN fmtMoney(dispCash, pStr2)
-          RUN fmtMoney(baseMgn, pStr3)
-          RUN fmtMoney(dispMgn, pStr4)
-          infoTxt := "  Cash: $" + pStr + " [$" + pStr2 + "]"
-          infoTxt := infoTxt + "  Margin: $" + pStr3 + " [$" + pStr4 + "]"
           qtyAct := 1
           ! Line exceeds 79 chars; getLotQty call requires full arguments.
           RUN getLotQty("=== BUY QUANTITY ===", sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), qty, purch, canMgn, maxQty, baseCash, baseMgn, baseStkMgn, 1, qtyAct) \ ! allowNav=1
           IF qtyAct = 3 THEN
-            ordCnt   := 0
             FOR s := 1 TO 9
-              prjMgnBal(s) := plyr.mgnBal(s)
+              buyStkQty(s) := 0
+              buyStkPur(s) := 1
             NEXT s
+            FOR b := 1 TO 3
+              buyBndQty(b) := 0
+            NEXT b
             action   := 3
             END
           ELSE IF qtyAct = 4 THEN
-            ordCnt   := 0
             FOR s := 1 TO 9
-              prjMgnBal(s) := plyr.mgnBal(s)
+              buyStkQty(s) := 0
+              buyStkPur(s) := 1
             NEXT s
+            FOR b := 1 TO 3
+              buyBndQty(b) := 0
+            NEXT b
             action   := 4
             END
           ENDIF \ENDIF
@@ -693,17 +732,23 @@ LOOP
           ELSE
             RUN getSaveQuitAct(qIn, sqAct)
             IF sqAct = 3 THEN
-              ordCnt   := 0
               FOR s := 1 TO 9
-                prjMgnBal(s) := plyr.mgnBal(s)
+                buyStkQty(s) := 0
+                buyStkPur(s) := 1
               NEXT s
+              FOR b := 1 TO 3
+                buyBndQty(b) := 0
+              NEXT b
               action   := 3
               END
             ELSE IF sqAct = 4 THEN
-              ordCnt   := 0
               FOR s := 1 TO 9
-                prjMgnBal(s) := plyr.mgnBal(s)
+                buyStkQty(s) := 0
+                buyStkPur(s) := 1
               NEXT s
+              FOR b := 1 TO 3
+                buyBndQty(b) := 0
+              NEXT b
               action   := 4
               END
             ELSE
@@ -729,31 +774,22 @@ LOOP
       ENDWHILE
 
       IF qty = 0 THEN
-        IF slotIdx > 0 THEN
-          FOR i := slotIdx TO ordCnt - 1
-            ordType(i)  := ordType(i + 1)
-            ordId(i)    := ordId(i + 1)
-            ordQty(i)   := ordQty(i + 1)
-            ordPurch(i) := ordPurch(i + 1)
-          NEXT i
-          ordType(ordCnt)  := 0
-          ordId(ordCnt)    := 0
-          ordQty(ordCnt)   := 0
-          ordPurch(ordCnt) := 0
-          ordCnt := ordCnt - 1
+        IF selType = 1 THEN
+          buyStkQty(selId) := 0
+          buyStkPur(selId) := 1
+        ELSE
+          buyBndQty(selId) := 0
         ENDIF
       ELSE
-        IF slotIdx = 0 THEN
-          ordCnt := ordCnt + 1
-          slotIdx := ordCnt
-        ENDIF
-        ordType(slotIdx)  := mapType(selIdx)
-        ordId(slotIdx)    := mapId(selIdx)
-        ordQty(slotIdx)   := qty
-        IF purch = 2 THEN
-          ordPurch(slotIdx) := 2
+        IF selType = 1 THEN
+          buyStkQty(selId) := qty
+          IF purch = 2 THEN
+            buyStkPur(selId) := 2
+          ELSE
+            buyStkPur(selId) := 1
+          ENDIF
         ELSE
-          ordPurch(slotIdx) := 1
+          buyBndQty(selId) := qty
         ENDIF
       ENDIF
     ENDIF
