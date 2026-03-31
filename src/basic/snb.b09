@@ -90,9 +90,18 @@ ON ERROR GOTO 900
 
 debugLog := FALSE
 
+! Bootstrap snbForkUtil into the current process so shared
+! child-process helpers are available to SNB.
+modNam := "snbForkUtil"
+RUN ensureModuleLib(modNam, FALSE, debugLog, ok)
+IF NOT ok THEN
+  PRINT "SNB: failed to load snbForkUtil"
+  END
+ENDIF
+
 ! Load snbPhaseCore as permanent resident for SNB's lifetime.
 modNam := "snbPhaseCore"
-RUN ensureModule(modNam, FALSE, debugLog, ok)
+RUN ensureModuleLib(modNam, FALSE, debugLog, ok)
 IF NOT ok THEN
   PRINT "SNB: failed to load snbPhaseCore"
   END
@@ -122,19 +131,19 @@ LOOP
     ! directory before forking. forChild=TRUE uses F$NMLink /
     ! F$NMLoad.
     modNam := "snbPhaseCore"
-    RUN ensureModule(modNam, TRUE, debugLog, ok)
+RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
     IF NOT ok THEN
       PRINT "SNB: failed to ensure snbPhaseCore for snbSetup"
       END
     ENDIF
     modNam := "snbDeckUtil"
-    RUN ensureModule(modNam, TRUE, debugLog, ok)
+    RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
     IF NOT ok THEN
       PRINT "SNB: failed to ensure snbDeckUtil for snbSetup"
       END
     ENDIF
     modNam := "snbMenuUtil"
-    RUN ensureModule(modNam, TRUE, debugLog, ok)
+    RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
     IF NOT ok THEN
       PRINT "SNB: failed to ensure snbMenuUtil for snbSetup"
       END
@@ -146,7 +155,7 @@ LOOP
       END
     ENDIF
 
-    RUN forkPhase("snbSetup", debugLog, exitStat)
+RUN forkPhaseLib("snbSetup", debugLog, exitStat)
     IF exitStat <> 0 THEN
       PRINT "SNB: snbSetup failed exitStat="; exitStat
       END
@@ -309,7 +318,7 @@ LOOP
         ENDIF
         IF NOT gameOver THEN
           modNam := "snbSellMargin"
-          RUN ensureModule(modNam, TRUE, debugLog, ok)
+          RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
           IF NOT ok THEN
             PRINT "SNB: failed to ensure snbSellMargin (snbSell)"
             gameOver := TRUE
@@ -355,11 +364,27 @@ LOOP
               modNam := "snbSellAI"
             ENDIF
           ELSE
+            modNam := "snbForkUtil"
+            RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+            IF NOT ok THEN
+              PRINT "SNB: failed to ensure snbForkUtil (snbSell)"
+              gameOver := TRUE
+            ENDIF
+            IF NOT gameOver THEN
+              modNam := "snbSellLot"
+              RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+              IF NOT ok THEN
+                PRINT "SNB: failed to ensure snbSellLot (snbSell)"
+                gameOver := TRUE
+              ENDIF
+            ENDIF
+            IF NOT gameOver THEN
             modNam := "snbTradeHumanUI"
-            RUN ensureModule(modNam, TRUE, debugLog, ok)
+            RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
             IF NOT ok THEN
               PRINT "SNB: failed to ensure snbTradeHumanUI (snbSell)"
               gameOver := TRUE
+            ENDIF
             ENDIF
             IF NOT gameOver THEN
               modNam := "snbSell"
@@ -367,14 +392,14 @@ LOOP
           ENDIF \ENDIF
         ENDIF
         IF NOT gameOver THEN
-          RUN ensureModule(modNam, TRUE, debugLog, ok)
+          RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
           IF NOT ok THEN
             PRINT "SNB: failed to ensure "; modNam
             gameOver := TRUE
           ENDIF
         ENDIF
         IF NOT gameOver THEN
-          RUN forkPhase(modNam, debugLog, exitStat)
+          RUN forkPhaseLib(modNam, debugLog, exitStat)
           GOSUB 100
         ENDIF
       ENDIF
@@ -644,7 +669,7 @@ LOOP
     ENDIF
 
     modNam := "snbPhaseCore"
-    RUN ensureModule(modNam, TRUE, debugLog, ok)
+    RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
     IF NOT ok THEN
       PRINT "SNB: failed to ensure snbPhaseCore for snbEndGame"
       END

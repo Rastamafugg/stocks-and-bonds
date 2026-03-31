@@ -1,0 +1,738 @@
+PROCEDURE snbSellLot
+(* ============================================================ *)
+(* PROCEDURE : snbSellLot                                       *)
+(* PURPOSE   : Child sell-asset quantity editor. Loads the      *)
+(*             selected asset context from SNBDRFTH, reads the  *)
+(*             active player from SNBSTATE, runs the stock or   *)
+(*             bond quantity editor, and updates only the       *)
+(*             draft files.                                     *)
+(* PARAMS    : None                                             *)
+(* NOTE      : snbStateIO, snbTradeShared, snbGameData,         *)
+(*             snbTradeHumanUI, and snbSellLot must be loaded.  *)
+(* ============================================================ *)
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
+TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
+TYPE DraftOrd = doSeq,doPhase,doPlyr,doType,doAsset,doMode,doStatus,doChk:BYTE;doQty,doPrice,doCashDl,doMgnDl,doResv1,doResv2:INTEGER
+TYPE DraftCtx = dcType,dcAsset,dcAct,dcChk:BYTE
+DIM saveHdr    : SaveHdr
+DIM plyr       : PlyrRec
+DIM mkt        : MktState
+DIM dHdr       : DraftHdr
+DIM dSum       : DraftSum
+DIM dOrd       : DraftOrd
+DIM dCtx       : DraftCtx
+DIM bPar(3)    : INTEGER
+DIM loadOK     : BOOLEAN
+DIM draftOK    : BOOLEAN
+DIM dFound     : BOOLEAN
+DIM stockNm    : STRING[14]
+DIM pStr       : STRING[8]
+DIM qIn        : STRING[8]
+DIM baseCash   : INTEGER
+DIM currMgnTot : INTEGER
+DIM baseMgn    : INTEGER
+DIM baseStkMgn : INTEGER
+DIM editQty    : INTEGER
+DIM ordModeVal : INTEGER
+DIM sqAct      : INTEGER
+DIM numOk      : BOOLEAN
+DIM valid      : BOOLEAN
+
+ON ERROR GOTO 900
+
+RUN loadDraftHdr("SNBDRFTH", dHdr, draftOK)
+IF NOT draftOK THEN
+  PRINT "snbSellLot: loadDraftHdr failed"
+  END
+ENDIF
+RUN loadDraftSum("SNBDRFTH", dSum, draftOK)
+IF NOT draftOK THEN
+  PRINT "snbSellLot: loadDraftSum failed"
+  END
+ENDIF
+RUN loadDraftCtx("SNBDRFTH", dCtx, draftOK)
+IF NOT draftOK THEN
+  PRINT "snbSellLot: loadDraftCtx failed"
+  END
+ENDIF
+IF dCtx.dcType < 1 OR dCtx.dcType > 2 THEN
+  PRINT "snbSellLot: invalid asset type"
+  END
+ENDIF
+IF dCtx.dcType = 1 THEN
+  IF dCtx.dcAsset < 1 OR dCtx.dcAsset > 9 THEN
+    PRINT "snbSellLot: invalid stock context"
+    END
+  ENDIF
+ELSE
+  IF dCtx.dcAsset < 1 OR dCtx.dcAsset > 3 THEN
+    PRINT "snbSellLot: invalid bond context"
+    END
+  ENDIF
+ENDIF
+dCtx.dcAct := 0
+RUN saveDraftCtx("SNBDRFTH", dCtx, draftOK)
+IF NOT draftOK THEN
+  PRINT "snbSellLot: saveDraftCtx failed"
+  END
+ENDIF
+
+RUN loadHdrMkt("SNBSTATE", saveHdr, mkt, loadOK)
+IF NOT loadOK THEN
+  PRINT "snbSellLot: loadHdrMkt failed"
+  END
+ENDIF
+RUN loadPlyrRec("SNBSTATE", saveHdr, dHdr.dhPlyr, plyr, loadOK)
+IF NOT loadOK THEN
+  PRINT "snbSellLot: loadPlyrRec failed"
+  END
+ENDIF
+RUN findSellDraftOrd("SNBDRFTD", dHdr, dCtx.dcType, dCtx.dcAsset, dOrd, dFound, draftOK)
+IF NOT draftOK THEN
+  PRINT "snbSellLot: findSellDraftOrd failed"
+  END
+ENDIF
+
+RUN calcMgnTot(plyr, currMgnTot)
+baseCash := plyr.cashBal + dSum.dsCashDl
+baseMgn := currMgnTot + dSum.dsMgnDl
+baseStkMgn := -1
+editQty := 0
+IF dFound THEN
+  baseCash := baseCash - dOrd.doCashDl
+  baseMgn := baseMgn - dOrd.doMgnDl
+  editQty := dOrd.doQty
+ENDIF
+IF dCtx.dcType = 1 THEN
+  RUN getStockName(dCtx.dcAsset, stockNm)
+  baseStkMgn := plyr.mgnBal(dCtx.dcAsset) + dSum.dsStkMgn(dCtx.dcAsset)
+  IF dFound THEN
+    baseStkMgn := baseStkMgn - dOrd.doMgnDl
+  ENDIF
+  ordModeVal := 0
+  IF plyr.mgnBal(dCtx.dcAsset) > 0 THEN
+    ordModeVal := 2
+  ENDIF
+  sqAct := 0
+  RUN getLotQty("=== SELL QUANTITY ===", stockNm, plyr.stckShrs(dCtx.dcAsset), mkt.stckPrice(dCtx.dcAsset), editQty, ordModeVal, 0, plyr.stckShrs(dCtx.dcAsset), baseCash, baseMgn, baseStkMgn, 1, sqAct)
+ELSE
+  RUN initBondPar(bPar)
+  sqAct := 0
+  valid := FALSE
+  WHILE NOT valid DO
+    RUN fmtMoney(bPar(dCtx.dcAsset), pStr)
+    PRINT "$"; pStr; " bond  "; plyr.bondUnts(dCtx.dcAsset); " unit(s) held"
+    INPUT "  Sell units (0/Enter=clear): ", qIn
+    IF qIn = "" THEN
+      editQty := 0
+      valid := TRUE
+    ELSE
+      IF qIn = "S" OR qIn = "s" THEN
+        sqAct := 3
+      ELSE IF qIn = "Q" OR qIn = "q" THEN
+        sqAct := 4
+      ENDIF \ENDIF
+      IF sqAct = 3 OR sqAct = 4 THEN
+        valid := TRUE
+      ELSE
+        RUN getNumIn(qIn, editQty, numOk)
+        IF NOT numOk THEN
+          PRINT "  Invalid: enter a number."
+        ELSE IF editQty < 0 THEN
+          PRINT "  Invalid: enter 0 or a positive amount."
+        ELSE IF editQty > plyr.bondUnts(dCtx.dcAsset) THEN
+          PRINT "  Invalid: you hold only ";
+          PRINT plyr.bondUnts(dCtx.dcAsset); " unit(s)."
+        ELSE
+          valid := TRUE
+        ENDIF \ENDIF \ENDIF
+      ENDIF
+    ENDIF
+  ENDWHILE
+ENDIF
+
+IF sqAct = 3 OR sqAct = 4 THEN
+  dCtx.dcAct := sqAct
+  RUN saveDraftCtx("SNBDRFTH", dCtx, draftOK)
+  IF NOT draftOK THEN
+    PRINT "snbSellLot: saveDraftCtx failed"
+  ENDIF
+  END
+ENDIF
+
+RUN loadDraftHdr("SNBDRFTH", dHdr, draftOK)
+IF NOT draftOK THEN
+  PRINT "snbSellLot: loadDraftHdr failed"
+  END
+ENDIF
+RUN setSellDraftOrd("SNBDRFTH", "SNBDRFTD", dHdr, dCtx.dcType, dCtx.dcAsset, editQty, plyr, mkt, draftOK)
+IF NOT draftOK THEN
+  PRINT "snbSellLot: setSellDraftOrd failed"
+  END
+ENDIF
+END
+
+900 PRINT "snbSellLot error ("; ERR; ")"
+END
+
+PROCEDURE loadDraftHdr
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
+PARAM hdrPath : STRING[20]
+PARAM hdr     : DraftHdr
+PARAM ok      : BOOLEAN
+DIM path      : BYTE
+DIM pathOpen  : BOOLEAN
+DIM chkExp    : INTEGER
+
+ON ERROR GOTO 900
+pathOpen := FALSE
+ok := FALSE
+OPEN #path, hdrPath:READ
+pathOpen := TRUE
+GET #path, hdr
+IF hdr.dhMagic <> $44 THEN
+  END
+ENDIF
+chkExp := hdr.dhMagic + hdr.dhFmtVer + hdr.dhPhase
+chkExp := chkExp + hdr.dhPlyr + hdr.dhStatus + hdr.dhRecCnt
+chkExp := chkExp + hdr.dhNextSeq + hdr.dhYear + hdr.dhMaxYr
+chkExp := LAND(chkExp, 255)
+IF chkExp <> hdr.dhChk THEN
+  END
+ENDIF
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    ok := FALSE
+END
+
+PROCEDURE saveDraftHdr
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
+PARAM hdrPath : STRING[20]
+PARAM hdr     : DraftHdr
+PARAM ok      : BOOLEAN
+DIM path      : BYTE
+DIM pathOpen  : BOOLEAN
+DIM chkSum    : INTEGER
+
+ON ERROR GOTO 900
+pathOpen := FALSE
+ok := FALSE
+chkSum := hdr.dhMagic + hdr.dhFmtVer + hdr.dhPhase
+chkSum := chkSum + hdr.dhPlyr + hdr.dhStatus + hdr.dhRecCnt
+chkSum := chkSum + hdr.dhNextSeq + hdr.dhYear + hdr.dhMaxYr
+hdr.dhChk := LAND(chkSum, 255)
+OPEN #path, hdrPath:UPDATE
+pathOpen := TRUE
+SEEK #path, 0
+PUT #path, hdr
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    ok := FALSE
+END
+
+PROCEDURE loadDraftSum
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
+TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
+PARAM hdrPath : STRING[20]
+PARAM sum     : DraftSum
+PARAM ok      : BOOLEAN
+DIM hdrStub   : DraftHdr
+DIM path      : BYTE
+DIM pathOpen  : BOOLEAN
+DIM seekPos   : INTEGER
+DIM chkExp    : INTEGER
+DIM s         : INTEGER
+DIM b         : INTEGER
+
+ON ERROR GOTO 900
+pathOpen := FALSE
+ok := FALSE
+seekPos := SIZE(hdrStub)
+OPEN #path, hdrPath:READ
+pathOpen := TRUE
+SEEK #path, seekPos
+GET #path, sum
+chkExp := sum.dsPhase + sum.dsPlyr + sum.dsHas
+chkExp := chkExp + sum.dsActCnt + sum.dsCashDl
+chkExp := chkExp + sum.dsMgnDl + sum.dsRepay
+FOR s := 1 TO 9
+  chkExp := chkExp + sum.dsStkQty(s) + sum.dsStkMgn(s)
+NEXT s
+FOR b := 1 TO 3
+  chkExp := chkExp + sum.dsBndQty(b)
+NEXT b
+chkExp := LAND(chkExp, 255)
+IF chkExp <> sum.dsChk THEN
+  END
+ENDIF
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    ok := FALSE
+END
+
+PROCEDURE saveDraftSum
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
+TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
+PARAM hdrPath : STRING[20]
+PARAM sum     : DraftSum
+PARAM ok      : BOOLEAN
+DIM hdrStub   : DraftHdr
+DIM path      : BYTE
+DIM pathOpen  : BOOLEAN
+DIM seekPos   : INTEGER
+DIM chkSum    : INTEGER
+DIM s         : INTEGER
+DIM b         : INTEGER
+
+ON ERROR GOTO 900
+pathOpen := FALSE
+ok := FALSE
+seekPos := SIZE(hdrStub)
+chkSum := sum.dsPhase + sum.dsPlyr + sum.dsHas
+chkSum := chkSum + sum.dsActCnt + sum.dsCashDl
+chkSum := chkSum + sum.dsMgnDl + sum.dsRepay
+FOR s := 1 TO 9
+  chkSum := chkSum + sum.dsStkQty(s) + sum.dsStkMgn(s)
+NEXT s
+FOR b := 1 TO 3
+  chkSum := chkSum + sum.dsBndQty(b)
+NEXT b
+sum.dsChk := LAND(chkSum, 255)
+OPEN #path, hdrPath:UPDATE
+pathOpen := TRUE
+SEEK #path, seekPos
+PUT #path, sum
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    ok := FALSE
+END
+
+PROCEDURE loadDraftCtx
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
+TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
+TYPE DraftCtx = dcType,dcAsset,dcAct,dcChk:BYTE
+PARAM hdrPath : STRING[20]
+PARAM ctx     : DraftCtx
+PARAM ok      : BOOLEAN
+DIM hdrStub   : DraftHdr
+DIM sumStub   : DraftSum
+DIM path      : BYTE
+DIM pathOpen  : BOOLEAN
+DIM seekPos   : INTEGER
+
+ON ERROR GOTO 900
+pathOpen := FALSE
+ok := FALSE
+seekPos := SIZE(hdrStub) + SIZE(sumStub)
+OPEN #path, hdrPath:READ
+pathOpen := TRUE
+SEEK #path, seekPos
+GET #path, ctx
+IF LAND(ctx.dcType + ctx.dcAsset + ctx.dcAct, 255) <> ctx.dcChk THEN
+  END
+ENDIF
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    ok := FALSE
+END
+
+PROCEDURE saveDraftCtx
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
+TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
+TYPE DraftCtx = dcType,dcAsset,dcAct,dcChk:BYTE
+PARAM hdrPath : STRING[20]
+PARAM ctx     : DraftCtx
+PARAM ok      : BOOLEAN
+DIM hdrStub   : DraftHdr
+DIM sumStub   : DraftSum
+DIM path      : BYTE
+DIM pathOpen  : BOOLEAN
+DIM seekPos   : INTEGER
+
+ON ERROR GOTO 900
+pathOpen := FALSE
+ok := FALSE
+seekPos := SIZE(hdrStub) + SIZE(sumStub)
+ctx.dcChk := LAND(ctx.dcType + ctx.dcAsset + ctx.dcAct, 255)
+OPEN #path, hdrPath:UPDATE
+pathOpen := TRUE
+SEEK #path, seekPos
+PUT #path, ctx
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    ok := FALSE
+END
+
+PROCEDURE loadDraftOrd
+TYPE DraftOrd = doSeq,doPhase,doPlyr,doType,doAsset,doMode,doStatus,doChk:BYTE;doQty,doPrice,doCashDl,doMgnDl,doResv1,doResv2:INTEGER
+PARAM ordPath : STRING[20]
+PARAM recIdx  : INTEGER
+PARAM ord     : DraftOrd
+PARAM ok      : BOOLEAN
+DIM path      : BYTE
+DIM pathOpen  : BOOLEAN
+DIM seekPos   : INTEGER
+DIM chkExp    : INTEGER
+
+ON ERROR GOTO 900
+pathOpen := FALSE
+ok := FALSE
+seekPos := (recIdx - 1) * SIZE(ord)
+OPEN #path, ordPath:READ
+pathOpen := TRUE
+SEEK #path, seekPos
+GET #path, ord
+chkExp := ord.doSeq + ord.doPhase + ord.doPlyr + ord.doType
+chkExp := chkExp + ord.doAsset + ord.doMode + ord.doStatus
+chkExp := chkExp + ord.doQty + ord.doPrice
+chkExp := chkExp + ord.doCashDl + ord.doMgnDl
+chkExp := chkExp + ord.doResv1 + ord.doResv2
+chkExp := LAND(chkExp, 255)
+IF chkExp <> ord.doChk THEN
+  END
+ENDIF
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    ok := FALSE
+END
+
+PROCEDURE saveDraftOrd
+TYPE DraftOrd = doSeq,doPhase,doPlyr,doType,doAsset,doMode,doStatus,doChk:BYTE;doQty,doPrice,doCashDl,doMgnDl,doResv1,doResv2:INTEGER
+PARAM ordPath : STRING[20]
+PARAM recIdx  : INTEGER
+PARAM ord     : DraftOrd
+PARAM ok      : BOOLEAN
+DIM path      : BYTE
+DIM pathOpen  : BOOLEAN
+DIM seekPos   : INTEGER
+DIM chkSum    : INTEGER
+
+ON ERROR GOTO 900
+pathOpen := FALSE
+ok := FALSE
+chkSum := ord.doSeq + ord.doPhase + ord.doPlyr + ord.doType
+chkSum := chkSum + ord.doAsset + ord.doMode + ord.doStatus
+chkSum := chkSum + ord.doQty + ord.doPrice
+chkSum := chkSum + ord.doCashDl + ord.doMgnDl
+chkSum := chkSum + ord.doResv1 + ord.doResv2
+ord.doChk := LAND(chkSum, 255)
+seekPos := (recIdx - 1) * SIZE(ord)
+OPEN #path, ordPath:UPDATE
+pathOpen := TRUE
+SEEK #path, seekPos
+PUT #path, ord
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    ok := FALSE
+END
+
+PROCEDURE appendDraftOrd
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
+TYPE DraftOrd = doSeq,doPhase,doPlyr,doType,doAsset,doMode,doStatus,doChk:BYTE;doQty,doPrice,doCashDl,doMgnDl,doResv1,doResv2:INTEGER
+PARAM hdrPath : STRING[20]
+PARAM ordPath : STRING[20]
+PARAM hdr     : DraftHdr
+PARAM ord     : DraftOrd
+PARAM ok      : BOOLEAN
+DIM recIdx    : INTEGER
+
+ON ERROR GOTO 900
+ok := FALSE
+ord.doSeq := hdr.dhNextSeq
+ord.doPhase := hdr.dhPhase
+ord.doPlyr := hdr.dhPlyr
+ord.doStatus := 1
+recIdx := hdr.dhRecCnt + 1
+RUN saveDraftOrd(ordPath, recIdx, ord, ok)
+IF NOT ok THEN
+  END
+ENDIF
+hdr.dhRecCnt := hdr.dhRecCnt + 1
+hdr.dhNextSeq := hdr.dhNextSeq + 1
+RUN saveDraftHdr(hdrPath, hdr, ok)
+END
+900 ok := FALSE
+END
+
+PROCEDURE findSellDraftOrd
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
+TYPE DraftOrd = doSeq,doPhase,doPlyr,doType,doAsset,doMode,doStatus,doChk:BYTE;doQty,doPrice,doCashDl,doMgnDl,doResv1,doResv2:INTEGER
+PARAM ordPath   : STRING[20]
+PARAM hdr       : DraftHdr
+PARAM wantType  : INTEGER
+PARAM wantId    : INTEGER
+PARAM ord       : DraftOrd
+PARAM found     : BOOLEAN
+PARAM ok        : BOOLEAN
+DIM recIdx      : INTEGER
+DIM loadOK      : BOOLEAN
+
+ON ERROR GOTO 900
+found := FALSE
+ok := FALSE
+FOR recIdx := 1 TO hdr.dhRecCnt
+  RUN loadDraftOrd(ordPath, recIdx, ord, loadOK)
+  IF NOT loadOK THEN
+    END
+  ENDIF
+  IF ord.doStatus = 1 THEN
+    IF ord.doType = wantType THEN
+      IF ord.doAsset = wantId THEN
+        found := TRUE
+      ENDIF
+    ENDIF
+  ENDIF
+NEXT recIdx
+ok := TRUE
+END
+900 ok := FALSE
+END
+
+PROCEDURE supersedeDraftOrd
+TYPE DraftOrd = doSeq,doPhase,doPlyr,doType,doAsset,doMode,doStatus,doChk:BYTE;doQty,doPrice,doCashDl,doMgnDl,doResv1,doResv2:INTEGER
+PARAM ordPath : STRING[20]
+PARAM recIdx  : INTEGER
+PARAM ok      : BOOLEAN
+DIM ord       : DraftOrd
+DIM loadOK    : BOOLEAN
+
+ON ERROR GOTO 900
+RUN loadDraftOrd(ordPath, recIdx, ord, loadOK)
+IF NOT loadOK THEN
+  ok := FALSE
+  END
+ENDIF
+ord.doStatus := 2
+RUN saveDraftOrd(ordPath, recIdx, ord, ok)
+END
+900 ok := FALSE
+END
+
+PROCEDURE buildSellDraftOrd
+TYPE DraftOrd = doSeq,doPhase,doPlyr,doType,doAsset,doMode,doStatus,doChk:BYTE;doQty,doPrice,doCashDl,doMgnDl,doResv1,doResv2:INTEGER
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+PARAM assetType : INTEGER
+PARAM assetIdx  : INTEGER
+PARAM reqQty    : INTEGER
+PARAM plyr      : PlyrRec
+PARAM mkt       : MktState
+PARAM ord       : DraftOrd
+PARAM ok        : BOOLEAN
+DIM bPar(3)     : INTEGER
+DIM proceeds    : INTEGER
+DIM repayAmt    : INTEGER
+
+ok := FALSE
+ord.doSeq := 0
+ord.doPhase := 1
+ord.doPlyr := 1
+ord.doType := assetType
+ord.doAsset := assetIdx
+ord.doMode := 1
+ord.doStatus := 1
+ord.doQty := reqQty
+ord.doPrice := 0
+ord.doCashDl := 0
+ord.doMgnDl := 0
+ord.doResv1 := 0
+ord.doResv2 := 0
+IF assetType = 1 THEN
+  IF assetIdx < 1 OR assetIdx > 9 THEN
+    END
+  ENDIF
+  IF reqQty < 0 OR reqQty > plyr.stckShrs(assetIdx) THEN
+    END
+  ENDIF
+  ord.doPrice := mkt.stckPrice(assetIdx)
+  proceeds := reqQty * ord.doPrice
+  IF plyr.mgnBal(assetIdx) > 0 THEN
+    ord.doMode := 2
+    RUN calcSaleMgnRpy(plyr.mgnBal(assetIdx), proceeds, repayAmt)
+    ord.doCashDl := proceeds - repayAmt
+    ord.doMgnDl := 0 - repayAmt
+  ELSE
+    ord.doCashDl := proceeds
+  ENDIF
+ELSE IF assetType = 2 THEN
+  RUN initBondPar(bPar)
+  IF assetIdx < 1 OR assetIdx > 3 THEN
+    END
+  ENDIF
+  IF reqQty < 0 OR reqQty > plyr.bondUnts(assetIdx) THEN
+    END
+  ENDIF
+  ord.doPrice := bPar(assetIdx)
+  ord.doCashDl := reqQty * ord.doPrice
+ELSE
+  END
+ENDIF \ENDIF
+ok := TRUE
+END
+
+PROCEDURE setSellDraftOrd
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
+TYPE DraftOrd = doSeq,doPhase,doPlyr,doType,doAsset,doMode,doStatus,doChk:BYTE;doQty,doPrice,doCashDl,doMgnDl,doResv1,doResv2:INTEGER
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+PARAM hdrPath   : STRING[20]
+PARAM ordPath   : STRING[20]
+PARAM hdr       : DraftHdr
+PARAM assetType : INTEGER
+PARAM assetIdx  : INTEGER
+PARAM reqQty    : INTEGER
+PARAM plyr      : PlyrRec
+PARAM mkt       : MktState
+PARAM ok        : BOOLEAN
+DIM ord         : DraftOrd
+DIM recIdx      : INTEGER
+DIM loadOK      : BOOLEAN
+
+ON ERROR GOTO 900
+ok := FALSE
+FOR recIdx := 1 TO hdr.dhRecCnt
+  RUN loadDraftOrd(ordPath, recIdx, ord, loadOK)
+  IF NOT loadOK THEN
+    END
+  ENDIF
+  IF ord.doStatus = 1 THEN
+    IF ord.doType = assetType THEN
+      IF ord.doAsset = assetIdx THEN
+        RUN supersedeDraftOrd(ordPath, recIdx, ok)
+        IF NOT ok THEN
+          END
+        ENDIF
+      ENDIF
+    ENDIF
+  ENDIF
+NEXT recIdx
+IF reqQty > 0 THEN
+  RUN buildSellDraftOrd(assetType, assetIdx, reqQty, plyr, mkt, ord, ok)
+  IF NOT ok THEN
+    END
+  ENDIF
+  RUN appendDraftOrd(hdrPath, ordPath, hdr, ord, ok)
+  IF NOT ok THEN
+    END
+  ENDIF
+ELSE
+  ok := TRUE
+ENDIF
+RUN rebuildSellDraftSum(hdrPath, ordPath, hdr, ok)
+END
+900 ok := FALSE
+END
+
+PROCEDURE initDraftSum
+TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
+PARAM sum : DraftSum
+DIM s     : INTEGER
+DIM b     : INTEGER
+DIM chkSum: INTEGER
+
+sum.dsPhase := 1
+sum.dsPlyr := 1
+sum.dsHas := 0
+sum.dsActCnt := 0
+sum.dsCashDl := 0
+sum.dsMgnDl := 0
+sum.dsRepay := 0
+FOR s := 1 TO 9
+  sum.dsStkQty(s) := 0
+  sum.dsStkMgn(s) := 0
+NEXT s
+FOR b := 1 TO 3
+  sum.dsBndQty(b) := 0
+NEXT b
+chkSum := sum.dsPhase + sum.dsPlyr + sum.dsHas
+chkSum := chkSum + sum.dsActCnt + sum.dsCashDl
+chkSum := chkSum + sum.dsMgnDl + sum.dsRepay
+FOR s := 1 TO 9
+  chkSum := chkSum + sum.dsStkQty(s) + sum.dsStkMgn(s)
+NEXT s
+FOR b := 1 TO 3
+  chkSum := chkSum + sum.dsBndQty(b)
+NEXT b
+sum.dsChk := LAND(chkSum, 255)
+END
+
+PROCEDURE rebuildSellDraftSum
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
+TYPE DraftOrd = doSeq,doPhase,doPlyr,doType,doAsset,doMode,doStatus,doChk:BYTE;doQty,doPrice,doCashDl,doMgnDl,doResv1,doResv2:INTEGER
+TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
+PARAM hdrPath : STRING[20]
+PARAM ordPath : STRING[20]
+PARAM hdr     : DraftHdr
+PARAM ok      : BOOLEAN
+DIM sum       : DraftSum
+DIM ord       : DraftOrd
+DIM recIdx    : INTEGER
+DIM loadOK    : BOOLEAN
+
+ON ERROR GOTO 900
+RUN initDraftSum(sum)
+FOR recIdx := 1 TO hdr.dhRecCnt
+  RUN loadDraftOrd(ordPath, recIdx, ord, loadOK)
+  IF NOT loadOK THEN
+    END
+  ENDIF
+  IF ord.doStatus = 1 THEN
+    sum.dsHas := 1
+    sum.dsActCnt := sum.dsActCnt + 1
+    sum.dsCashDl := sum.dsCashDl + ord.doCashDl
+    sum.dsMgnDl := sum.dsMgnDl + ord.doMgnDl
+    IF ord.doType = 1 THEN
+      sum.dsStkQty(ord.doAsset) := sum.dsStkQty(ord.doAsset) - ord.doQty
+      sum.dsStkMgn(ord.doAsset) := sum.dsStkMgn(ord.doAsset) + ord.doMgnDl
+    ELSE IF ord.doType = 2 THEN
+      sum.dsBndQty(ord.doAsset) := sum.dsBndQty(ord.doAsset) - ord.doQty
+    ENDIF \ENDIF
+  ENDIF
+NEXT recIdx
+RUN saveDraftSum(hdrPath, sum, ok)
+END
+900 ok := FALSE
+END
