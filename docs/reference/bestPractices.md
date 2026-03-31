@@ -229,7 +229,7 @@ DIR       EXEC      READ      UPDATE    WRITE
 
 ### Parameters, Variables, and Types
 
-* **Variable, Param, and Type Attribute names must be unique within a procedure.** It is a syntax error when a variable or parameter shares the same name as a TYPE attribute.
+* **Variable, Param, Type, and Type Attribute names must be unique within a procedure.** It is a syntax error when a variable or parameter shares the same name as a TYPE or TYPE attribute.  Basic09 treats identifiers case-insensitively, so, for example, saveHdr and SaveHdr are the same name.
 
 * **PARAM passing is governed by storage size compatibility, not semantic type identity.** Basic09 does not enforce declared type identity at the call site. It checks storage size. This means size-compatible reinterpretation can be intentional, but a size mismatch causes the called procedure to read the wrong bytes silently. The rules by caller source are:
 
