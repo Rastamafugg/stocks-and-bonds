@@ -13,8 +13,8 @@ PROCEDURE snbMarket
 (* SIDE EFX  : Reads and writes SNBSTATE. Modifies             *)
 (*             mkt.stckPrice, mkt.divSuspnd, and split         *)
 (*             stock holdings in player records.               *)
-(* NOTE      : snbDeckUtil and snbMarket must be pre-loaded    *)
-(*             by coordinator.                                 *)
+(* NOTE      : snbStateIO, snbDeckUtil, and snbMarket must be  *)
+(*             pre-loaded by coordinator.                      *)
 (* ============================================================ *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
@@ -143,9 +143,9 @@ RUN applyMktYear(cardId, rolls, mkt, prcBef, mktDlt, crdDlt, spOcc, dvSusp, dvRn
 ! Apply all stock splits to player records before any
 ! market save/quit checkpoint can be taken from S13-S15.
 FOR p := 1 TO iPlyrCnt
-  RUN loadMktPlyrRec("SNBSTATE", hdr, p, plyr, plyrOK)
+    RUN loadPlyrRec("SNBSTATE", hdr, p, plyr, plyrOK)
   IF NOT plyrOK THEN
-    PRINT "snbMarket: loadMktPlyrRec failed"
+      PRINT "snbMarket: loadPlyrRec failed"
     END
   ENDIF
   plyrDirty := FALSE
@@ -156,9 +156,9 @@ FOR p := 1 TO iPlyrCnt
     ENDIF
   NEXT s
   IF plyrDirty THEN
-    RUN saveMktPlyrRec("SNBSTATE", hdr, p, plyr, plyrOK)
+    RUN savePlyrRec("SNBSTATE", hdr, p, plyr, plyrOK)
     IF NOT plyrOK THEN
-      PRINT "snbMarket: saveMktPlyrRec failed"
+      PRINT "snbMarket: savePlyrRec failed"
       END
     ENDIF
   ENDIF
@@ -185,15 +185,11 @@ FOR s := 1 TO 9
     NEXT tInt
     ! Pre-split price = post-split price * 2.
     oDPrc := mkt.stckPrice(s) * 2
-    ! Read stock name at position s from DATA 720.
-    RESTORE 720
-    FOR tInt := 1 TO s
-      READ sNam
-    NEXT tInt
+    RUN getMktStockName(s, sNam)
     FOR p := 1 TO iPlyrCnt
-      RUN loadMktPlyrRec("SNBSTATE", hdr, p, plyr, plyrOK)
+      RUN loadPlyrRec("SNBSTATE", hdr, p, plyr, plyrOK)
       IF NOT plyrOK THEN
-        PRINT "snbMarket: loadMktPlyrRec failed"
+        PRINT "snbMarket: loadPlyrRec failed"
         END
       ENDIF
       pNames(p) := plyr.plyrName
@@ -215,11 +211,7 @@ FOR s := 1 TO 9
     ENDIF \ENDIF
   ENDIF
   IF dvSusp(s) OR dvRnst(s) THEN
-    ! Read stock name at position s from DATA 720.
-    RESTORE 720
-    FOR tInt := 1 TO s
-      READ sNam
-    NEXT tInt
+    RUN getMktStockName(s, sNam)
     IF dvSusp(s) THEN
       evTyp := 1  \ ! SUSPENDED
     ELSE
@@ -251,11 +243,6 @@ IF NOT saveOK THEN
   PRINT "snbMarket: saveHdrMktState failed"
 ENDIF
 END
-
-! Stock names 1..9 for split and dividend flag screens.
-720 DATA "Growth Corp","Metro Props","Pioneer Mut"
-721 DATA "Shady Brooks","Stryker Drlg","Tri-City Trn"
-722 DATA "United Auto","Uranium Ent","Valley Power"
 
 900 PRINT "snbMarket error ("; ERR; ")"
 END
@@ -344,66 +331,6 @@ END
     loadOK := FALSE
 END
 
-PROCEDURE loadMktPlyrRec
-(* ============================================================ *)
-(* PROCEDURE : loadMktPlyrRec                                   *)
-(* PURPOSE   : Load one player record for market split updates  *)
-(*             without reading the full player array.           *)
-(* PARAMS    : savePath - source filename                       *)
-(*             hdr      - validated SaveHdr                     *)
-(*             plyrIdx  - player index (1..plyrCount)           *)
-(*             plyr     - receives PlyrRec                      *)
-(*             loadOK   - TRUE on success                       *)
-(* ============================================================ *)
-! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
-! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
-PARAM savePath : STRING[20]
-PARAM hdr      : SaveHdr
-PARAM plyrIdx  : INTEGER
-PARAM plyr     : PlyrRec
-PARAM loadOK   : BOOLEAN
-DIM path       : BYTE
-DIM pathOpen   : BOOLEAN
-DIM iMaxYr     : INTEGER
-DIM iDeckCnt   : INTEGER
-DIM seekPos    : INTEGER
-
-ON ERROR GOTO 900
-
-pathOpen := FALSE
-loadOK   := FALSE
-
-IF plyrIdx < 1 OR plyrIdx > hdr.plyrCount THEN
-  PRINT "loadMktPlyrRec: invalid player index"
-  END
-ENDIF
-
-iMaxYr := hdr.maxYears
-iDeckCnt := iMaxYr + 1
-IF iDeckCnt > 36 THEN
-  iDeckCnt := 36
-ENDIF
-seekPos := SIZE(hdr) + iDeckCnt + ((plyrIdx - 1) * SIZE(plyr))
-
-OPEN #path, savePath:READ
-pathOpen := TRUE
-SEEK #path, seekPos
-GET #path, plyr
-
-CLOSE #path
-pathOpen := FALSE
-loadOK := TRUE
-END
-
-900 IF pathOpen THEN
-      CLOSE #path
-    ENDIF
-    PRINT "loadMktPlyrRec error ("; ERR; ") reading: "; savePath
-    loadOK := FALSE
-END
-
 PROCEDURE saveHdrMktState
 (* ============================================================ *)
 (* PROCEDURE : saveHdrMktState                                  *)
@@ -470,66 +397,6 @@ END
     saveOK := FALSE
 END
 
-PROCEDURE saveMktPlyrRec
-(* ============================================================ *)
-(* PROCEDURE : saveMktPlyrRec                                   *)
-(* PURPOSE   : Save one player record after market split        *)
-(*             updates without rewriting all player records.    *)
-(* PARAMS    : savePath - target filename                       *)
-(*             hdr      - current SaveHdr                       *)
-(*             plyrIdx  - player index (1..plyrCount)           *)
-(*             plyr     - player record to write                *)
-(*             saveOK   - TRUE on success                       *)
-(* ============================================================ *)
-! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
-! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
-PARAM savePath : STRING[20]
-PARAM hdr      : SaveHdr
-PARAM plyrIdx  : INTEGER
-PARAM plyr     : PlyrRec
-PARAM saveOK   : BOOLEAN
-DIM path       : BYTE
-DIM pathOpen   : BOOLEAN
-DIM iMaxYr     : INTEGER
-DIM iDeckCnt   : INTEGER
-DIM seekPos    : INTEGER
-
-ON ERROR GOTO 900
-
-pathOpen := FALSE
-saveOK   := FALSE
-
-IF plyrIdx < 1 OR plyrIdx > hdr.plyrCount THEN
-  PRINT "saveMktPlyrRec: invalid player index"
-  END
-ENDIF
-
-iMaxYr := hdr.maxYears
-iDeckCnt := iMaxYr + 1
-IF iDeckCnt > 36 THEN
-  iDeckCnt := 36
-ENDIF
-seekPos := SIZE(hdr) + iDeckCnt + ((plyrIdx - 1) * SIZE(plyr))
-
-OPEN #path, savePath:UPDATE
-pathOpen := TRUE
-SEEK #path, seekPos
-PUT #path, plyr
-
-CLOSE #path
-pathOpen := FALSE
-saveOK := TRUE
-END
-
-900 IF pathOpen THEN
-      CLOSE #path
-    ENDIF
-    PRINT "saveMktPlyrRec error ("; ERR; ") writing: "; savePath
-    saveOK := FALSE
-END
-
 PROCEDURE quitMktToMenu
 (* ============================================================ *)
 (* PROCEDURE : quitMktToMenu                                    *)
@@ -576,69 +443,11 @@ RUN saveHdrMktState("SNBSTATE", hdr, mkt, saveOK)
 IF NOT saveOK THEN
   END
 ENDIF
-RUN copyMktSaveFile("SNBSTATE", "SNBGAME", saveOK)
+RUN copySaveFile("SNBSTATE", "SNBGAME", saveOK)
 IF NOT saveOK THEN
   END
 ENDIF
 RUN quitMktToMenu(hdr, mkt, saveOK)
-END
-
-PROCEDURE copyMktSaveFile
-(* ============================================================ *)
-(* PROCEDURE : copyMktSaveFile                                  *)
-(* PURPOSE   : Copy one complete save file for market-phase     *)
-(*             save-to-menu without requiring snbPhaseCore.     *)
-(* PARAMS    : srcPath - source filename                        *)
-(*             dstPath - destination filename                   *)
-(*             copyOK  - TRUE on success                        *)
-(* ============================================================ *)
-PARAM srcPath : STRING[20]
-PARAM dstPath : STRING[20]
-PARAM copyOK  : BOOLEAN
-DIM srcPathNo : BYTE
-DIM dstPathNo : BYTE
-DIM srcOpen   : BOOLEAN
-DIM dstOpen   : BOOLEAN
-DIM byt       : BYTE
-
-ON ERROR GOTO 900
-
-srcOpen := FALSE
-dstOpen := FALSE
-copyOK  := FALSE
-
-ON ERROR GOTO 100
-DELETE dstPath
-
-100 ON ERROR GOTO 900
-
-OPEN #srcPathNo, srcPath:READ
-srcOpen := TRUE
-CREATE #dstPathNo, dstPath:WRITE
-dstOpen := TRUE
-
-LOOP
-  EXITIF EOF(#srcPathNo) THEN
-  ENDEXIT
-  GET #srcPathNo, byt
-  PUT #dstPathNo, byt
-ENDLOOP
-
-CLOSE #srcPathNo
-srcOpen := FALSE
-CLOSE #dstPathNo
-dstOpen := FALSE
-copyOK := TRUE
-END
-
-900 IF srcOpen THEN
-      CLOSE #srcPathNo
-    ENDIF
-    IF dstOpen THEN
-      CLOSE #dstPathNo
-    ENDIF
-    PRINT "copyMktSaveFile error ("; ERR; ")"
-    copyOK := FALSE
 END
 
 PROCEDURE doRolls
@@ -767,6 +576,35 @@ ELSE
 ENDIF \ENDIF
 
 END
+
+PROCEDURE getMktStockName
+(* ============================================================ *)
+(* PROCEDURE : getMktStockName                                  *)
+(* PURPOSE   : Return the display name for stock 1..9 from the  *)
+(*             local market stock-name table.                   *)
+(* PARAMS    : stkId   - stock id 1..9                          *)
+(*             stkName - receives display name                  *)
+(* SIDE EFX  : Repositions local DATA pointer.                  *)
+(* ============================================================ *)
+PARAM stkId   : INTEGER
+PARAM stkName : STRING[12]
+DIM s         : INTEGER
+
+stkName := ""
+IF stkId < 1 OR stkId > 9 THEN
+  END
+ENDIF
+
+RESTORE 100
+FOR s := 1 TO stkId
+  READ stkName
+NEXT s
+END
+
+! Stock names 1..9 for market displays.
+100 DATA "Growth Corp","Metro Props","Pioneer Mut"
+101 DATA "Shady Brooks","Stryker Drlg","Tri-City Trn"
+102 DATA "United Auto","Uranium Ent","Valley Power"
 
 PROCEDURE getMktDelta
 (* ============================================================ *)
@@ -1143,7 +981,6 @@ PARAM action  : BYTE
 DIM sName : STRING[12]
 DIM sign  : STRING[1]
 DIM e     : INTEGER
-DIM s     : INTEGER
 
 ON ERROR GOTO 900
 
@@ -1160,10 +997,7 @@ PRINT "  "; flavTxt
 PRINT
 PRINT "  STOCKS AFFECTED:"
 FOR e := 1 TO card.efxCnt
-  RESTORE 100
-  FOR s := 1 TO card.efxStk(e)
-    READ sName
-  NEXT s
+  RUN getMktStockName(card.efxStk(e), sName)
   IF card.efxDlt(e) >= 0 THEN
     sign := "+"
   ELSE
@@ -1178,11 +1012,6 @@ ENDIF
 PRINT
 RUN getPhaseNav(action)
 END
-
-! Stock names 1..9 for effect display (spec Section 2.1)
-100 DATA "Growth Corp","Metro Props","Pioneer Mut"
-101 DATA "Shady Brooks","Stryker Drlg","Tri-City Trn"
-102 DATA "United Auto","Uranium Ent","Valley Power"
 
 900 PRINT "scrCard error ("; ERR; ")"
 END
@@ -1233,9 +1062,8 @@ IF rollCnt = 9 THEN
   ! Per-stock display: Mode B Year 1 or Mode C.
   PRINT "  STOCK            D1   D2  TOT  MKT"
   PRINT "  --------------------------------------"
-  RESTORE 100
   FOR r := 1 TO rollCnt
-    READ sName
+    RUN getMktStockName(r, sName)
     ! Line exceeds 79 chars; PRINT USING row format requires single line.
     PRINT USING "'  ',S12<,X4,I3>,X2,I3>,X2,I3>,X1,I4>", sName, dieOne(r), dieTwo(r), rollTot(r), mktDlt(r)
   NEXT r
@@ -1250,11 +1078,6 @@ ENDIF
 PRINT
 RUN getPhaseNav(action)
 END
-
-! Stock names 1..9 for mode C display (spec Section 2.1)
-100 DATA "Growth Corp","Metro Props","Pioneer Mut"
-101 DATA "Shady Brooks","Stryker Drlg","Tri-City Trn"
-102 DATA "United Auto","Uranium Ent","Valley Power"
 
 900 PRINT "scrDice error ("; ERR; ")"
 END
@@ -1305,9 +1128,8 @@ PRINT
   PRINT "  STOCK          PREV   MKT   CRD   NEW NOTE"
 PRINT "  ------------   ----  ----  ----  ---- ----"
 
-RESTORE 100
 FOR s := 1 TO 9
-  READ sName
+  RUN getMktStockName(s, sName)
 
   ! Derive status flag; BKRT takes priority over all others.
   IF newPrc(s) = 0 THEN
@@ -1334,11 +1156,6 @@ NEXT s
 PRINT
 RUN getPhaseNav(action)
 END
-
-! Stock names 1..9 (spec Section 2.1)
-100 DATA "Growth Corp","Metro Props","Pioneer Mut"
-101 DATA "Shady Brooks","Stryker Drlg","Tri-City Trn"
-102 DATA "United Auto","Uranium Ent","Valley Power"
 
 900 PRINT "scrMktBoard error ("; ERR; ")"
 END

@@ -9,7 +9,7 @@ PROCEDURE snbBuy
 (* PARAMS    : None (child process; no PARAM handoff)           *)
 (* SIDE EFX  : Reads and writes SNBSTATE. Copies SNBSTATE to    *)
 (*             SNBGAME on save.                                 *)
-(* NOTE      : snbPhaseCore, snbTradeShared,                    *)
+(* NOTE      : snbStateIO, snbTradeShared,                     *)
 (*             snbTradeHumanUI, and snbBuy must be pre-loaded   *)
 (*             by the coordinator before fork.                  *)
 (* ============================================================ *)

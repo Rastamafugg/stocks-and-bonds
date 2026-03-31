@@ -1,0 +1,386 @@
+PROCEDURE snbStateIO
+(* ================================================== *)
+(* PROCEDURE: snbStateIO                              *)
+(* PURPOSE:   README entry for snbStateIO module.     *)
+(*            Lists all procedures in this module.    *)
+(* PARAMS:    None                                    *)
+(* ================================================== *)
+PRINT "snbStateIO"
+PRINT "  getPhaseNav"
+PRINT "  loadHdrMkt"
+PRINT "  loadPlyrRec"
+PRINT "  savePlyrRec"
+PRINT "  saveHdrOnly"
+PRINT "  copySaveFile"
+END
+
+PROCEDURE getPhaseNav
+(* ================================================== *)
+(* PROCEDURE: getPhaseNav                             *)
+(* PURPOSE:   Read a year-phase navigation key.      *)
+(*            Any key except S/Q continues. S saves  *)
+(*            and exits the current game. Q quits    *)
+(*            without saving.                        *)
+(* PARAMS:    action - receives result:              *)
+(*              1=Continue 2=Save+Exit 3=Quit        *)
+(* EFFECTS:   Prints prompt and waits for one key.   *)
+(* ================================================== *)
+PARAM action:BYTE
+
+DIM k:STRING[1]
+
+ON ERROR GOTO 900
+
+PRINT
+PRINT "  Any key=continue  S=save+exit  Q=quit: ";
+GET #0, k
+PRINT
+
+IF k = "S" OR k = "s" THEN
+  action := 2
+ELSE IF k = "Q" OR k = "q" THEN
+  action := 3
+ELSE
+  action := 1
+ENDIF \ENDIF
+END
+
+900 PRINT "getPhaseNav error ("; ERR; ")"
+END
+
+PROCEDURE loadHdrMkt
+(* ============================================================ *)
+(* PROCEDURE : loadHdrMkt                                       *)
+(* PURPOSE   : Load and validate the save header, then load the *)
+(*             market state without reading the full player     *)
+(*             array into memory.                               *)
+(* PARAMS    : savePath - source filename                       *)
+(*             hdr      - receives SaveHdr                      *)
+(*             mkt      - receives MktState                     *)
+(*             loadOK   - TRUE on success                       *)
+(* SIDE EFX  : Prints a diagnostic on failure.                  *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+PARAM savePath : STRING[20]
+PARAM hdr      : SaveHdr
+PARAM mkt      : MktState
+PARAM loadOK   : BOOLEAN
+DIM path       : BYTE
+DIM pathOpen   : BOOLEAN
+DIM chkExp     : INTEGER
+DIM iMaxYr     : INTEGER
+DIM iDeckCnt   : INTEGER
+DIM seekPos    : INTEGER
+DIM skipPlyr   : PlyrRec
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+loadOK   := FALSE
+
+OPEN #path, savePath:READ
+pathOpen := TRUE
+
+GET #path, hdr
+
+IF hdr.magic <> $53 THEN
+  PRINT "loadHdrMkt: not a valid save file: "; savePath
+  END
+ENDIF
+IF hdr.fmtVersion <> 2 THEN
+  PRINT "loadHdrMkt: incompatible save file version: "; savePath
+  END
+ENDIF
+
+chkExp := hdr.magic      + hdr.fmtVersion + hdr.maxYears
+chkExp := chkExp + hdr.plyrCount  + hdr.rollMode
+chkExp := chkExp + hdr.mgnRule    + hdr.currYear
+chkExp := chkExp + hdr.savedPhase + hdr.savedPlyr
+chkExp := chkExp + hdr.gameStage  + hdr.bnkrFlgs
+chkExp := LAND(chkExp, 255)
+IF chkExp <> hdr.checksum THEN
+  PRINT "loadHdrMkt: save file is corrupt: "; savePath
+  END
+ENDIF
+
+iMaxYr := hdr.maxYears
+iDeckCnt := iMaxYr + 1
+IF iDeckCnt > 36 THEN
+  iDeckCnt := 36
+ENDIF
+seekPos := SIZE(hdr) + iDeckCnt + (SIZE(skipPlyr) * 6)
+SEEK #path, seekPos
+GET #path, mkt
+
+CLOSE #path
+pathOpen := FALSE
+loadOK := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "loadHdrMkt error ("; ERR; ") reading: "; savePath
+    loadOK := FALSE
+END
+
+PROCEDURE loadPlyrRec
+(* ============================================================ *)
+(* PROCEDURE : loadPlyrRec                                      *)
+(* PURPOSE   : Load one player record from a save file using    *)
+(*             the existing on-disk layout.                     *)
+(* PARAMS    : savePath - source filename                       *)
+(*             hdr      - validated SaveHdr                     *)
+(*             plyrIdx  - player record index (1..plyrCount)    *)
+(*             plyr     - receives PlyrRec                      *)
+(*             loadOK   - TRUE on success                       *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+PARAM savePath : STRING[20]
+PARAM hdr      : SaveHdr
+PARAM plyrIdx  : INTEGER
+PARAM plyr     : PlyrRec
+PARAM loadOK   : BOOLEAN
+DIM path       : BYTE
+DIM pathOpen   : BOOLEAN
+DIM iMaxYr     : INTEGER
+DIM iDeckCnt   : INTEGER
+DIM seekPos    : INTEGER
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+loadOK   := FALSE
+
+IF plyrIdx < 1 OR plyrIdx > hdr.plyrCount THEN
+  PRINT "loadPlyrRec: invalid player index"
+  END
+ENDIF
+
+iMaxYr := hdr.maxYears
+iDeckCnt := iMaxYr + 1
+IF iDeckCnt > 36 THEN
+  iDeckCnt := 36
+ENDIF
+seekPos := SIZE(hdr) + iDeckCnt + ((plyrIdx - 1) * SIZE(plyr))
+
+OPEN #path, savePath:READ
+pathOpen := TRUE
+SEEK #path, seekPos
+GET #path, plyr
+
+CLOSE #path
+pathOpen := FALSE
+loadOK := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "loadPlyrRec error ("; ERR; ") reading: "; savePath
+    loadOK := FALSE
+END
+
+PROCEDURE savePlyrRec
+(* ============================================================ *)
+(* PROCEDURE : savePlyrRec                                      *)
+(* PURPOSE   : Write one player record back to an existing save *)
+(*             file without rewriting the full player array.    *)
+(* PARAMS    : savePath - target filename                       *)
+(*             hdr      - current SaveHdr                       *)
+(*             plyrIdx  - player record index (1..plyrCount)    *)
+(*             plyr     - player record to write                *)
+(*             saveOK   - TRUE on success                       *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+PARAM savePath : STRING[20]
+PARAM hdr      : SaveHdr
+PARAM plyrIdx  : INTEGER
+PARAM plyr     : PlyrRec
+PARAM saveOK   : BOOLEAN
+DIM path       : BYTE
+DIM pathOpen   : BOOLEAN
+DIM iMaxYr     : INTEGER
+DIM iDeckCnt   : INTEGER
+DIM seekPos    : INTEGER
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+saveOK   := FALSE
+
+IF plyrIdx < 1 OR plyrIdx > hdr.plyrCount THEN
+  PRINT "savePlyrRec: invalid player index"
+  END
+ENDIF
+
+iMaxYr := hdr.maxYears
+iDeckCnt := iMaxYr + 1
+IF iDeckCnt > 36 THEN
+  iDeckCnt := 36
+ENDIF
+seekPos := SIZE(hdr) + iDeckCnt + ((plyrIdx - 1) * SIZE(plyr))
+
+OPEN #path, savePath:UPDATE
+pathOpen := TRUE
+SEEK #path, seekPos
+PUT #path, plyr
+
+CLOSE #path
+pathOpen := FALSE
+saveOK := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "savePlyrRec error ("; ERR; ") writing: "; savePath
+    saveOK := FALSE
+END
+
+PROCEDURE saveHdrOnly
+(* ============================================================ *)
+(* PROCEDURE : saveHdrOnly                                      *)
+(* PURPOSE   : Rewrite only the header in an existing save file *)
+(*             after recomputing bnkrFlgs from on-disk player   *)
+(*             records and then recomputing the checksum.       *)
+(* PARAMS    : savePath - target filename                       *)
+(*             hdr      - current SaveHdr; updated in place     *)
+(*             saveOK   - TRUE on success                       *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+PARAM savePath : STRING[20]
+PARAM hdr      : SaveHdr
+PARAM saveOK   : BOOLEAN
+DIM path       : BYTE
+DIM pathOpen   : BOOLEAN
+DIM iFlgs      : INTEGER
+DIM shft       : INTEGER
+DIM chkSum     : INTEGER
+DIM iMaxYr     : INTEGER
+DIM iDeckCnt   : INTEGER
+DIM iPlyrCnt   : INTEGER
+DIM seekPos    : INTEGER
+DIM plyr       : PlyrRec
+DIM i          : INTEGER
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+saveOK   := FALSE
+
+OPEN #path, savePath:UPDATE
+pathOpen := TRUE
+
+iMaxYr := hdr.maxYears
+iDeckCnt := iMaxYr + 1
+IF iDeckCnt > 36 THEN
+  iDeckCnt := 36
+ENDIF
+
+hdr.bnkrFlgs := 0
+shft         := 1
+iPlyrCnt     := hdr.plyrCount
+seekPos      := SIZE(hdr) + iDeckCnt
+SEEK #path, seekPos
+FOR i := 1 TO iPlyrCnt
+  GET #path, plyr
+  IF plyr.isBankrupt THEN
+    iFlgs        := hdr.bnkrFlgs
+    hdr.bnkrFlgs := LOR(iFlgs, shft)
+  ENDIF
+  shft := shft * 2
+NEXT i
+
+chkSum := hdr.magic      + hdr.fmtVersion + hdr.maxYears
+chkSum := chkSum + hdr.plyrCount  + hdr.rollMode
+chkSum := chkSum + hdr.mgnRule    + hdr.currYear
+chkSum := chkSum + hdr.savedPhase + hdr.savedPlyr
+chkSum := chkSum + hdr.gameStage  + hdr.bnkrFlgs
+hdr.checksum := LAND(chkSum, 255)
+
+SEEK #path, 0
+PUT #path, hdr
+
+CLOSE #path
+pathOpen := FALSE
+saveOK := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "saveHdrOnly error ("; ERR; ") writing: "; savePath
+    saveOK := FALSE
+END
+
+PROCEDURE copySaveFile
+(* ============================================================ *)
+(* PROCEDURE : copySaveFile                                     *)
+(* PURPOSE   : Copy one complete save file to another path      *)
+(*             without loading the full file into memory.       *)
+(* PARAMS    : srcPath - source filename                        *)
+(*             dstPath - destination filename                   *)
+(*             copyOK  - TRUE on success                        *)
+(* ============================================================ *)
+PARAM srcPath : STRING[20]
+PARAM dstPath : STRING[20]
+PARAM copyOK  : BOOLEAN
+DIM srcPathNo : BYTE
+DIM dstPathNo : BYTE
+DIM srcOpen   : BOOLEAN
+DIM dstOpen   : BOOLEAN
+DIM byt       : BYTE
+
+ON ERROR GOTO 900
+
+srcOpen := FALSE
+dstOpen := FALSE
+copyOK  := FALSE
+
+ON ERROR GOTO 100
+DELETE dstPath
+
+100 ON ERROR GOTO 900
+
+OPEN #srcPathNo, srcPath:READ
+srcOpen := TRUE
+CREATE #dstPathNo, dstPath:WRITE
+dstOpen := TRUE
+
+LOOP
+  EXITIF EOF(#srcPathNo) THEN
+  ENDEXIT
+  GET #srcPathNo, byt
+  PUT #dstPathNo, byt
+ENDLOOP
+
+CLOSE #srcPathNo
+srcOpen := FALSE
+CLOSE #dstPathNo
+dstOpen := FALSE
+copyOK := TRUE
+END
+
+900 IF srcOpen THEN
+      CLOSE #srcPathNo
+    ENDIF
+    IF dstOpen THEN
+      CLOSE #dstPathNo
+    ENDIF
+    PRINT "copySaveFile error ("; ERR; ")"
+    copyOK := FALSE
+END

@@ -9,7 +9,7 @@ PROCEDURE snbSellAI
 (* SIDE EFX  : Reads and writes SNBSTATE. Modifies player      *)
 (*             cash, margin, holdings, and margin flags via    *)
 (*             applySells.                                     *)
-(* NOTE      : snbPhaseCore, snbTradeShared, snbTradeMgn,      *)
+(* NOTE      : snbPhaseCore, snbStateIO, snbTradeShared,       *)
 (*             snbGameData, snbSellMargin, and snbSellAI       *)
 (*             must be pre-loaded by the coordinator before    *)
 (*             fork.                                           *)
