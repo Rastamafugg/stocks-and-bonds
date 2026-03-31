@@ -1,82 +1,43 @@
 PROCEDURE snbSell
 (* ============================================================ *)
 (* PROCEDURE : snbSell                                          *)
-(* PURPOSE   : Human sell-phase child process. Loads SNBSTATE, *)
-(*             runs the sell phase for the current saved-turn  *)
-(*             human player only, handles any resulting        *)
-(*             margin flow, then writes the next checkpoint    *)
-(*             back to SNBSTATE.                               *)
-(* PARAMS    : None (child process; no PARAM handoff)          *)
-(* SIDE EFX  : Reads and writes SNBSTATE. Modifies player      *)
-(*             cash, holdings, and margin state via            *)
-(*             applySells.                                     *)
-(* NOTE      : snbPhaseCore, snbTradeShared, snbGameData,      *)
-(*             snbTradeHumanUI, snbSellMargin, and snbSell     *)
-(*             must be pre-loaded by the coordinator before    *)
-(*             fork.                                           *)
+(* PURPOSE   : Human sell-phase child process. Loads SNBSTATE   *)
+(*             header and market state once, then processes     *)
+(*             consecutive human players by loading and saving   *)
+(*             one player record at a time. Exits when the next *)
+(*             active player is AI, when a sell-driven margin   *)
+(*             checkpoint is reached, or when the buy phase     *)
+(*             begins.                                          *)
+(* PARAMS    : None (child process; no PARAM handoff)           *)
+(* SIDE EFX  : Reads and writes SNBSTATE. Copies SNBSTATE to    *)
+(*             SNBGAME on save.                                 *)
+(* NOTE      : snbPhaseCore, snbTradeShared, snbGameData,       *)
+(*             snbTradeHumanUI, snbSellMargin, and snbSell      *)
+(*             must be pre-loaded by the coordinator before     *)
+(*             fork.                                            *)
 (* ============================================================ *)
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
-DIM hdr        : SaveHdr
-DIM deckOrd(36): BYTE
-DIM plyrs(6)   : PlyrRec
-DIM mkt        : MktState
-DIM loadOK     : BOOLEAN
-DIM iCYr       : INTEGER
-DIM iPCnt      : INTEGER
-DIM ordTyp(12) : INTEGER
-DIM ordId(12)  : INTEGER
-DIM ordQty(12) : INTEGER
-DIM ordCnt     : INTEGER
-DIM usrAct     : INTEGER
-DIM stockNm    : STRING[14]
-DIM bPar(3)    : INTEGER
-DIM repay      : INTEGER
-DIM loopIdx    : INTEGER \ ! Loop counter
-DIM s          : INTEGER \ ! Securities index
-DIM qty        : INTEGER
-DIM pStr       : STRING[8]
-DIM pStr2      : STRING[8]
-DIM keyCode    : INTEGER
-DIM mapCnt     : INTEGER
-DIM mapType(12): INTEGER
-DIM mapId(12)  : INTEGER
-DIM mapKey(12) : INTEGER
-DIM mapQty(12) : INTEGER
-DIM stockCnt   : INTEGER
-DIM bondCnt    : INTEGER
-DIM keyLbl     : STRING[1]
-DIM slotIdx    : INTEGER
-DIM slotQty    : INTEGER
-DIM selIdx     : INTEGER
-DIM kIn        : STRING[1]
-DIM workCash   : INTEGER
-DIM workMgn    : INTEGER
-DIM prcd       : INTEGER
-DIM ordModeVal : INTEGER
+DIM hdr      : SaveHdr
+DIM plyr     : PlyrRec
+DIM mkt      : MktState
+DIM loadOK   : BOOLEAN
+DIM saveOK   : BOOLEAN
+DIM iCYr     : INTEGER
+DIM iPCnt    : INTEGER
+DIM p        : INTEGER
+DIM nextP    : INTEGER
+DIM scanP    : INTEGER
+DIM usrAct   : INTEGER
 DIM currMgnTot : INTEGER
-DIM workBal(9) : INTEGER
-DIM p          : INTEGER
-DIM nextP      : INTEGER
-DIM yldPct     : INTEGER
-DIM divVal     : INTEGER
-DIM hasSell    : BOOLEAN
-DIM sqAct      : INTEGER
-DIM cnfIn      : STRING[1]
-DIM holdQty    : INTEGER
-DIM prjQty     : INTEGER
-DIM divPrj     : INTEGER
-DIM projTxt    : STRING[8]
-DIM mgnTxt     : STRING[7]
-DIM ordTxt     : STRING[24]
-DIM bondParVal : INTEGER
-DIM bondQtyVal : INTEGER
+DIM s        : INTEGER
+
 ON ERROR GOTO 900
 
-RUN loadGame("SNBSTATE", hdr, deckOrd, plyrs, mkt, loadOK)
+RUN loadHdrMkt("SNBSTATE", hdr, mkt, loadOK)
 IF NOT loadOK THEN
-  PRINT "snbSell: loadGame failed"
+  PRINT "snbSell: loadHdrMkt failed"
   END
 ENDIF
 
@@ -91,287 +52,88 @@ IF p < 1 OR p > iPCnt THEN
   END
 ENDIF
 
-IF NOT plyrs(p).isBankrupt THEN
-  ordCnt := 0
-  IF iCYr > 1 THEN
-    RUN initBondPar(bPar)
-    RUN clrOrders(ordTyp, ordId, ordQty, ordCnt)
+LOOP
 
-    LOOP
+  EXITIF p < 1 OR p > iPCnt THEN
+  ENDEXIT
 
-      workCash := plyrs(p).cashBal
-      FOR s := 1 TO 9
-        workBal(s) := plyrs(p).mgnBal(s)
-      NEXT s
-      workMgn := 0
-      hasSell := FALSE
-      FOR loopIdx := 1 TO ordCnt
-        IF ordTyp(loopIdx) = 1 THEN
-          prcd := ordQty(loopIdx) * mkt.stckPrice(ordId(loopIdx))
-          IF workBal(ordId(loopIdx)) > 0 THEN
-            RUN calcSaleMgnRpy(workBal(ordId(loopIdx)), prcd, repay)
-            workBal(ordId(loopIdx)) := workBal(ordId(loopIdx)) - repay
-            workCash := workCash + (prcd - repay)
-          ELSE
-            workCash := workCash + prcd
-          ENDIF
-        ELSE
-          prcd := ordQty(loopIdx) * bPar(ordId(loopIdx))
-          workCash := workCash + prcd
-        ENDIF
-      NEXT loopIdx
-      FOR s := 1 TO 9
-        workMgn := workMgn + workBal(s)
-      NEXT s
-      RUN calcMgnTot(plyrs(p), currMgnTot)
+  RUN loadPlyrRec("SNBSTATE", hdr, p, plyr, loadOK)
+  IF NOT loadOK THEN
+    PRINT "snbSell: loadPlyrRec failed"
+    END
+  ENDIF
 
-      RUN clrScr
-      PRINT "=== SELL PHASE - YEAR "; iCYr; " ==="
-      PRINT "  Player: "; plyrs(p).plyrName
-      RUN fmtMoney(plyrs(p).cashBal, pStr)
-      RUN fmtMoney(workCash, pStr2)
-      PRINT "  Cash: $"; pStr; " [$"; pStr2; "]";
-      RUN fmtMoney(currMgnTot, pStr)
-      RUN fmtMoney(workMgn, pStr2)
-      PRINT "  Margin: $"; pStr; " [$"; pStr2; "]"
-      PRINT
+  IF plyr.plyrType = 2 THEN
+    hdr.savedPhase := 1
+    hdr.savedPlyr  := p
+    hdr.gameStage  := 2
+    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
+    IF NOT saveOK THEN
+      PRINT "snbSell: saveHdrOnly failed"
+    ENDIF
+    END
+  ENDIF
 
-      RUN prepAssetMaps(plyrs(p), mkt, 1, ordTyp, ordId, ordQty, ordCnt, mapType, mapId, mapKey, mapQty, mapCnt, stockCnt, bondCnt)
-
-      PRINT "  STOCKS:";
-      IF stockCnt = 1 THEN
-        PRINT " press 1"
-      ELSE IF stockCnt > 1 THEN
-        PRINT " press 1-"; stockCnt
-      ELSE
-        PRINT
-      ENDIF \ENDIF
-      FOR loopIdx := 1 TO mapCnt
-        IF mapType(loopIdx) = 1 THEN
-          hasSell := TRUE
-          s := mapId(loopIdx)
-          RUN getStockName(s, stockNm)
-          slotQty := mapQty(loopIdx)
-          keyLbl := CHR$(mapKey(loopIdx))
-          RUN getStockDivRate(s, yldPct)
-          divVal := (mkt.stckPrice(s) * yldPct) / 100
-          holdQty := plyrs(p).stckShrs(s)
-          prjQty := holdQty
-          divPrj := 0
-          IF slotQty > 0 THEN
-            prjQty := holdQty - slotQty
-            IF holdQty > 0 THEN
-              divPrj := (divVal * prjQty) / holdQty
-            ENDIF
-          ENDIF
-          projTxt := ""
-          IF slotQty > 0 THEN
-            RUN padNumber(divPrj, 2, pStr)
-            projTxt := "[$" + pStr + "]"
-          ENDIF
-          mgnTxt := ""
-          IF plyrs(p).mgnBal(s) > 0 THEN
-            mgnTxt := "[ MGN]"
-          ENDIF
-          IF slotQty > 0 AND plyrs(p).mgnBal(s) > 0 THEN
-            mgnTxt := "[-MGN]"
-          ENDIF
-          ordTxt := ""
-          IF slotQty > 0 THEN
-            ordTxt := "- SELL " + TRIM$(STR$(slotQty))
-            ordTxt := ordTxt + " = TOT " + TRIM$(STR$(prjQty))
-          ENDIF
-          ! Line exceeds 79 chars; PRINT USING row format requires single line.
-          PRINT USING "'  ',S1<,' ',S12<,'  $',I4>,' ',I2>,'% -> $',I2>,' ',S5<,' ',S6<,' OWN ',I3>,' ',S18<", keyLbl, stockNm, mkt.stckPrice(s), yldPct, divVal, projTxt, mgnTxt, holdQty, ordTxt
-        ENDIF
-      NEXT loopIdx
-
-      PRINT
-      PRINT "  BONDS:";
-      IF bondCnt = 1 THEN
-        PRINT " press A"
-      ELSE IF bondCnt > 1 THEN
-        PRINT " press A-"; CHR$(ASC("A") + bondCnt - 1)
-      ELSE
-        PRINT
-      ENDIF \ENDIF
-      FOR loopIdx := 1 TO mapCnt
-        IF mapType(loopIdx) = 2 THEN
-          hasSell := TRUE
-          s := mapId(loopIdx)
-          slotQty := mapQty(loopIdx)
-          keyLbl := CHR$(mapKey(loopIdx))
-          ! Line exceeds 79 chars; PRINT USING row format requires single line.
-          PRINT USING "'  ',S1<,' $',I6>,'  ',I3>,' unit(s)'", keyLbl, bPar(s), plyrs(p).bondUnts(s);
-          IF slotQty > 0 THEN
-            PRINT "  [Sell "; slotQty; "]"
-          ELSE
-            PRINT
-          ENDIF
-        ENDIF
-      NEXT loopIdx
-
-      IF NOT hasSell THEN
-        PRINT
-        PRINT "Nothing to sell this turn."
-        IF currMgnTot <= 0 THEN
-          PRINT
-          PRINT "  Any key=continue  S=save+exit  Q=quit: ";
-          GET #0, kIn
-          PRINT
-          ordCnt := 0
-          IF kIn = "S" OR kIn = "s" THEN
-            usrAct := 3
-          ELSE IF kIn = "Q" OR kIn = "q" THEN
-            usrAct := 4
-          ELSE
-            usrAct := 2
-          ENDIF \ENDIF
-          EXITIF TRUE THEN
-          ENDEXIT
-        ENDIF
-      ENDIF
-
-      PRINT
-      IF ordCnt > 0 THEN
-        PRINT "  Enter=confirm orders  P=pass  S=save+exit  Q=quit"
-      ELSE
-        PRINT "  P=pass  S=save+exit  Q=quit"
-      ENDIF
-      GET #0, kIn
-      PRINT
-
-      sqAct := 0
-      IF kIn = "S" OR kIn = "s" THEN
-        sqAct := 3
-      ELSE IF kIn = "Q" OR kIn = "q" THEN
-        sqAct := 4
-      ENDIF \ENDIF
-      IF sqAct = 3 THEN
-        ordCnt := 0
-        usrAct := 3
-        EXITIF TRUE THEN
-        ENDEXIT
-      ELSE IF sqAct = 4 THEN
-        ordCnt := 0
-        usrAct := 4
-        EXITIF TRUE THEN
-        ENDEXIT
-      ENDIF \ENDIF
-
-      RUN resolveOrderEditSel(kIn, mapType, mapId, mapKey, mapCnt, ordTyp, ordId, ordQty, ordCnt, keyCode, selIdx, slotIdx, slotQty)
-
-      IF keyCode = ASC("P") THEN
-        IF ordCnt > 0 THEN
-          PRINT "Pending orders will be discarded. Press Y to pass."
-          GET #0, cnfIn
-          PRINT
-          IF cnfIn = "Y" OR cnfIn = "y" THEN
-            ordCnt := 0
-            usrAct := 2
-            EXITIF TRUE THEN
-            ENDEXIT
-          ENDIF
-        ELSE
-          usrAct := 2
-          EXITIF TRUE THEN
-          ENDEXIT
-        ENDIF
-      ELSE IF keyCode = 13 THEN
-        IF ordCnt > 0 THEN
-          usrAct := 1
-          EXITIF TRUE THEN
-          ENDEXIT
-        ENDIF
-      ELSE
-        IF selIdx > 0 THEN
-          s := mapId(selIdx)
-          stockNm := ""
-          bondParVal := 0
-          bondQtyVal := 0
-          IF mapType(selIdx) = 1 THEN
-            RUN getStockName(s, stockNm)
-          ELSE
-            bondParVal := bPar(s)
-            bondQtyVal := plyrs(p).bondUnts(s)
-          ENDIF
-          workCash := plyrs(p).cashBal
-          FOR loopIdx := 1 TO 9
-            workBal(loopIdx) := plyrs(p).mgnBal(loopIdx)
-          NEXT loopIdx
-          FOR loopIdx := 1 TO ordCnt
-            IF loopIdx <> slotIdx THEN
-              IF ordTyp(loopIdx) = 1 THEN
-                prcd := ordQty(loopIdx) * mkt.stckPrice(ordId(loopIdx))
-                IF workBal(ordId(loopIdx)) > 0 THEN
-                  RUN calcSaleMgnRpy(workBal(ordId(loopIdx)), prcd, repay)
-                  workBal(ordId(loopIdx)) := workBal(ordId(loopIdx)) - repay
-                  workCash := workCash + (prcd - repay)
-                ELSE
-                  workCash := workCash + prcd
-                ENDIF
-              ELSE
-                workCash := workCash + (ordQty(loopIdx) * bPar(ordId(loopIdx)))
-              ENDIF
-            ENDIF
-          NEXT loopIdx
-          workMgn := 0
-          FOR loopIdx := 1 TO 9
-            workMgn := workMgn + workBal(loopIdx)
-          NEXT loopIdx
-          ordModeVal := 0
-          IF plyrs(p).mgnBal(s) > 0 THEN
-            ordModeVal := 2
-          ENDIF
-          ! Line exceeds 79 chars; RUN statement cannot be split.
-          RUN promptEditOrderQty("=== SELL QUANTITY ===", mapType(selIdx), stockNm, plyrs(p).stckShrs(s), mkt.stckPrice(s), ordModeVal, workCash, workMgn, workBal(s), bondParVal, bondQtyVal, 1, slotIdx, ordQty, qty, sqAct)
-          IF sqAct = 3 THEN
-            ordCnt := 0
-            usrAct := 3
-            EXITIF TRUE THEN
-            ENDEXIT
-          ELSE IF sqAct = 4 THEN
-            ordCnt := 0
-            usrAct := 4
-            EXITIF TRUE THEN
-            ENDEXIT
-          ENDIF \ENDIF
-          RUN commitOrderQty(ordTyp, ordId, ordQty, ordCnt, slotIdx, mapType(selIdx), mapId(selIdx), qty)
-        ENDIF
-      ENDIF \ENDIF
-
-    ENDLOOP
-
-    IF usrAct = 3 THEN
-      hdr.savedPhase := 1
-      hdr.savedPlyr  := p
-      RUN saveGame("SNBGAME", hdr, deckOrd, plyrs, mkt)
-      hdr.savedPhase := 9
-      hdr.savedPlyr  := 0
-      RUN saveGame("SNBSTATE", hdr, deckOrd, plyrs, mkt)
-      END
-    ELSE IF usrAct = 4 THEN
-      hdr.savedPhase := 9
-      hdr.savedPlyr  := 0
-      RUN saveGame("SNBSTATE", hdr, deckOrd, plyrs, mkt)
-      END
-    ENDIF \ENDIF
-    IF ordCnt > 0 THEN
-      RUN applySells(plyrs(p), mkt, ordTyp, ordId, ordQty, ordCnt)
+  usrAct := 1
+  IF NOT plyr.isBankrupt THEN
+    IF iCYr > 1 THEN
+      RUN runSellPlyr(iCYr, plyr, mkt, usrAct)
     ENDIF
   ENDIF
 
+  RUN savePlyrRec("SNBSTATE", hdr, p, plyr, saveOK)
+  IF NOT saveOK THEN
+    PRINT "snbSell: savePlyrRec failed"
+    END
+  ENDIF
+
+  IF usrAct = 3 THEN
+    hdr.savedPhase := 1
+    hdr.savedPlyr  := p
+    hdr.gameStage  := 2
+    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
+    IF NOT saveOK THEN
+      PRINT "snbSell: saveHdrOnly failed"
+      END
+    ENDIF
+    RUN copySaveFile("SNBSTATE", "SNBGAME", saveOK)
+    IF NOT saveOK THEN
+      PRINT "snbSell: copySaveFile failed"
+      END
+    ENDIF
+    hdr.savedPhase := 9
+    hdr.savedPlyr  := 0
+    hdr.gameStage  := 2
+    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
+    IF NOT saveOK THEN
+      PRINT "snbSell: saveHdrOnly failed"
+    ENDIF
+    END
+  ELSE IF usrAct = 4 THEN
+    hdr.savedPhase := 9
+    hdr.savedPlyr  := 0
+    hdr.gameStage  := 2
+    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
+    IF NOT saveOK THEN
+      PRINT "snbSell: saveHdrOnly failed"
+    ENDIF
+    END
+  ENDIF \ENDIF
+
   IF hdr.mgnRule = 1 THEN
-    IF NOT plyrs(p).isBankrupt THEN
+    IF NOT plyr.isBankrupt THEN
       IF iCYr < 10 THEN
         FOR s := 1 TO 9
-          IF NOT plyrs(p).isBankrupt THEN
-            IF plyrs(p).mgnBal(s) > 0 THEN
-              IF plyrs(p).stckShrs(s) = 0 OR mkt.stckPrice(s) <= 25 THEN
+          IF NOT plyr.isBankrupt THEN
+            IF plyr.mgnBal(s) > 0 THEN
+              IF plyr.stckShrs(s) = 0 OR mkt.stckPrice(s) <= 25 THEN
                 hdr.savedPhase := 4
                 hdr.savedPlyr  := p
-                hdr.gameStage := 2
-                RUN saveGame("SNBSTATE", hdr, deckOrd, plyrs, mkt)
+                hdr.gameStage  := 2
+                RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
+                IF NOT saveOK THEN
+                  PRINT "snbSell: saveHdrOnly failed"
+                ENDIF
                 END
               ENDIF
             ENDIF
@@ -380,34 +142,384 @@ IF NOT plyrs(p).isBankrupt THEN
       ENDIF
     ENDIF
 
-    IF NOT plyrs(p).isBankrupt THEN
+    IF NOT plyr.isBankrupt THEN
       IF iCYr = 10 THEN
-        RUN calcMgnTot(plyrs(p), currMgnTot)
+        RUN calcMgnTot(plyr, currMgnTot)
         IF currMgnTot > 0 THEN
           hdr.savedPhase := 3
           hdr.savedPlyr  := p
-          hdr.gameStage := 2
-          RUN saveGame("SNBSTATE", hdr, deckOrd, plyrs, mkt)
+          hdr.gameStage  := 2
+          RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
+          IF NOT saveOK THEN
+            PRINT "snbSell: saveHdrOnly failed"
+          ENDIF
           END
         ENDIF
       ENDIF
     ENDIF
   ENDIF
-ENDIF
 
-RUN findNextActivePlyr(plyrs, iPCnt, p, nextP)
-IF nextP > 0 THEN
-  hdr.savedPhase := 1
-  hdr.savedPlyr  := nextP
-ELSE
-  hdr.savedPhase := 2
-  hdr.savedPlyr  := 1
-ENDIF
+  nextP := 0
+  FOR scanP := p + 1 TO iPCnt
+    IF nextP = 0 THEN
+      RUN loadPlyrRec("SNBSTATE", hdr, scanP, plyr, loadOK)
+      IF NOT loadOK THEN
+        PRINT "snbSell: loadPlyrRec failed"
+        END
+      ENDIF
+      IF NOT plyr.isBankrupt THEN
+        nextP := scanP
+      ENDIF
+    ENDIF
+  NEXT scanP
 
-hdr.gameStage := 2
-RUN saveGame("SNBSTATE", hdr, deckOrd, plyrs, mkt)
+  IF nextP = 0 THEN
+    hdr.savedPhase := 2
+    hdr.savedPlyr  := 1
+    hdr.gameStage  := 2
+    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
+    IF NOT saveOK THEN
+      PRINT "snbSell: saveHdrOnly failed"
+    ENDIF
+    END
+  ENDIF
+
+  IF plyr.plyrType = 2 THEN
+    hdr.savedPhase := 1
+    hdr.savedPlyr  := nextP
+    hdr.gameStage  := 2
+    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
+    IF NOT saveOK THEN
+      PRINT "snbSell: saveHdrOnly failed"
+    ENDIF
+    END
+  ENDIF
+
+  p := nextP
+
+ENDLOOP
+
 END
 
 900 PRINT "snbSell error ("; ERR; ")"
+RUN waitKey
+END
+
+PROCEDURE runSellPlyr
+(* ============================================================ *)
+(* PROCEDURE : runSellPlyr                                      *)
+(* PURPOSE   : Run the human sell-phase editor for one player   *)
+(*             record only. Applies confirmed sell orders to    *)
+(*             the passed-in player record.                     *)
+(* PARAMS    : currYear - current game year                     *)
+(*             plyr     - player record for the active turn     *)
+(*             mkt      - market state                          *)
+(*             action   - 1=continue 3=save+exit 4=quit         *)
+(* SIDE EFX  : Modifies plyr cash, holdings, and margin state   *)
+(*             on confirmed orders.                             *)
+(* ============================================================ *)
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+PARAM currYear   : INTEGER
+PARAM plyr       : PlyrRec
+PARAM mkt        : MktState
+PARAM action     : INTEGER
+DIM ordTyp(12)   : INTEGER
+DIM ordId(12)    : INTEGER
+DIM ordQty(12)   : INTEGER
+DIM ordCnt       : INTEGER
+DIM stockNm      : STRING[14]
+DIM bPar(3)      : INTEGER
+DIM repay        : INTEGER
+DIM loopIdx      : INTEGER
+DIM s            : INTEGER
+DIM qty          : INTEGER
+DIM pStr         : STRING[8]
+DIM pStr2        : STRING[8]
+DIM keyCode      : INTEGER
+DIM mapCnt       : INTEGER
+DIM mapType(12)  : INTEGER
+DIM mapId(12)    : INTEGER
+DIM mapKey(12)   : INTEGER
+DIM mapQty(12)   : INTEGER
+DIM stockCnt     : INTEGER
+DIM bondCnt      : INTEGER
+DIM keyLbl       : STRING[1]
+DIM slotIdx      : INTEGER
+DIM slotQty      : INTEGER
+DIM selIdx       : INTEGER
+DIM kIn          : STRING[1]
+DIM workCash     : INTEGER
+DIM workMgn      : INTEGER
+DIM prcd         : INTEGER
+DIM ordModeVal   : INTEGER
+DIM currMgnTot   : INTEGER
+DIM workBal(9)   : INTEGER
+DIM yldPct       : INTEGER
+DIM divVal       : INTEGER
+DIM hasSell      : BOOLEAN
+DIM sqAct        : INTEGER
+DIM cnfIn        : STRING[1]
+DIM holdQty      : INTEGER
+DIM prjQty       : INTEGER
+DIM divPrj       : INTEGER
+DIM projTxt      : STRING[8]
+DIM mgnTxt       : STRING[7]
+DIM ordTxt       : STRING[24]
+DIM bondParVal   : INTEGER
+DIM bondQtyVal   : INTEGER
+
+ON ERROR GOTO 900
+
+action := 1
+ordCnt := 0
+RUN initBondPar(bPar)
+RUN clrOrders(ordTyp, ordId, ordQty, ordCnt)
+
+LOOP
+
+  workCash := plyr.cashBal
+  FOR s := 1 TO 9
+    workBal(s) := plyr.mgnBal(s)
+  NEXT s
+  workMgn := 0
+  hasSell := FALSE
+  FOR loopIdx := 1 TO ordCnt
+    IF ordTyp(loopIdx) = 1 THEN
+      prcd := ordQty(loopIdx) * mkt.stckPrice(ordId(loopIdx))
+      IF workBal(ordId(loopIdx)) > 0 THEN
+        RUN calcSaleMgnRpy(workBal(ordId(loopIdx)), prcd, repay)
+        workBal(ordId(loopIdx)) := workBal(ordId(loopIdx)) - repay
+        workCash := workCash + (prcd - repay)
+      ELSE
+        workCash := workCash + prcd
+      ENDIF
+    ELSE
+      prcd := ordQty(loopIdx) * bPar(ordId(loopIdx))
+      workCash := workCash + prcd
+    ENDIF
+  NEXT loopIdx
+  FOR s := 1 TO 9
+    workMgn := workMgn + workBal(s)
+  NEXT s
+  RUN calcMgnTot(plyr, currMgnTot)
+
+  RUN clrScr
+  PRINT "=== SELL PHASE - YEAR "; currYear; " ==="
+  PRINT "  Player: "; plyr.plyrName
+  RUN fmtMoney(plyr.cashBal, pStr)
+  RUN fmtMoney(workCash, pStr2)
+  PRINT "  Cash: $"; pStr; " [$"; pStr2; "]";
+  RUN fmtMoney(currMgnTot, pStr)
+  RUN fmtMoney(workMgn, pStr2)
+  PRINT "  Margin: $"; pStr; " [$"; pStr2; "]"
+  PRINT
+
+  RUN prepAssetMaps(plyr, mkt, 1, ordTyp, ordId, ordQty, ordCnt, mapType, mapId, mapKey, mapQty, mapCnt, stockCnt, bondCnt)
+
+  PRINT "  STOCKS:";
+  IF stockCnt = 1 THEN
+    PRINT " press 1"
+  ELSE IF stockCnt > 1 THEN
+    PRINT " press 1-"; stockCnt
+  ELSE
+    PRINT
+  ENDIF \ENDIF
+  FOR loopIdx := 1 TO mapCnt
+    IF mapType(loopIdx) = 1 THEN
+      hasSell := TRUE
+      s := mapId(loopIdx)
+      RUN getStockName(s, stockNm)
+      slotQty := mapQty(loopIdx)
+      keyLbl := CHR$(mapKey(loopIdx))
+      RUN getStockDivRate(s, yldPct)
+      divVal := (mkt.stckPrice(s) * yldPct) / 100
+      holdQty := plyr.stckShrs(s)
+      prjQty := holdQty
+      divPrj := 0
+      IF slotQty > 0 THEN
+        prjQty := holdQty - slotQty
+        IF holdQty > 0 THEN
+          divPrj := (divVal * prjQty) / holdQty
+        ENDIF
+      ENDIF
+      projTxt := ""
+      IF slotQty > 0 THEN
+        RUN padNumber(divPrj, 2, pStr)
+        projTxt := "[$" + pStr + "]"
+      ENDIF
+      mgnTxt := ""
+      IF plyr.mgnBal(s) > 0 THEN
+        mgnTxt := "[ MGN]"
+      ENDIF
+      IF slotQty > 0 AND plyr.mgnBal(s) > 0 THEN
+        mgnTxt := "[-MGN]"
+      ENDIF
+      ordTxt := ""
+      IF slotQty > 0 THEN
+        ordTxt := "- SELL " + TRIM$(STR$(slotQty))
+        ordTxt := ordTxt + " = TOT " + TRIM$(STR$(prjQty))
+      ENDIF
+      ! Line exceeds 79 chars; PRINT USING row format requires single line.
+      PRINT USING "'  ',S1<,' ',S12<,'  $',I4>,' ',I2>,'% -> $',I2>,' ',S5<,' ',S6<,' OWN ',I3>,' ',S18<", keyLbl, stockNm, mkt.stckPrice(s), yldPct, divVal, projTxt, mgnTxt, holdQty, ordTxt
+    ENDIF
+  NEXT loopIdx
+
+  PRINT
+  PRINT "  BONDS:";
+  IF bondCnt = 1 THEN
+    PRINT " press A"
+  ELSE IF bondCnt > 1 THEN
+    PRINT " press A-"; CHR$(ASC("A") + bondCnt - 1)
+  ELSE
+    PRINT
+  ENDIF \ENDIF
+  FOR loopIdx := 1 TO mapCnt
+    IF mapType(loopIdx) = 2 THEN
+      hasSell := TRUE
+      s := mapId(loopIdx)
+      slotQty := mapQty(loopIdx)
+      keyLbl := CHR$(mapKey(loopIdx))
+      ! Line exceeds 79 chars; PRINT USING row format requires single line.
+      PRINT USING "'  ',S1<,' $',I6>,'  ',I3>,' unit(s)'", keyLbl, bPar(s), plyr.bondUnts(s);
+      IF slotQty > 0 THEN
+        PRINT "  [Sell "; slotQty; "]"
+      ELSE
+        PRINT
+      ENDIF
+    ENDIF
+  NEXT loopIdx
+
+  IF NOT hasSell THEN
+    PRINT
+    PRINT "Nothing to sell this turn."
+    IF currMgnTot <= 0 THEN
+      PRINT
+      PRINT "  Any key=continue  S=save+exit  Q=quit: ";
+      GET #0, kIn
+      PRINT
+      ordCnt := 0
+      IF kIn = "S" OR kIn = "s" THEN
+        action := 3
+      ELSE IF kIn = "Q" OR kIn = "q" THEN
+        action := 4
+      ELSE
+        action := 1
+      ENDIF \ENDIF
+      END
+    ENDIF
+  ENDIF
+
+  PRINT
+  IF ordCnt > 0 THEN
+    PRINT "  Enter=confirm orders  P=pass  S=save+exit  Q=quit"
+  ELSE
+    PRINT "  P=pass  S=save+exit  Q=quit"
+  ENDIF
+  GET #0, kIn
+  PRINT
+
+  sqAct := 0
+  IF kIn = "S" OR kIn = "s" THEN
+    sqAct := 3
+  ELSE IF kIn = "Q" OR kIn = "q" THEN
+    sqAct := 4
+  ENDIF \ENDIF
+  IF sqAct = 3 THEN
+    ordCnt := 0
+    action := 3
+    END
+  ELSE IF sqAct = 4 THEN
+    ordCnt := 0
+    action := 4
+    END
+  ENDIF \ENDIF
+
+  RUN resolveOrderEditSel(kIn, mapType, mapId, mapKey, mapCnt, ordTyp, ordId, ordQty, ordCnt, keyCode, selIdx, slotIdx, slotQty)
+
+  IF keyCode = ASC("P") THEN
+    IF ordCnt > 0 THEN
+      PRINT "Pending orders will be discarded. Press Y to pass."
+      GET #0, cnfIn
+      PRINT
+      IF cnfIn = "Y" OR cnfIn = "y" THEN
+        ordCnt := 0
+        action := 1
+        END
+      ENDIF
+    ELSE
+      action := 1
+      END
+    ENDIF
+  ELSE IF keyCode = 13 THEN
+    IF ordCnt > 0 THEN
+      EXITIF TRUE THEN
+      ENDEXIT
+    ENDIF
+  ELSE
+    IF selIdx > 0 THEN
+      s := mapId(selIdx)
+      stockNm := ""
+      bondParVal := 0
+      bondQtyVal := 0
+      IF mapType(selIdx) = 1 THEN
+        RUN getStockName(s, stockNm)
+      ELSE
+        bondParVal := bPar(s)
+        bondQtyVal := plyr.bondUnts(s)
+      ENDIF
+      workCash := plyr.cashBal
+      FOR loopIdx := 1 TO 9
+        workBal(loopIdx) := plyr.mgnBal(loopIdx)
+      NEXT loopIdx
+      FOR loopIdx := 1 TO ordCnt
+        IF loopIdx <> slotIdx THEN
+          IF ordTyp(loopIdx) = 1 THEN
+            prcd := ordQty(loopIdx) * mkt.stckPrice(ordId(loopIdx))
+            IF workBal(ordId(loopIdx)) > 0 THEN
+              RUN calcSaleMgnRpy(workBal(ordId(loopIdx)), prcd, repay)
+              workBal(ordId(loopIdx)) := workBal(ordId(loopIdx)) - repay
+              workCash := workCash + (prcd - repay)
+            ELSE
+              workCash := workCash + prcd
+            ENDIF
+          ELSE
+            workCash := workCash + (ordQty(loopIdx) * bPar(ordId(loopIdx)))
+          ENDIF
+        ENDIF
+      NEXT loopIdx
+      workMgn := 0
+      FOR loopIdx := 1 TO 9
+        workMgn := workMgn + workBal(loopIdx)
+      NEXT loopIdx
+      ordModeVal := 0
+      IF plyr.mgnBal(s) > 0 THEN
+        ordModeVal := 2
+      ENDIF
+      ! Line exceeds 79 chars; RUN statement cannot be split.
+      RUN promptEditOrderQty("=== SELL QUANTITY ===", mapType(selIdx), stockNm, plyr.stckShrs(s), mkt.stckPrice(s), ordModeVal, workCash, workMgn, workBal(s), bondParVal, bondQtyVal, 1, slotIdx, ordQty, qty, sqAct)
+      IF sqAct = 3 THEN
+        ordCnt := 0
+        action := 3
+        END
+      ELSE IF sqAct = 4 THEN
+        ordCnt := 0
+        action := 4
+        END
+      ENDIF \ENDIF
+      RUN commitOrderQty(ordTyp, ordId, ordQty, ordCnt, slotIdx, mapType(selIdx), mapId(selIdx), qty)
+    ENDIF
+  ENDIF \ENDIF
+
+ENDLOOP
+
+IF ordCnt > 0 THEN
+  RUN applySells(plyr, mkt, ordTyp, ordId, ordQty, ordCnt)
+ENDIF
+
+action := 1
+END
+
+900 PRINT "runSellPlyr error ("; ERR; ")"
 RUN waitKey
 END
