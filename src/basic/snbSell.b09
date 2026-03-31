@@ -204,9 +204,9 @@ PROCEDURE runSellPlyr
 (* ============================================================ *)
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
-TYPE DraftHdr = magic,fmtVersion,phaseCode,playerIdx,status,recCount,nextSeq,checksum:BYTE;currYear,maxYears:INTEGER
-TYPE DraftSum = phaseCode,playerIdx,hasDraft,activeCnt,checksum:BYTE;cashDelta,totalMgnDelta,totalRepay:INTEGER;stkQty(9):INTEGER;stkMgn(9):INTEGER;bndQty(3):INTEGER
-TYPE DraftOrd = seq,phaseCode,playerIdx,ordType,assetId,mode,status,checksum:BYTE;qty,priceSnap,cashDelta,mgnDelta,resv1,resv2:INTEGER
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
+TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
+TYPE DraftOrd = doSeq,doPhase,doPlyr,doType,doAsset,doMode,doStatus,doChk:BYTE;doQty,doPrice,doCashDl,doMgnDl,doResv1,doResv2:INTEGER
 PARAM curYear    : INTEGER
 PARAM plyr       : PlyrRec
 PARAM mkt        : MktState
@@ -277,8 +277,8 @@ LOOP
   ENDIF
   hasSell := FALSE
   RUN calcMgnTot(plyr, currMgnTot)
-  workCash := plyr.cashBal + dSum.cashDelta
-  workMgn := currMgnTot + dSum.totalMgnDelta
+  workCash := plyr.cashBal + dSum.dsCashDl
+  workMgn := currMgnTot + dSum.dsMgnDl
 
   RUN clrScr
   PRINT "=== SELL PHASE - YEAR "; curYear; " ==="
@@ -312,12 +312,12 @@ LOOP
         stockCnt := stockCnt + 1
         hasSell := TRUE
         RUN getStockName(s, stockNm)
-        slotQty := 0 - dSum.stkQty(s)
+        slotQty := 0 - dSum.dsStkQty(s)
         keyLbl := CHR$(ASC("0") + stockCnt)
         RUN getStockDivRate(s, yldPct)
         divVal := (mkt.stckPrice(s) * yldPct) / 100
         holdQty := plyr.stckShrs(s)
-        prjQty := holdQty + dSum.stkQty(s)
+        prjQty := holdQty + dSum.dsStkQty(s)
         divPrj := 0
         IF slotQty > 0 THEN
           IF holdQty > 0 THEN
@@ -330,10 +330,10 @@ LOOP
           projTxt := "[$" + pStr + "]"
         ENDIF
         mgnTxt := ""
-        IF plyr.mgnBal(s) + dSum.stkMgn(s) > 0 THEN
+        IF plyr.mgnBal(s) + dSum.dsStkMgn(s) > 0 THEN
           mgnTxt := "[ MGN]"
         ENDIF
-        IF dSum.stkMgn(s) < 0 THEN
+        IF dSum.dsStkMgn(s) < 0 THEN
           mgnTxt := "[-MGN]"
         ENDIF
         ordTxt := ""
@@ -367,7 +367,7 @@ LOOP
     IF plyr.bondUnts(b) > 0 THEN
       bondCnt := bondCnt + 1
       hasSell := TRUE
-      slotQty := 0 - dSum.bndQty(b)
+      slotQty := 0 - dSum.dsBndQty(b)
       keyLbl := CHR$(ASC("A") + bondCnt - 1)
       ! Line exceeds 79 chars; PRINT USING row format requires single line.
       PRINT USING "'  ',S1<,' $',I6>,'  ',I3>,' unit(s)'", keyLbl, bPar(b), plyr.bondUnts(b);
@@ -400,7 +400,7 @@ LOOP
   ENDIF
 
   PRINT
-  IF dSum.activeCnt > 0 THEN
+  IF dSum.dsActCnt > 0 THEN
     PRINT "  Enter=confirm orders  P=pass  S=save+exit  Q=quit"
   ELSE
     PRINT "  P=pass  S=save+exit  Q=quit"
@@ -461,7 +461,7 @@ LOOP
   NEXT b
 
   IF keyCode = ASC("P") THEN
-    IF dSum.activeCnt > 0 THEN
+    IF dSum.dsActCnt > 0 THEN
       PRINT "Pending orders will be discarded. Press Y to pass."
       GET #0, cnfIn
       PRINT
@@ -476,7 +476,7 @@ LOOP
       END
     ENDIF
   ELSE IF keyCode = 13 THEN
-    IF dSum.activeCnt > 0 THEN
+    IF dSum.dsActCnt > 0 THEN
       EXITIF TRUE THEN
       ENDEXIT
     ENDIF
@@ -496,20 +496,20 @@ LOOP
       IF selType = 1 THEN
         RUN getStockName(selId, stockNm)
       ENDIF
-      baseCash := plyr.cashBal + dSum.cashDelta
-      baseMgn := currMgnTot + dSum.totalMgnDelta
+      baseCash := plyr.cashBal + dSum.dsCashDl
+      baseMgn := currMgnTot + dSum.dsMgnDl
       baseStkMgn := -1
       editQty := 0
       IF dFound THEN
-        baseCash := baseCash - dOrd.cashDelta
-        baseMgn := baseMgn - dOrd.mgnDelta
-        editQty := dOrd.qty
+        baseCash := baseCash - dOrd.doCashDl
+        baseMgn := baseMgn - dOrd.doMgnDl
+        editQty := dOrd.doQty
       ENDIF
       ordModeVal := 0
       IF selType = 1 THEN
-        baseStkMgn := plyr.mgnBal(selId) + dSum.stkMgn(selId)
+        baseStkMgn := plyr.mgnBal(selId) + dSum.dsStkMgn(selId)
         IF dFound THEN
-          baseStkMgn := baseStkMgn - dOrd.mgnDelta
+          baseStkMgn := baseStkMgn - dOrd.doMgnDl
         ENDIF
         IF plyr.mgnBal(selId) > 0 THEN
           ordModeVal := 2
@@ -601,8 +601,8 @@ PROCEDURE initSellDraft
 (* PURPOSE   : Create fresh sell-draft files with an empty      *)
 (*             summary cache.                                   *)
 (* ============================================================ *)
-TYPE DraftHdr = magic,fmtVersion,phaseCode,playerIdx,status,recCount,nextSeq,checksum:BYTE;currYear,maxYears:INTEGER
-TYPE DraftSum = phaseCode,playerIdx,hasDraft,activeCnt,checksum:BYTE;cashDelta,totalMgnDelta,totalRepay:INTEGER;stkQty(9):INTEGER;stkMgn(9):INTEGER;bndQty(3):INTEGER
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
+TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
 PARAM hdrPath : STRING[20]
 PARAM ordPath : STRING[20]
 PARAM currYr  : INTEGER
@@ -622,19 +622,19 @@ RUN clearDraftFiles(hdrPath, ordPath, ok)
 
 CREATE #path, hdrPath:UPDATE
 pathOpen := TRUE
-hdr.magic      := $44
-hdr.fmtVersion := 1
-hdr.phaseCode  := 1
-hdr.playerIdx  := 1
-hdr.status     := 1
-hdr.recCount   := 0
-hdr.nextSeq    := 1
-hdr.currYear   := currYr
-hdr.maxYears   := 10
-chkSum := hdr.magic + hdr.fmtVersion + hdr.phaseCode
-chkSum := chkSum + hdr.playerIdx + hdr.status + hdr.recCount
-chkSum := chkSum + hdr.nextSeq + hdr.currYear + hdr.maxYears
-hdr.checksum := LAND(chkSum, 255)
+hdr.dhMagic      := $44
+hdr.dhFmtVer := 1
+hdr.dhPhase  := 1
+hdr.dhPlyr  := 1
+hdr.dhStatus     := 1
+hdr.dhRecCnt   := 0
+hdr.dhNextSeq    := 1
+hdr.dhYear   := currYr
+hdr.dhMaxYr   := 10
+chkSum := hdr.dhMagic + hdr.dhFmtVer + hdr.dhPhase
+chkSum := chkSum + hdr.dhPlyr + hdr.dhStatus + hdr.dhRecCnt
+chkSum := chkSum + hdr.dhNextSeq + hdr.dhYear + hdr.dhMaxYr
+hdr.dhChk := LAND(chkSum, 255)
 PUT #path, hdr
 
 RUN initDraftSum(sum)
@@ -662,26 +662,26 @@ PROCEDURE initDraftSum
 (* PROCEDURE : initDraftSum                                     *)
 (* PURPOSE   : Zero one sell-draft summary record.              *)
 (* ============================================================ *)
-TYPE DraftSum = phaseCode,playerIdx,hasDraft,activeCnt,checksum:BYTE;cashDelta,totalMgnDelta,totalRepay:INTEGER;stkQty(9):INTEGER;stkMgn(9):INTEGER;bndQty(3):INTEGER
+TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
 PARAM sum : DraftSum
 DIM s     : INTEGER
 DIM b     : INTEGER
 
-sum.phaseCode := 1
-sum.playerIdx := 1
-sum.hasDraft := 0
-sum.activeCnt := 0
-sum.cashDelta := 0
-sum.totalMgnDelta := 0
-sum.totalRepay := 0
+sum.dsPhase := 1
+sum.dsPlyr := 1
+sum.dsHas := 0
+sum.dsActCnt := 0
+sum.dsCashDl := 0
+sum.dsMgnDl := 0
+sum.dsRepay := 0
 FOR s := 1 TO 9
-  sum.stkQty(s) := 0
-  sum.stkMgn(s) := 0
+  sum.dsStkQty(s) := 0
+  sum.dsStkMgn(s) := 0
 NEXT s
 FOR b := 1 TO 3
-  sum.bndQty(b) := 0
+  sum.dsBndQty(b) := 0
 NEXT b
-sum.checksum := 0
+sum.dsChk := 0
 END
 
 PROCEDURE loadDraftHdr
@@ -689,7 +689,7 @@ PROCEDURE loadDraftHdr
 (* PROCEDURE : loadDraftHdr                                     *)
 (* PURPOSE   : Read and validate the sell-draft header.         *)
 (* ============================================================ *)
-TYPE DraftHdr = magic,fmtVersion,phaseCode,playerIdx,status,recCount,nextSeq,checksum:BYTE;currYear,maxYears:INTEGER
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
 PARAM hdrPath : STRING[20]
 PARAM hdr     : DraftHdr
 PARAM ok      : BOOLEAN
@@ -706,20 +706,20 @@ OPEN #path, hdrPath:READ
 pathOpen := TRUE
 GET #path, hdr
 
-IF hdr.magic <> $44 THEN
+IF hdr.dhMagic <> $44 THEN
   PRINT "loadDraftHdr: invalid magic"
   END
 ENDIF
-IF hdr.fmtVersion <> 1 THEN
+IF hdr.dhFmtVer <> 1 THEN
   PRINT "loadDraftHdr: invalid version"
   END
 ENDIF
 
-chkExp := hdr.magic + hdr.fmtVersion + hdr.phaseCode
-chkExp := chkExp + hdr.playerIdx + hdr.status + hdr.recCount
-chkExp := chkExp + hdr.nextSeq + hdr.currYear + hdr.maxYears
+chkExp := hdr.dhMagic + hdr.dhFmtVer + hdr.dhPhase
+chkExp := chkExp + hdr.dhPlyr + hdr.dhStatus + hdr.dhRecCnt
+chkExp := chkExp + hdr.dhNextSeq + hdr.dhYear + hdr.dhMaxYr
 chkExp := LAND(chkExp, 255)
-IF chkExp <> hdr.checksum THEN
+IF chkExp <> hdr.dhChk THEN
   PRINT "loadDraftHdr: corrupt header"
   END
 ENDIF
@@ -742,7 +742,7 @@ PROCEDURE saveDraftHdr
 (* PURPOSE   : Write the sell-draft header after checksum       *)
 (*             refresh.                                         *)
 (* ============================================================ *)
-TYPE DraftHdr = magic,fmtVersion,phaseCode,playerIdx,status,recCount,nextSeq,checksum:BYTE;currYear,maxYears:INTEGER
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
 PARAM hdrPath : STRING[20]
 PARAM hdr     : DraftHdr
 PARAM ok      : BOOLEAN
@@ -755,10 +755,10 @@ ON ERROR GOTO 900
 pathOpen := FALSE
 ok := FALSE
 
-chkSum := hdr.magic + hdr.fmtVersion + hdr.phaseCode
-chkSum := chkSum + hdr.playerIdx + hdr.status + hdr.recCount
-chkSum := chkSum + hdr.nextSeq + hdr.currYear + hdr.maxYears
-hdr.checksum := LAND(chkSum, 255)
+chkSum := hdr.dhMagic + hdr.dhFmtVer + hdr.dhPhase
+chkSum := chkSum + hdr.dhPlyr + hdr.dhStatus + hdr.dhRecCnt
+chkSum := chkSum + hdr.dhNextSeq + hdr.dhYear + hdr.dhMaxYr
+hdr.dhChk := LAND(chkSum, 255)
 
 OPEN #path, hdrPath:UPDATE
 pathOpen := TRUE
@@ -781,8 +781,8 @@ PROCEDURE loadDraftSum
 (* PROCEDURE : loadDraftSum                                     *)
 (* PURPOSE   : Read and validate the cached sell-draft summary. *)
 (* ============================================================ *)
-TYPE DraftHdr = magic,fmtVersion,phaseCode,playerIdx,status,recCount,nextSeq,checksum:BYTE;currYear,maxYears:INTEGER
-TYPE DraftSum = phaseCode,playerIdx,hasDraft,activeCnt,checksum:BYTE;cashDelta,totalMgnDelta,totalRepay:INTEGER;stkQty(9):INTEGER;stkMgn(9):INTEGER;bndQty(3):INTEGER
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
+TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
 PARAM hdrPath : STRING[20]
 PARAM sum     : DraftSum
 PARAM ok      : BOOLEAN
@@ -805,17 +805,17 @@ pathOpen := TRUE
 SEEK #path, seekPos
 GET #path, sum
 
-chkExp := sum.phaseCode + sum.playerIdx + sum.hasDraft
-chkExp := chkExp + sum.activeCnt + sum.cashDelta
-chkExp := chkExp + sum.totalMgnDelta + sum.totalRepay
+chkExp := sum.dsPhase + sum.dsPlyr + sum.dsHas
+chkExp := chkExp + sum.dsActCnt + sum.dsCashDl
+chkExp := chkExp + sum.dsMgnDl + sum.dsRepay
 FOR s := 1 TO 9
-  chkExp := chkExp + sum.stkQty(s) + sum.stkMgn(s)
+  chkExp := chkExp + sum.dsStkQty(s) + sum.dsStkMgn(s)
 NEXT s
 FOR b := 1 TO 3
-  chkExp := chkExp + sum.bndQty(b)
+  chkExp := chkExp + sum.dsBndQty(b)
 NEXT b
 chkExp := LAND(chkExp, 255)
-IF chkExp <> sum.checksum THEN
+IF chkExp <> sum.dsChk THEN
   PRINT "loadDraftSum: corrupt summary"
   END
 ENDIF
@@ -837,8 +837,8 @@ PROCEDURE saveDraftSum
 (* PROCEDURE : saveDraftSum                                     *)
 (* PURPOSE   : Write the cached sell-draft summary.             *)
 (* ============================================================ *)
-TYPE DraftHdr = magic,fmtVersion,phaseCode,playerIdx,status,recCount,nextSeq,checksum:BYTE;currYear,maxYears:INTEGER
-TYPE DraftSum = phaseCode,playerIdx,hasDraft,activeCnt,checksum:BYTE;cashDelta,totalMgnDelta,totalRepay:INTEGER;stkQty(9):INTEGER;stkMgn(9):INTEGER;bndQty(3):INTEGER
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
+TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
 PARAM hdrPath : STRING[20]
 PARAM sum     : DraftSum
 PARAM ok      : BOOLEAN
@@ -856,16 +856,16 @@ pathOpen := FALSE
 ok := FALSE
 seekPos := SIZE(hdrStub)
 
-chkSum := sum.phaseCode + sum.playerIdx + sum.hasDraft
-chkSum := chkSum + sum.activeCnt + sum.cashDelta
-chkSum := chkSum + sum.totalMgnDelta + sum.totalRepay
+chkSum := sum.dsPhase + sum.dsPlyr + sum.dsHas
+chkSum := chkSum + sum.dsActCnt + sum.dsCashDl
+chkSum := chkSum + sum.dsMgnDl + sum.dsRepay
 FOR s := 1 TO 9
-  chkSum := chkSum + sum.stkQty(s) + sum.stkMgn(s)
+  chkSum := chkSum + sum.dsStkQty(s) + sum.dsStkMgn(s)
 NEXT s
 FOR b := 1 TO 3
-  chkSum := chkSum + sum.bndQty(b)
+  chkSum := chkSum + sum.dsBndQty(b)
 NEXT b
-sum.checksum := LAND(chkSum, 255)
+sum.dsChk := LAND(chkSum, 255)
 
 OPEN #path, hdrPath:UPDATE
 pathOpen := TRUE
@@ -888,7 +888,7 @@ PROCEDURE loadDraftOrd
 (* PROCEDURE : loadDraftOrd                                     *)
 (* PURPOSE   : Read one fixed-size draft order record.          *)
 (* ============================================================ *)
-TYPE DraftOrd = seq,phaseCode,playerIdx,ordType,assetId,mode,status,checksum:BYTE;qty,priceSnap,cashDelta,mgnDelta,resv1,resv2:INTEGER
+TYPE DraftOrd = doSeq,doPhase,doPlyr,doType,doAsset,doMode,doStatus,doChk:BYTE;doQty,doPrice,doCashDl,doMgnDl,doResv1,doResv2:INTEGER
 PARAM ordPath : STRING[20]
 PARAM recIdx  : INTEGER
 PARAM ord     : DraftOrd
@@ -909,13 +909,13 @@ pathOpen := TRUE
 SEEK #path, seekPos
 GET #path, ord
 
-chkExp := ord.seq + ord.phaseCode + ord.playerIdx + ord.ordType
-chkExp := chkExp + ord.assetId + ord.mode + ord.status
-chkExp := chkExp + ord.qty + ord.priceSnap
-chkExp := chkExp + ord.cashDelta + ord.mgnDelta
-chkExp := chkExp + ord.resv1 + ord.resv2
+chkExp := ord.doSeq + ord.doPhase + ord.doPlyr + ord.doType
+chkExp := chkExp + ord.doAsset + ord.doMode + ord.doStatus
+chkExp := chkExp + ord.doQty + ord.doPrice
+chkExp := chkExp + ord.doCashDl + ord.doMgnDl
+chkExp := chkExp + ord.doResv1 + ord.doResv2
 chkExp := LAND(chkExp, 255)
-IF chkExp <> ord.checksum THEN
+IF chkExp <> ord.doChk THEN
   PRINT "loadDraftOrd: corrupt order"
   END
 ENDIF
@@ -937,7 +937,7 @@ PROCEDURE saveDraftOrd
 (* PROCEDURE : saveDraftOrd                                     *)
 (* PURPOSE   : Write one fixed-size draft order record.         *)
 (* ============================================================ *)
-TYPE DraftOrd = seq,phaseCode,playerIdx,ordType,assetId,mode,status,checksum:BYTE;qty,priceSnap,cashDelta,mgnDelta,resv1,resv2:INTEGER
+TYPE DraftOrd = doSeq,doPhase,doPlyr,doType,doAsset,doMode,doStatus,doChk:BYTE;doQty,doPrice,doCashDl,doMgnDl,doResv1,doResv2:INTEGER
 PARAM ordPath : STRING[20]
 PARAM recIdx  : INTEGER
 PARAM ord     : DraftOrd
@@ -952,12 +952,12 @@ ON ERROR GOTO 900
 pathOpen := FALSE
 ok := FALSE
 
-chkSum := ord.seq + ord.phaseCode + ord.playerIdx + ord.ordType
-chkSum := chkSum + ord.assetId + ord.mode + ord.status
-chkSum := chkSum + ord.qty + ord.priceSnap
-chkSum := chkSum + ord.cashDelta + ord.mgnDelta
-chkSum := chkSum + ord.resv1 + ord.resv2
-ord.checksum := LAND(chkSum, 255)
+chkSum := ord.doSeq + ord.doPhase + ord.doPlyr + ord.doType
+chkSum := chkSum + ord.doAsset + ord.doMode + ord.doStatus
+chkSum := chkSum + ord.doQty + ord.doPrice
+chkSum := chkSum + ord.doCashDl + ord.doMgnDl
+chkSum := chkSum + ord.doResv1 + ord.doResv2
+ord.doChk := LAND(chkSum, 255)
 
 seekPos := (recIdx - 1) * SIZE(ord)
 OPEN #path, ordPath:UPDATE
@@ -981,8 +981,8 @@ PROCEDURE appendDraftOrd
 (* PROCEDURE : appendDraftOrd                                   *)
 (* PURPOSE   : Append one active sell-draft order.              *)
 (* ============================================================ *)
-TYPE DraftHdr = magic,fmtVersion,phaseCode,playerIdx,status,recCount,nextSeq,checksum:BYTE;currYear,maxYears:INTEGER
-TYPE DraftOrd = seq,phaseCode,playerIdx,ordType,assetId,mode,status,checksum:BYTE;qty,priceSnap,cashDelta,mgnDelta,resv1,resv2:INTEGER
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
+TYPE DraftOrd = doSeq,doPhase,doPlyr,doType,doAsset,doMode,doStatus,doChk:BYTE;doQty,doPrice,doCashDl,doMgnDl,doResv1,doResv2:INTEGER
 PARAM hdrPath : STRING[20]
 PARAM ordPath : STRING[20]
 PARAM hdr     : DraftHdr
@@ -993,17 +993,17 @@ DIM recIdx    : INTEGER
 ON ERROR GOTO 900
 
 ok := FALSE
-ord.seq := hdr.nextSeq
-ord.phaseCode := hdr.phaseCode
-ord.playerIdx := hdr.playerIdx
-ord.status := 1
-recIdx := hdr.recCount + 1
+ord.doSeq := hdr.dhNextSeq
+ord.doPhase := hdr.dhPhase
+ord.doPlyr := hdr.dhPlyr
+ord.doStatus := 1
+recIdx := hdr.dhRecCnt + 1
 RUN saveDraftOrd(ordPath, recIdx, ord, ok)
 IF NOT ok THEN
   END
 ENDIF
-hdr.recCount := hdr.recCount + 1
-hdr.nextSeq := hdr.nextSeq + 1
+hdr.dhRecCnt := hdr.dhRecCnt + 1
+hdr.dhNextSeq := hdr.dhNextSeq + 1
 RUN saveDraftHdr(hdrPath, hdr, ok)
 END
 
@@ -1016,8 +1016,8 @@ PROCEDURE findSellDraftOrd
 (* PROCEDURE : findSellDraftOrd                                 *)
 (* PURPOSE   : Find one active sell-draft order for an asset.   *)
 (* ============================================================ *)
-TYPE DraftHdr = magic,fmtVersion,phaseCode,playerIdx,status,recCount,nextSeq,checksum:BYTE;currYear,maxYears:INTEGER
-TYPE DraftOrd = seq,phaseCode,playerIdx,ordType,assetId,mode,status,checksum:BYTE;qty,priceSnap,cashDelta,mgnDelta,resv1,resv2:INTEGER
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
+TYPE DraftOrd = doSeq,doPhase,doPlyr,doType,doAsset,doMode,doStatus,doChk:BYTE;doQty,doPrice,doCashDl,doMgnDl,doResv1,doResv2:INTEGER
 PARAM ordPath   : STRING[20]
 PARAM hdr       : DraftHdr
 PARAM wantType  : INTEGER
@@ -1033,14 +1033,14 @@ ON ERROR GOTO 900
 found := FALSE
 ok := FALSE
 
-FOR recIdx := 1 TO hdr.recCount
+FOR recIdx := 1 TO hdr.dhRecCnt
   RUN loadDraftOrd(ordPath, recIdx, ord, loadOK)
   IF NOT loadOK THEN
     END
   ENDIF
-  IF ord.status = 1 THEN
-    IF ord.ordType = wantType THEN
-      IF ord.assetId = wantId THEN
+  IF ord.doStatus = 1 THEN
+    IF ord.doType = wantType THEN
+      IF ord.doAsset = wantId THEN
         found := TRUE
       ENDIF
     ENDIF
@@ -1059,7 +1059,7 @@ PROCEDURE supersedeDraftOrd
 (* PROCEDURE : supersedeDraftOrd                                *)
 (* PURPOSE   : Mark one active order as superseded in place.    *)
 (* ============================================================ *)
-TYPE DraftOrd = seq,phaseCode,playerIdx,ordType,assetId,mode,status,checksum:BYTE;qty,priceSnap,cashDelta,mgnDelta,resv1,resv2:INTEGER
+TYPE DraftOrd = doSeq,doPhase,doPlyr,doType,doAsset,doMode,doStatus,doChk:BYTE;doQty,doPrice,doCashDl,doMgnDl,doResv1,doResv2:INTEGER
 PARAM ordPath : STRING[20]
 PARAM recIdx  : INTEGER
 PARAM ok      : BOOLEAN
@@ -1073,7 +1073,7 @@ IF NOT loadOK THEN
   ok := FALSE
   END
 ENDIF
-ord.status := 2
+ord.doStatus := 2
 RUN saveDraftOrd(ordPath, recIdx, ord, ok)
 END
 
@@ -1086,7 +1086,7 @@ PROCEDURE buildSellDraftOrd
 (* PROCEDURE : buildSellDraftOrd                                *)
 (* PURPOSE   : Build one sell-draft order record for an asset.  *)
 (* ============================================================ *)
-TYPE DraftOrd = seq,phaseCode,playerIdx,ordType,assetId,mode,status,checksum:BYTE;qty,priceSnap,cashDelta,mgnDelta,resv1,resv2:INTEGER
+TYPE DraftOrd = doSeq,doPhase,doPlyr,doType,doAsset,doMode,doStatus,doChk:BYTE;doQty,doPrice,doCashDl,doMgnDl,doResv1,doResv2:INTEGER
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 PARAM assetType : INTEGER
@@ -1102,19 +1102,19 @@ DIM repayAmt    : INTEGER
 
 ok := FALSE
 
-ord.seq := 0
-ord.phaseCode := 1
-ord.playerIdx := 1
-ord.ordType := assetType
-ord.assetId := assetIdx
-ord.mode := 1
-ord.status := 1
-ord.qty := reqQty
-ord.priceSnap := 0
-ord.cashDelta := 0
-ord.mgnDelta := 0
-ord.resv1 := 0
-ord.resv2 := 0
+ord.doSeq := 0
+ord.doPhase := 1
+ord.doPlyr := 1
+ord.doType := assetType
+ord.doAsset := assetIdx
+ord.doMode := 1
+ord.doStatus := 1
+ord.doQty := reqQty
+ord.doPrice := 0
+ord.doCashDl := 0
+ord.doMgnDl := 0
+ord.doResv1 := 0
+ord.doResv2 := 0
 
 IF assetType = 1 THEN
   IF assetIdx < 1 OR assetIdx > 9 THEN
@@ -1123,15 +1123,15 @@ IF assetType = 1 THEN
   IF reqQty < 0 OR reqQty > plyr.stckShrs(assetIdx) THEN
     END
   ENDIF
-  ord.priceSnap := mkt.stckPrice(assetIdx)
-  proceeds := reqQty * ord.priceSnap
+  ord.doPrice := mkt.stckPrice(assetIdx)
+  proceeds := reqQty * ord.doPrice
   IF plyr.mgnBal(assetIdx) > 0 THEN
-    ord.mode := 2
+    ord.doMode := 2
     RUN calcSaleMgnRpy(plyr.mgnBal(assetIdx), proceeds, repayAmt)
-    ord.cashDelta := proceeds - repayAmt
-    ord.mgnDelta := 0 - repayAmt
+    ord.doCashDl := proceeds - repayAmt
+    ord.doMgnDl := 0 - repayAmt
   ELSE
-    ord.cashDelta := proceeds
+    ord.doCashDl := proceeds
   ENDIF
 ELSE IF assetType = 2 THEN
   RUN initBondPar(bPar)
@@ -1141,8 +1141,8 @@ ELSE IF assetType = 2 THEN
   IF reqQty < 0 OR reqQty > plyr.bondUnts(assetIdx) THEN
     END
   ENDIF
-  ord.priceSnap := bPar(assetIdx)
-  ord.cashDelta := reqQty * ord.priceSnap
+  ord.doPrice := bPar(assetIdx)
+  ord.doCashDl := reqQty * ord.doPrice
 ELSE
   END
 ENDIF \ENDIF
@@ -1156,8 +1156,8 @@ PROCEDURE setSellDraftOrd
 (* PURPOSE   : Replace one asset's active sell-draft order and  *)
 (*             rebuild the cached summary.                      *)
 (* ============================================================ *)
-TYPE DraftHdr = magic,fmtVersion,phaseCode,playerIdx,status,recCount,nextSeq,checksum:BYTE;currYear,maxYears:INTEGER
-TYPE DraftOrd = seq,phaseCode,playerIdx,ordType,assetId,mode,status,checksum:BYTE;qty,priceSnap,cashDelta,mgnDelta,resv1,resv2:INTEGER
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
+TYPE DraftOrd = doSeq,doPhase,doPlyr,doType,doAsset,doMode,doStatus,doChk:BYTE;doQty,doPrice,doCashDl,doMgnDl,doResv1,doResv2:INTEGER
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 PARAM hdrPath   : STRING[20]
@@ -1177,14 +1177,14 @@ ON ERROR GOTO 900
 
 ok := FALSE
 
-FOR recIdx := 1 TO hdr.recCount
+FOR recIdx := 1 TO hdr.dhRecCnt
   RUN loadDraftOrd(ordPath, recIdx, ord, loadOK)
   IF NOT loadOK THEN
     END
   ENDIF
-  IF ord.status = 1 THEN
-    IF ord.ordType = assetType THEN
-      IF ord.assetId = assetIdx THEN
+  IF ord.doStatus = 1 THEN
+    IF ord.doType = assetType THEN
+      IF ord.doAsset = assetIdx THEN
         RUN supersedeDraftOrd(ordPath, recIdx, ok)
         IF NOT ok THEN
           END
@@ -1220,9 +1220,9 @@ PROCEDURE rebuildSellDraftSum
 (* PURPOSE   : Rebuild the cached sell-draft summary from all   *)
 (*             active draft orders.                             *)
 (* ============================================================ *)
-TYPE DraftHdr = magic,fmtVersion,phaseCode,playerIdx,status,recCount,nextSeq,checksum:BYTE;currYear,maxYears:INTEGER
-TYPE DraftOrd = seq,phaseCode,playerIdx,ordType,assetId,mode,status,checksum:BYTE;qty,priceSnap,cashDelta,mgnDelta,resv1,resv2:INTEGER
-TYPE DraftSum = phaseCode,playerIdx,hasDraft,activeCnt,checksum:BYTE;cashDelta,totalMgnDelta,totalRepay:INTEGER;stkQty(9):INTEGER;stkMgn(9):INTEGER;bndQty(3):INTEGER
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
+TYPE DraftOrd = doSeq,doPhase,doPlyr,doType,doAsset,doMode,doStatus,doChk:BYTE;doQty,doPrice,doCashDl,doMgnDl,doResv1,doResv2:INTEGER
+TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
 PARAM hdrPath : STRING[20]
 PARAM ordPath : STRING[20]
 PARAM hdr     : DraftHdr
@@ -1236,21 +1236,21 @@ ON ERROR GOTO 900
 
 RUN initDraftSum(sum)
 
-FOR recIdx := 1 TO hdr.recCount
+FOR recIdx := 1 TO hdr.dhRecCnt
   RUN loadDraftOrd(ordPath, recIdx, ord, loadOK)
   IF NOT loadOK THEN
     END
   ENDIF
-  IF ord.status = 1 THEN
-    sum.hasDraft := 1
-    sum.activeCnt := sum.activeCnt + 1
-    sum.cashDelta := sum.cashDelta + ord.cashDelta
-    sum.totalMgnDelta := sum.totalMgnDelta + ord.mgnDelta
-    IF ord.ordType = 1 THEN
-      sum.stkQty(ord.assetId) := sum.stkQty(ord.assetId) - ord.qty
-      sum.stkMgn(ord.assetId) := sum.stkMgn(ord.assetId) + ord.mgnDelta
-    ELSE IF ord.ordType = 2 THEN
-      sum.bndQty(ord.assetId) := sum.bndQty(ord.assetId) - ord.qty
+  IF ord.doStatus = 1 THEN
+    sum.dsHas := 1
+    sum.dsActCnt := sum.dsActCnt + 1
+    sum.dsCashDl := sum.dsCashDl + ord.doCashDl
+    sum.dsMgnDl := sum.dsMgnDl + ord.doMgnDl
+    IF ord.doType = 1 THEN
+      sum.dsStkQty(ord.doAsset) := sum.dsStkQty(ord.doAsset) - ord.doQty
+      sum.dsStkMgn(ord.doAsset) := sum.dsStkMgn(ord.doAsset) + ord.doMgnDl
+    ELSE IF ord.doType = 2 THEN
+      sum.dsBndQty(ord.doAsset) := sum.dsBndQty(ord.doAsset) - ord.doQty
     ENDIF \ENDIF
   ENDIF
 NEXT recIdx
@@ -1268,8 +1268,8 @@ PROCEDURE replaySellDraft
 (* PURPOSE   : Apply active sell-draft orders to one player     *)
 (*             record on final confirm.                         *)
 (* ============================================================ *)
-TYPE DraftHdr = magic,fmtVersion,phaseCode,playerIdx,status,recCount,nextSeq,checksum:BYTE;currYear,maxYears:INTEGER
-TYPE DraftOrd = seq,phaseCode,playerIdx,ordType,assetId,mode,status,checksum:BYTE;qty,priceSnap,cashDelta,mgnDelta,resv1,resv2:INTEGER
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
+TYPE DraftOrd = doSeq,doPhase,doPlyr,doType,doAsset,doMode,doStatus,doChk:BYTE;doQty,doPrice,doCashDl,doMgnDl,doResv1,doResv2:INTEGER
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 PARAM ordPath : STRING[20]
@@ -1289,43 +1289,43 @@ ON ERROR GOTO 900
 ok := FALSE
 RUN initBondPar(bPar)
 
-FOR recIdx := 1 TO hdr.recCount
+FOR recIdx := 1 TO hdr.dhRecCnt
   RUN loadDraftOrd(ordPath, recIdx, ord, loadOK)
   IF NOT loadOK THEN
     END
   ENDIF
-  IF ord.status = 1 THEN
-    IF ord.ordType = 1 THEN
-      IF ord.assetId < 1 OR ord.assetId > 9 THEN
+  IF ord.doStatus = 1 THEN
+    IF ord.doType = 1 THEN
+      IF ord.doAsset < 1 OR ord.doAsset > 9 THEN
         END
       ENDIF
-      IF ord.qty > plyr.stckShrs(ord.assetId) THEN
+      IF ord.doQty > plyr.stckShrs(ord.doAsset) THEN
         END
       ENDIF
-      IF ord.priceSnap <> mkt.stckPrice(ord.assetId) THEN
+      IF ord.doPrice <> mkt.stckPrice(ord.doAsset) THEN
         END
       ENDIF
-      proceeds := ord.qty * ord.priceSnap
-      IF plyr.mgnBal(ord.assetId) > 0 THEN
-        RUN calcSaleMgnRpy(plyr.mgnBal(ord.assetId), proceeds, repayAmt)
-        plyr.mgnBal(ord.assetId) := plyr.mgnBal(ord.assetId) - repayAmt
+      proceeds := ord.doQty * ord.doPrice
+      IF plyr.mgnBal(ord.doAsset) > 0 THEN
+        RUN calcSaleMgnRpy(plyr.mgnBal(ord.doAsset), proceeds, repayAmt)
+        plyr.mgnBal(ord.doAsset) := plyr.mgnBal(ord.doAsset) - repayAmt
         plyr.cashBal := plyr.cashBal + (proceeds - repayAmt)
       ELSE
         plyr.cashBal := plyr.cashBal + proceeds
       ENDIF
-      plyr.stckShrs(ord.assetId) := plyr.stckShrs(ord.assetId) - ord.qty
-    ELSE IF ord.ordType = 2 THEN
-      IF ord.assetId < 1 OR ord.assetId > 3 THEN
+      plyr.stckShrs(ord.doAsset) := plyr.stckShrs(ord.doAsset) - ord.doQty
+    ELSE IF ord.doType = 2 THEN
+      IF ord.doAsset < 1 OR ord.doAsset > 3 THEN
         END
       ENDIF
-      IF ord.qty > plyr.bondUnts(ord.assetId) THEN
+      IF ord.doQty > plyr.bondUnts(ord.doAsset) THEN
         END
       ENDIF
-      IF ord.priceSnap <> bPar(ord.assetId) THEN
+      IF ord.doPrice <> bPar(ord.doAsset) THEN
         END
       ENDIF
-      plyr.cashBal := plyr.cashBal + (ord.qty * ord.priceSnap)
-      plyr.bondUnts(ord.assetId) := plyr.bondUnts(ord.assetId) - ord.qty
+      plyr.cashBal := plyr.cashBal + (ord.doQty * ord.doPrice)
+      plyr.bondUnts(ord.doAsset) := plyr.bondUnts(ord.doAsset) - ord.doQty
     ENDIF \ENDIF
   ENDIF
 NEXT recIdx
