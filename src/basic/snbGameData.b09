@@ -7,6 +7,8 @@ PROCEDURE snbGameData
 (* ================================================== *)
 PRINT "snbGameData"
 PRINT "  initStockNames"
+PRINT "  getStockName"
+PRINT "  getStockDivRate"
 PRINT "  initBondPar"
 END
 
@@ -28,6 +30,66 @@ sNam(6) := "Tri-City Trn"
 sNam(7) := "United Auto"
 sNam(8) := "Uranium Ent"
 sNam(9) := "Valley Power"
+END
+
+PROCEDURE getStockName
+(* ================================================== *)
+(* PROCEDURE: getStockName                            *)
+(* PURPOSE:   Return one stock name by stock id.      *)
+(* PARAMS:    stockId - stock index 1..9              *)
+(*            stockNm - receives stock display name   *)
+(* EFFECTS:   stockNm is blank for an invalid id.     *)
+(* ================================================== *)
+PARAM stockId : INTEGER
+PARAM stockNm : STRING[14]
+
+stockNm := ""
+IF stockId = 1 THEN
+  stockNm := "Growth Corp"
+ELSE IF stockId = 2 THEN
+  stockNm := "Metro Props"
+ELSE IF stockId = 3 THEN
+  stockNm := "Pioneer Mut"
+ELSE IF stockId = 4 THEN
+  stockNm := "Shady Brooks"
+ELSE IF stockId = 5 THEN
+  stockNm := "Stryker Drlg"
+ELSE IF stockId = 6 THEN
+  stockNm := "Tri-City Trn"
+ELSE IF stockId = 7 THEN
+  stockNm := "United Auto"
+ELSE IF stockId = 8 THEN
+  stockNm := "Uranium Ent"
+ELSE IF stockId = 9 THEN
+  stockNm := "Valley Power"
+ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF
+END
+
+PROCEDURE getStockDivRate
+(* ================================================== *)
+(* PROCEDURE: getStockDivRate                         *)
+(* PURPOSE:   Return one stock dividend rate by id.   *)
+(* PARAMS:    stockId - stock index 1..9              *)
+(*            divRate - receives dividend percent     *)
+(* EFFECTS:   divRate=0 for an invalid id.            *)
+(* ================================================== *)
+PARAM stockId : INTEGER
+PARAM divRate : INTEGER
+
+divRate := 0
+IF stockId = 1 THEN
+  divRate := 1
+ELSE IF stockId = 3 THEN
+  divRate := 4
+ELSE IF stockId = 4 THEN
+  divRate := 7
+ELSE IF stockId = 7 THEN
+  divRate := 2
+ELSE IF stockId = 8 THEN
+  divRate := 6
+ELSE IF stockId = 9 THEN
+  divRate := 3
+ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF
 END
 
 PROCEDURE initBondPar

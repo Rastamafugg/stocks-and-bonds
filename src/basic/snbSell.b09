@@ -30,7 +30,7 @@ DIM ordId(12)  : INTEGER
 DIM ordQty(12) : INTEGER
 DIM ordCnt     : INTEGER
 DIM usrAct     : INTEGER
-DIM sNam(9)    : STRING[14]
+DIM stockNm    : STRING[14]
 DIM bPar(3)    : INTEGER
 DIM repay      : INTEGER
 DIM loopIdx    : INTEGER \ ! Loop counter
@@ -59,7 +59,6 @@ DIM currMgnTot : INTEGER
 DIM workBal(9) : INTEGER
 DIM p          : INTEGER
 DIM nextP      : INTEGER
-DIM divRate(9) : INTEGER
 DIM yldPct     : INTEGER
 DIM divVal     : INTEGER
 DIM hasSell    : BOOLEAN
@@ -71,6 +70,8 @@ DIM divPrj     : INTEGER
 DIM projTxt    : STRING[8]
 DIM mgnTxt     : STRING[7]
 DIM ordTxt     : STRING[24]
+DIM bondParVal : INTEGER
+DIM bondQtyVal : INTEGER
 ON ERROR GOTO 900
 
 RUN loadGame("SNBSTATE", hdr, deckOrd, plyrs, mkt, loadOK)
@@ -81,7 +82,6 @@ ENDIF
 
 iCYr  := hdr.currYear
 iPCnt := hdr.plyrCount
-RUN initStockNames(sNam)
 p := 1
 IF hdr.savedPhase = 1 THEN
   p := hdr.savedPlyr
@@ -94,15 +94,6 @@ ENDIF
 IF NOT plyrs(p).isBankrupt THEN
   ordCnt := 0
   IF iCYr > 1 THEN
-    divRate(1) := 1
-    divRate(2) := 0
-    divRate(3) := 4
-    divRate(4) := 7
-    divRate(5) := 0
-    divRate(6) := 0
-    divRate(7) := 2
-    divRate(8) := 6
-    divRate(9) := 3
     RUN initBondPar(bPar)
     RUN clrOrders(ordTyp, ordId, ordQty, ordCnt)
 
@@ -159,10 +150,11 @@ IF NOT plyrs(p).isBankrupt THEN
         IF mapType(loopIdx) = 1 THEN
           hasSell := TRUE
           s := mapId(loopIdx)
+          RUN getStockName(s, stockNm)
           slotQty := mapQty(loopIdx)
           keyLbl := CHR$(mapKey(loopIdx))
-          yldPct := divRate(s)
-          divVal := (mkt.stckPrice(s) * divRate(s)) / 100
+          RUN getStockDivRate(s, yldPct)
+          divVal := (mkt.stckPrice(s) * yldPct) / 100
           holdQty := plyrs(p).stckShrs(s)
           prjQty := holdQty
           divPrj := 0
@@ -190,7 +182,7 @@ IF NOT plyrs(p).isBankrupt THEN
             ordTxt := ordTxt + " = TOT " + TRIM$(STR$(prjQty))
           ENDIF
           ! Line exceeds 79 chars; PRINT USING row format requires single line.
-          PRINT USING "'  ',S1<,' ',S12<,'  $',I4>,' ',I2>,'% -> $',I2>,' ',S5<,' ',S6<,' OWN ',I3>,' ',S18<", keyLbl, sNam(s), mkt.stckPrice(s), yldPct, divVal, projTxt, mgnTxt, holdQty, ordTxt
+          PRINT USING "'  ',S1<,' ',S12<,'  $',I4>,' ',I2>,'% -> $',I2>,' ',S5<,' ',S6<,' OWN ',I3>,' ',S18<", keyLbl, stockNm, mkt.stckPrice(s), yldPct, divVal, projTxt, mgnTxt, holdQty, ordTxt
         ENDIF
       NEXT loopIdx
 
@@ -294,6 +286,15 @@ IF NOT plyrs(p).isBankrupt THEN
       ELSE
         IF selIdx > 0 THEN
           s := mapId(selIdx)
+          stockNm := ""
+          bondParVal := 0
+          bondQtyVal := 0
+          IF mapType(selIdx) = 1 THEN
+            RUN getStockName(s, stockNm)
+          ELSE
+            bondParVal := bPar(s)
+            bondQtyVal := plyrs(p).bondUnts(s)
+          ENDIF
           workCash := plyrs(p).cashBal
           FOR loopIdx := 1 TO 9
             workBal(loopIdx) := plyrs(p).mgnBal(loopIdx)
@@ -323,7 +324,7 @@ IF NOT plyrs(p).isBankrupt THEN
             ordModeVal := 2
           ENDIF
           ! Line exceeds 79 chars; RUN statement cannot be split.
-          RUN promptEditOrderQty("=== SELL QUANTITY ===", mapType(selIdx), sNam(s), plyrs(p).stckShrs(s), mkt.stckPrice(s), ordModeVal, workCash, workMgn, workBal(s), bPar(s), plyrs(p).bondUnts(s), 1, slotIdx, ordQty, qty, sqAct)
+          RUN promptEditOrderQty("=== SELL QUANTITY ===", mapType(selIdx), stockNm, plyrs(p).stckShrs(s), mkt.stckPrice(s), ordModeVal, workCash, workMgn, workBal(s), bondParVal, bondQtyVal, 1, slotIdx, ordQty, qty, sqAct)
           IF sqAct = 3 THEN
             ordCnt := 0
             usrAct := 3

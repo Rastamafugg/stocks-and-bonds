@@ -131,7 +131,12 @@ ELSE
       valid := TRUE
     ELSE
       IF bondNav <> 0 THEN
-        RUN getSaveQuitAct(qIn, action)
+        action := 0
+        IF qIn = "S" OR qIn = "s" THEN
+          action := 3
+        ELSE IF qIn = "Q" OR qIn = "q" THEN
+          action := 4
+        ENDIF \ENDIF
         IF action = 3 OR action = 4 THEN
           END
         ENDIF

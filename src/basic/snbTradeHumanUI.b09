@@ -57,29 +57,15 @@ PARAM currStkMgn : INTEGER
 PARAM allowNav : INTEGER
 PARAM navAct   : INTEGER
 
-DIM buf          : STRING[8]
-DIM dispTxt      : STRING[48]
-DIM infoTxt      : STRING[80]
-DIM errTxt       : STRING[48]
-DIM maxTxt       : STRING[8]
-DIM priceLbl     : STRING[8]
-DIM lblCsh       : STRING[8]
-DIM lblCshPrj    : STRING[8]
-DIM lblMgnObl    : STRING[8]
-DIM lblMgnOblPrj : STRING[8]
-DIM lblStkMgn    : STRING[8]
-DIM lblStkMgnPrj : STRING[8]
 DIM kIn          : STRING[1]
-DIM lastChr      : STRING[1]
+DIM pStr         : STRING[8]
+DIM pStr2        : STRING[8]
 DIM keyCode      : INTEGER
-DIM numOk        : BOOLEAN
-DIM workQty      : INTEGER
 DIM totalQty     : INTEGER
 DIM regs         : Register
 DIM callCod      : BYTE
 DIM iCC          : INTEGER
 DIM iBits        : INTEGER
-DIM dispQty      : INTEGER
 DIM cashNow      : INTEGER
 DIM mgnNow       : INTEGER
 DIM stkMgnNow    : INTEGER
@@ -90,19 +76,16 @@ DIM prjAmt       : INTEGER
 ON ERROR GOTO 900
 
 navAct := 1
-buf := ""
-errTxt := ""
 
 LOOP
   RUN clrScr
   PRINT title
   PRINT
-  dispQty := qty
   cashNow := currCash
   mgnNow  := currMrgObl
   stkMgnNow := currStkMgn
-  IF dispQty > 0 THEN
-    prjCost := dispQty * price
+  IF qty > 0 THEN
+    prjCost := qty * price
     IF ordMode = 2 AND canMode <> 0 THEN \ ! MARG
       prjCash := prjCost / 2
       cashNow := cashNow - prjCash
@@ -131,21 +114,19 @@ LOOP
       cashNow := currCash + prjCost
     ENDIF \ENDIF \ENDIF \ENDIF
   ENDIF
-  RUN fmtMoney(currCash, lblCsh)
-  RUN fmtMoney(cashNow, lblCshPrj)
-  RUN fmtMoney(currMrgObl, lblMgnObl)
-  RUN fmtMoney(mgnNow, lblMgnOblPrj)
-  IF currStkMgn >= 0 THEN
-    RUN fmtMoney(currStkMgn, lblStkMgn)
-    RUN fmtMoney(stkMgnNow, lblStkMgnPrj)
-  ENDIF
-  PRINT "  Cash: $"; lblCsh; " [$"; lblCshPrj; "]";
+  RUN fmtMoney(currCash, pStr)
+  RUN fmtMoney(cashNow, pStr2)
+  PRINT "  Cash: $"; pStr; " [$"; pStr2; "]";
+  RUN fmtMoney(currMrgObl, pStr)
+  RUN fmtMoney(mgnNow, pStr2)
   IF ordMode = 3 THEN \ ! LIQ
-    PRINT "  Obligation: $"; lblMgnObl; " [$"; lblMgnOblPrj; "]"
+    PRINT "  Obligation: $"; pStr; " [$"; pStr2; "]"
   ELSE
-    PRINT "  Margin: $"; lblMgnObl; " [$"; lblMgnOblPrj; "]";
+    PRINT "  Margin: $"; pStr; " [$"; pStr2; "]";
     IF currStkMgn >= 0 THEN
-      PRINT "  Stock Mgn: $"; lblStkMgn; " [$"; lblStkMgnPrj; "]"
+      RUN fmtMoney(currStkMgn, pStr)
+      RUN fmtMoney(stkMgnNow, pStr2)
+      PRINT "  Stock Mgn: $"; pStr; " [$"; pStr2; "]"
     ELSE
       PRINT
     ENDIF
@@ -153,25 +134,22 @@ LOOP
   IF ordMode = 3 THEN
     PRINT
   ENDIF
-  RUN fmtMoney(price, priceLbl)
-  infoTxt := "  " + stockNm + "  " + TRIM$(STR$(holdQty))
-  infoTxt := infoTxt + " shrs @ $" + priceLbl
+  RUN fmtMoney(price, pStr)
+  PRINT "  "; stockNm; "  "; TRIM$(STR$(holdQty)); " shrs @ $"; pStr;
   IF qty > 0 THEN
     IF ordMode = 0 OR ordMode = 3 OR (ordMode = 2 AND canMode = 0) THEN \ ! SELL / LIQ / MARG sell
-      infoTxt := infoTxt + "  [Sell " + TRIM$(STR$(qty)) + "]"
+      PRINT "  [Sell "; TRIM$(STR$(qty)); "]"
     ELSE
       totalQty := holdQty + qty
       IF ordMode = 2 THEN \ ! MARG
-        infoTxt := infoTxt + "  + [" + TRIM$(STR$(qty))
-        infoTxt := infoTxt + " Shrs M] = " + TRIM$(STR$(totalQty))
+        PRINT "  + ["; TRIM$(STR$(qty)); " Shrs M] = "; TRIM$(STR$(totalQty)); " Total"
       ELSE
-        infoTxt := infoTxt + "  + [" + TRIM$(STR$(qty))
-        infoTxt := infoTxt + " Shrs C] = " + TRIM$(STR$(totalQty))
+        PRINT "  + ["; TRIM$(STR$(qty)); " Shrs C] = "; TRIM$(STR$(totalQty)); " Total"
       ENDIF
-      infoTxt := infoTxt + " Total"
     ENDIF
+  ELSE
+    PRINT
   ENDIF
-  PRINT infoTxt
   PRINT
   PRINT "  Adjust Stock Amount:"
   PRINT
@@ -184,12 +162,7 @@ LOOP
     PRINT "  S=save+exit       Q=quit"
   ENDIF
   PRINT
-  dispTxt := "  Qty (Up/Down, 0 clears): " + TRIM$(STR$(qty)) + "   "
-  PRINT dispTxt
-  IF errTxt <> "" THEN
-    PRINT
-    PRINT errTxt
-  ENDIF
+  PRINT "  Qty (Up/Down, 0 clears): "; TRIM$(STR$(qty)); "   "
 
   GET #0, kIn
   IF kIn <> "" THEN
@@ -212,15 +185,12 @@ LOOP
     iBits := regs.a
   ENDIF
 
-  errTxt := ""
   IF LAND(iBits, $08) <> 0 THEN
-    buf := ""
     qty := qty + 10
     IF qty > maxQty THEN
       qty := maxQty
     ENDIF
   ELSE IF LAND(iBits, $10) <> 0 THEN
-    buf := ""
     qty := qty - 10
     IF qty < 0 THEN
       qty := 0
@@ -235,10 +205,8 @@ LOOP
     END
   ELSE IF canMode <> 0 AND keyCode = ASC("C") THEN \ ! CASH
     ordMode := 1 \ ! CASH
-    buf := ""
   ELSE IF canMode <> 0 AND keyCode = ASC("M") THEN \ ! MARG
     ordMode := 2 \ ! MARG
-    buf := ""
   ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF
 ENDLOOP
 
