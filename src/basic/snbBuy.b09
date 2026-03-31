@@ -1,63 +1,47 @@
 PROCEDURE snbBuy
 (* ============================================================ *)
 (* PROCEDURE : snbBuy                                           *)
-(* PURPOSE   : Human buy-phase child process. Loads SNBSTATE,  *)
-(*             runs the buy phase for the current saved-turn   *)
-(*             human player only, then writes the next         *)
-(*             checkpoint and gameStage back to SNBSTATE.      *)
-(* PARAMS    : None (child process; no PARAM handoff)          *)
-(* SIDE EFX  : Reads and writes SNBSTATE. Modifies player      *)
-(*             cash, margin, holdings, hadCashPur, and         *)
-(*             hdr.gameStage.                                  *)
-(* NOTE      : snbPhaseCore, snbTradeShared,                   *)
-(*             snbTradeHumanUI, snbBuyExec, and snbBuy must be *)
-(*             pre-loaded by the coordinator before fork.      *)
+(* PURPOSE   : Human buy-phase child process. Loads SNBSTATE    *)
+(*             header and market state once, then processes     *)
+(*             consecutive human players by loading and saving  *)
+(*             one player record at a time. Exits when the next *)
+(*             active player is AI or when margin-pay begins.   *)
+(* PARAMS    : None (child process; no PARAM handoff)           *)
+(* SIDE EFX  : Reads and writes SNBSTATE. Copies SNBSTATE to    *)
+(*             SNBGAME on save.                                 *)
+(* NOTE      : snbPhaseCore, snbTradeShared,                    *)
+(*             snbTradeHumanUI, snbBuyExec, and snbBuy must be  *)
+(*             pre-loaded by the coordinator before fork.       *)
 (* ============================================================ *)
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
-DIM hdr        : SaveHdr
-DIM deckOrd(36): BYTE
-DIM plyrs(6)   : PlyrRec
-DIM mkt        : MktState
-DIM loadOK     : BOOLEAN
-DIM iCYr       : INTEGER
-DIM iMaxYr     : INTEGER
-DIM iPCnt      : INTEGER
-DIM activePlrs : INTEGER
-DIM ordTyp(12) : INTEGER
-DIM ordId(12)  : INTEGER
-DIM ordQty(12) : INTEGER
-DIM ordPur(12) : INTEGER
-DIM ordCnt     : INTEGER
-DIM prjMgnBal(9): INTEGER
-DIM pNam       : STRING[27]
-DIM mgnElig    : BOOLEAN
-DIM mgnYrOk    : BOOLEAN
-DIM usrAct     : INTEGER
-DIM actualRpy  : INTEGER
-DIM aiTierVal  : INTEGER
-DIM pTypeVal   : INTEGER
-DIM p          : INTEGER
-DIM nextP      : INTEGER
+DIM hdr      : SaveHdr
+DIM plyr     : PlyrRec
+DIM mkt      : MktState
+DIM loadOK   : BOOLEAN
+DIM saveOK   : BOOLEAN
+DIM iCYr     : INTEGER
+DIM iMaxYr   : INTEGER
+DIM iPCnt    : INTEGER
+DIM mgnRuleVal : INTEGER
+DIM p        : INTEGER
+DIM nextP    : INTEGER
+DIM scanP    : INTEGER
+DIM usrAct   : INTEGER
 
 ON ERROR GOTO 900
 
-RUN loadGame("SNBSTATE", hdr, deckOrd, plyrs, mkt, loadOK)
+RUN loadHdrMkt("SNBSTATE", hdr, mkt, loadOK)
 IF NOT loadOK THEN
-  PRINT "snbBuy: loadGame failed"
+  PRINT "snbBuy: loadHdrMkt failed"
   END
 ENDIF
 
 iCYr   := hdr.currYear
 iMaxYr := hdr.maxYears
 iPCnt  := hdr.plyrCount
-mgnYrOk := FALSE
-IF hdr.mgnRule = 1 THEN
-  IF iCYr < iMaxYr THEN
-    mgnYrOk := TRUE
-  ENDIF
-ENDIF
+mgnRuleVal := hdr.mgnRule
 p := 1
 IF hdr.savedPhase = 2 THEN
   p := hdr.savedPlyr
@@ -67,52 +51,185 @@ IF p < 1 OR p > iPCnt THEN
   END
 ENDIF
 
-RUN findNextActivePlyr(plyrs, iPCnt, p, nextP)
+LOOP
 
-IF NOT plyrs(p).isBankrupt THEN
-  pTypeVal  := plyrs(p).plyrType
-  aiTierVal := plyrs(p).aiTier
-  RUN fmtPlyrName(plyrs(p).plyrName, pTypeVal, aiTierVal, pNam)
-  ordCnt  := 0
-  mgnElig := plyrs(p).hadCashPur
-  FOR pTypeVal := 1 TO 9
-    prjMgnBal(pTypeVal) := plyrs(p).mgnBal(pTypeVal)
-  NEXT pTypeVal
+  EXITIF p < 1 OR p > iPCnt THEN
+  ENDEXIT
 
-  RUN scrBuy(iCYr, plyrs(p), mkt, mgnElig, mgnYrOk, ordTyp, ordId, ordQty, ordPur, ordCnt, prjMgnBal, usrAct)
+  RUN loadPlyrRec("SNBSTATE", hdr, p, plyr, loadOK)
+  IF NOT loadOK THEN
+    PRINT "snbBuy: loadPlyrRec failed"
+    END
+  ENDIF
+
+  IF plyr.plyrType = 2 THEN
+    hdr.savedPhase := 2
+    hdr.savedPlyr  := p
+    hdr.gameStage  := 2
+    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
+    IF NOT saveOK THEN
+      PRINT "snbBuy: saveHdrOnly failed"
+    ENDIF
+    END
+  ENDIF
+
+  usrAct := 1
+  IF NOT plyr.isBankrupt THEN
+    RUN runBuyPlyr(iCYr, iMaxYr, mgnRuleVal, plyr, mkt, usrAct)
+  ENDIF
+
+  RUN savePlyrRec("SNBSTATE", hdr, p, plyr, saveOK)
+  IF NOT saveOK THEN
+    PRINT "snbBuy: savePlyrRec failed"
+    END
+  ENDIF
+
   IF usrAct = 3 THEN
-    RUN saveQuitToMenu(2, p, hdr, deckOrd, plyrs, mkt)
+    hdr.savedPhase := 2
+    hdr.savedPlyr  := p
+    hdr.gameStage  := 2
+    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
+    IF NOT saveOK THEN
+      PRINT "snbBuy: saveHdrOnly failed"
+      END
+    ENDIF
+    RUN copySaveFile("SNBSTATE", "SNBGAME", saveOK)
+    IF NOT saveOK THEN
+      PRINT "snbBuy: copySaveFile failed"
+      END
+    ENDIF
+    hdr.savedPhase := 9
+    hdr.savedPlyr  := 0
+    hdr.gameStage  := 2
+    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
+    IF NOT saveOK THEN
+      PRINT "snbBuy: saveHdrOnly failed"
+    ENDIF
     END
   ELSE IF usrAct = 4 THEN
-    RUN quitToMenu(hdr, deckOrd, plyrs, mkt)
+    hdr.savedPhase := 9
+    hdr.savedPlyr  := 0
+    hdr.gameStage  := 2
+    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
+    IF NOT saveOK THEN
+      PRINT "snbBuy: saveHdrOnly failed"
+    ENDIF
     END
   ENDIF \ENDIF
 
-  IF ordCnt > 0 THEN
-    RUN applyBuys(plyrs(p), mkt, ordTyp, ordId, ordQty, ordPur, ordCnt)
-  ENDIF
-  plyrs(p).obligation := 0
-ENDIF
+  nextP := 0
+  FOR scanP := p + 1 TO iPCnt
+    IF nextP = 0 THEN
+      RUN loadPlyrRec("SNBSTATE", hdr, scanP, plyr, loadOK)
+      IF NOT loadOK THEN
+        PRINT "snbBuy: loadPlyrRec failed"
+        END
+      ENDIF
+      IF NOT plyr.isBankrupt THEN
+        nextP := scanP
+      ENDIF
+    ENDIF
+  NEXT scanP
 
-IF nextP > 0 THEN
-  hdr.savedPhase := 2
-  hdr.savedPlyr  := nextP
-ELSE
-  hdr.savedPhase := 5
-  hdr.savedPlyr  := 1
-ENDIF
-
-activePlrs := 0
-FOR p := 1 TO iPCnt
-  IF NOT plyrs(p).isBankrupt THEN
-    activePlrs := activePlrs + 1
+  IF nextP = 0 THEN
+    hdr.savedPhase := 5
+    hdr.savedPlyr  := 1
+    hdr.gameStage  := 2
+    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
+    IF NOT saveOK THEN
+      PRINT "snbBuy: saveHdrOnly failed"
+    ENDIF
+    END
   ENDIF
-NEXT p
-hdr.gameStage := 2
-RUN saveGame("SNBSTATE", hdr, deckOrd, plyrs, mkt)
+
+  IF plyr.plyrType = 2 THEN
+    hdr.savedPhase := 2
+    hdr.savedPlyr  := nextP
+    hdr.gameStage  := 2
+    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
+    IF NOT saveOK THEN
+      PRINT "snbBuy: saveHdrOnly failed"
+    ENDIF
+    END
+  ENDIF
+
+  p := nextP
+
+ENDLOOP
+
 END
 
 900 PRINT "snbBuy error ("; ERR; ")"
+RUN waitKey
+END
+
+PROCEDURE runBuyPlyr
+(* ============================================================ *)
+(* PROCEDURE : runBuyPlyr                                       *)
+(* PURPOSE   : Run the human buy-phase editor for one player    *)
+(*             record only. Applies confirmed buy orders to     *)
+(*             the passed-in player record.                     *)
+(* PARAMS    : currYear   - current game year                   *)
+(*             maxYears   - configured final year               *)
+(*             mgnRuleVal - staged hdr.mgnRule                  *)
+(*             plyr       - player record for the active turn   *)
+(*             mkt        - market state                        *)
+(*             action     - 1=continue 3=save+exit 4=quit       *)
+(* SIDE EFX  : Modifies plyr cash, margin, holdings, hadCashPur,*)
+(*             and obligation on confirmed orders.              *)
+(* ============================================================ *)
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+PARAM currYear   : INTEGER
+PARAM maxYears   : INTEGER
+PARAM mgnRuleVal : INTEGER
+PARAM plyr       : PlyrRec
+PARAM mkt        : MktState
+PARAM action     : INTEGER
+DIM ordTyp(12)   : INTEGER
+DIM ordId(12)    : INTEGER
+DIM ordQty(12)   : INTEGER
+DIM ordPur(12)   : INTEGER
+DIM ordCnt       : INTEGER
+DIM prjMgnBal(9) : INTEGER
+DIM mgnElig      : BOOLEAN
+DIM mgnYrOk      : BOOLEAN
+DIM usrAct       : INTEGER
+DIM s            : INTEGER
+
+ON ERROR GOTO 900
+
+action := 1
+ordCnt := 0
+mgnElig := plyr.hadCashPur
+mgnYrOk := FALSE
+IF mgnRuleVal = 1 THEN
+  IF currYear < maxYears THEN
+    mgnYrOk := TRUE
+  ENDIF
+ENDIF
+FOR s := 1 TO 9
+  prjMgnBal(s) := plyr.mgnBal(s)
+NEXT s
+
+! Line exceeds 79 chars; RUN statement cannot be split.
+RUN scrBuy(currYear, plyr, mkt, mgnElig, mgnYrOk, ordTyp, ordId, ordQty, ordPur, ordCnt, prjMgnBal, usrAct)
+IF usrAct = 3 THEN
+  action := 3
+  END
+ELSE IF usrAct = 4 THEN
+  action := 4
+  END
+ENDIF \ENDIF
+
+IF ordCnt > 0 THEN
+  RUN applyBuys(plyr, mkt, ordTyp, ordId, ordQty, ordPur, ordCnt)
+ENDIF
+plyr.obligation := 0
+action := 1
+END
+
+900 PRINT "runBuyPlyr error ("; ERR; ")"
 RUN waitKey
 END
 
