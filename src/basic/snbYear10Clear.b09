@@ -10,9 +10,8 @@ PROCEDURE snbYear10Clear
 (* SIDE EFX  : Reads and writes SNBSTATE. May modify player     *)
 (*             cash, margin, holdings, and bankruptcy state.    *)
 (* NOTE      : snbPhaseCore, snbTradeShared, snbGameData,       *)
-(*             snbTradeHumanUI, snbSellMargin, and              *)
-(*             snbYear10Clear must be pre-loaded by the         *)
-(*             coordinator before fork.                         *)
+(*             snbTradeHumanUI, and snbYear10Clear must be      *)
+(*             pre-loaded by the coordinator before fork.       *)
 (* ============================================================ *)
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
@@ -24,10 +23,8 @@ DIM mkt        : MktState
 DIM loadOK     : BOOLEAN
 DIM iCYr       : INTEGER
 DIM iPCnt      : INTEGER
-DIM ordTyp(12) : INTEGER
-DIM ordId(12)  : INTEGER
-DIM ordQty(12) : INTEGER
-DIM ordCnt     : INTEGER
+DIM sellStkQty(9): INTEGER
+DIM sellBndQty(3): INTEGER
 DIM clrAct     : BYTE
 DIM bPar(3)    : INTEGER
 DIM totalMgn   : INTEGER
@@ -43,23 +40,20 @@ DIM pStr2      : STRING[8]
 DIM valid      : BOOLEAN
 DIM numOk      : BOOLEAN
 DIM keyCode    : INTEGER
-DIM mapCnt     : INTEGER
-DIM mapType(12): INTEGER
-DIM mapId(12)  : INTEGER
-DIM mapKey(12) : INTEGER
-DIM mapQty(12) : INTEGER
 DIM stockCnt   : INTEGER
 DIM bondCnt    : INTEGER
 DIM keyLbl     : STRING[1]
-DIM slotIdx    : INTEGER
 DIM slotQty    : INTEGER
-DIM selIdx     : INTEGER
 DIM kIn        : STRING[1]
 DIM workCash   : INTEGER
 DIM workMgn    : INTEGER
 DIM workBal(9) : INTEGER
 DIM prcd       : INTEGER
 DIM currMgnTot : INTEGER
+DIM pendCnt    : INTEGER
+DIM dispIdx    : INTEGER
+DIM selType    : INTEGER
+DIM selId      : INTEGER
 DIM p          : INTEGER
 DIM nextP      : INTEGER
 DIM ordModeVal : INTEGER
@@ -98,21 +92,32 @@ IF NOT plyrs(p).isBankrupt THEN
       ENDEXIT
       clrAct := 1
       repay := 0
-      RUN clrOrders(ordTyp, ordId, ordQty, ordCnt)
+      FOR s := 1 TO 9
+        sellStkQty(s) := 0
+      NEXT s
+      FOR loopIdx := 1 TO 3
+        sellBndQty(loopIdx) := 0
+      NEXT loopIdx
       LOOP
         workCash := plyrs(p).cashBal
         FOR s := 1 TO 9
           workBal(s) := plyrs(p).mgnBal(s)
         NEXT s
         workMgn := 0
-        FOR loopIdx := 1 TO ordCnt
-          IF ordTyp(loopIdx) = 1 THEN
-            prcd := ordQty(loopIdx) * mkt.stckPrice(ordId(loopIdx))
-            RUN calcSaleMgnRpy(workBal(ordId(loopIdx)), prcd, actualRpy)
-            workBal(ordId(loopIdx)) := workBal(ordId(loopIdx)) - actualRpy
+        pendCnt := 0
+        FOR s := 1 TO 9
+          IF sellStkQty(s) > 0 THEN
+            pendCnt := pendCnt + 1
+            prcd := sellStkQty(s) * mkt.stckPrice(s)
+            RUN calcSaleMgnRpy(workBal(s), prcd, actualRpy)
+            workBal(s) := workBal(s) - actualRpy
             workCash := workCash + (prcd - actualRpy)
-          ELSE
-            prcd := ordQty(loopIdx) * bPar(ordId(loopIdx))
+          ENDIF
+        NEXT s
+        FOR loopIdx := 1 TO 3
+          IF sellBndQty(loopIdx) > 0 THEN
+            pendCnt := pendCnt + 1
+            prcd := sellBndQty(loopIdx) * bPar(loopIdx)
             workCash := workCash + prcd
           ENDIF
         NEXT loopIdx
@@ -146,8 +151,18 @@ IF NOT plyrs(p).isBankrupt THEN
         PRINT "  All margin must be cleared before the buy phase."
         PRINT
 
-        RUN prepAssetMaps(plyrs(p), mkt, 2, ordTyp, ordId, ordQty, ordCnt, mapType, mapId, mapKey, mapQty, mapCnt, stockCnt, bondCnt)
-
+        stockCnt := 0
+        bondCnt := 0
+        FOR s := 1 TO 9
+          IF plyrs(p).stckShrs(s) > 0 AND mkt.stckPrice(s) > 0 THEN
+            stockCnt := stockCnt + 1
+          ENDIF
+        NEXT s
+        FOR loopIdx := 1 TO 3
+          IF plyrs(p).bondUnts(loopIdx) > 0 THEN
+            bondCnt := bondCnt + 1
+          ENDIF
+        NEXT loopIdx
         PRINT "  STOCKS:";
         IF stockCnt = 1 THEN
           PRINT " press 1"
@@ -156,11 +171,12 @@ IF NOT plyrs(p).isBankrupt THEN
         ELSE
           PRINT
         ENDIF \ENDIF
-        FOR loopIdx := 1 TO mapCnt
-          IF mapType(loopIdx) = 1 THEN
-            s := mapId(loopIdx)
-            slotQty := mapQty(loopIdx)
-            keyLbl := CHR$(mapKey(loopIdx))
+        dispIdx := 0
+        FOR s := 1 TO 9
+          IF plyrs(p).stckShrs(s) > 0 AND mkt.stckPrice(s) > 0 THEN
+            dispIdx := dispIdx + 1
+            slotQty := sellStkQty(s)
+            keyLbl := CHR$(ASC("0") + dispIdx)
             ! Line exceeds 79 chars; PRINT USING row format requires single line.
             PRINT USING "'  ',S1<,' ',S12<,I5>,' shrs @ $',I4>", keyLbl, sNam(s), plyrs(p).stckShrs(s), mkt.stckPrice(s);
             IF plyrs(p).mgnBal(s) > 0 THEN
@@ -171,7 +187,7 @@ IF NOT plyrs(p).isBankrupt THEN
             ENDIF
             PRINT
           ENDIF
-        NEXT loopIdx
+        NEXT s
         PRINT
         PRINT "  BONDS:";
         IF bondCnt = 1 THEN
@@ -181,13 +197,14 @@ IF NOT plyrs(p).isBankrupt THEN
         ELSE
           PRINT
         ENDIF \ENDIF
-        FOR loopIdx := 1 TO mapCnt
-          IF mapType(loopIdx) = 2 THEN
-            s := mapId(loopIdx)
-            slotQty := mapQty(loopIdx)
-            keyLbl := CHR$(mapKey(loopIdx))
+        dispIdx := 0
+        FOR loopIdx := 1 TO 3
+          IF plyrs(p).bondUnts(loopIdx) > 0 THEN
+            dispIdx := dispIdx + 1
+            slotQty := sellBndQty(loopIdx)
+            keyLbl := CHR$(ASC("A") + dispIdx - 1)
             ! Line exceeds 79 chars; PRINT USING row format requires single line.
-            PRINT USING "'  ',S1<,' $',I6>,' bond  ',I3>,' unit(s)'", keyLbl, bPar(s), plyrs(p).bondUnts(s);
+            PRINT USING "'  ',S1<,' $',I6>,' bond  ',I3>,' unit(s)'", keyLbl, bPar(loopIdx), plyrs(p).bondUnts(loopIdx);
             IF slotQty > 0 THEN
               PRINT "  [Sell "; slotQty; "]";
             ENDIF
@@ -199,9 +216,6 @@ IF NOT plyrs(p).isBankrupt THEN
         GET #0, kIn
         PRINT
 
-        selIdx := 0
-        slotIdx := 0
-        slotQty := 0
         IF kIn <> "" THEN
           keyCode := ASC(kIn)
           IF keyCode >= ASC("a") AND keyCode <= ASC("z") THEN
@@ -210,14 +224,33 @@ IF NOT plyrs(p).isBankrupt THEN
         ELSE
           keyCode := 0
         ENDIF
-        FOR loopIdx := 1 TO mapCnt
-          IF mapKey(loopIdx) = keyCode THEN
-            selIdx := loopIdx
+
+        selType := 0
+        selId   := 0
+        dispIdx := 0
+        FOR s := 1 TO 9
+          IF selType = 0 THEN
+            IF plyrs(p).stckShrs(s) > 0 AND mkt.stckPrice(s) > 0 THEN
+              dispIdx := dispIdx + 1
+              IF keyCode = ASC("0") + dispIdx THEN
+                selType := 1
+                selId   := s
+              ENDIF
+            ENDIF
+          ENDIF
+        NEXT s
+        dispIdx := 0
+        FOR loopIdx := 1 TO 3
+          IF selType = 0 THEN
+            IF plyrs(p).bondUnts(loopIdx) > 0 THEN
+              dispIdx := dispIdx + 1
+              IF keyCode = ASC("A") + dispIdx - 1 THEN
+                selType := 2
+                selId   := loopIdx
+              ENDIF
+            ENDIF
           ENDIF
         NEXT loopIdx
-        IF selIdx > 0 THEN
-          RUN findOrderSlot(ordTyp, ordId, ordQty, ordCnt, mapType(selIdx), mapId(selIdx), slotIdx, slotQty)
-        ENDIF
 
         IF keyCode = ASC("D") THEN
           clrAct := 2
@@ -263,21 +296,26 @@ IF NOT plyrs(p).isBankrupt THEN
             RUN waitKey
           ENDIF
         ELSE
-          IF selIdx > 0 THEN
-            s := mapId(selIdx)
+          IF selType > 0 THEN
+            s := selId
             workCash := plyrs(p).cashBal
             FOR loopIdx := 1 TO 9
               workBal(loopIdx) := plyrs(p).mgnBal(loopIdx)
             NEXT loopIdx
-            FOR loopIdx := 1 TO ordCnt
-              IF loopIdx <> slotIdx THEN
-                IF ordTyp(loopIdx) = 1 THEN
-                  prcd := ordQty(loopIdx) * mkt.stckPrice(ordId(loopIdx))
-                  RUN calcSaleMgnRpy(workBal(ordId(loopIdx)), prcd, actualRpy)
-                  workBal(ordId(loopIdx)) := workBal(ordId(loopIdx)) - actualRpy
+            FOR loopIdx := 1 TO 9
+              IF selType <> 1 OR loopIdx <> selId THEN
+                IF sellStkQty(loopIdx) > 0 THEN
+                  prcd := sellStkQty(loopIdx) * mkt.stckPrice(loopIdx)
+                  RUN calcSaleMgnRpy(workBal(loopIdx), prcd, actualRpy)
+                  workBal(loopIdx) := workBal(loopIdx) - actualRpy
                   workCash := workCash + (prcd - actualRpy)
-                ELSE
-                  prcd := ordQty(loopIdx) * bPar(ordId(loopIdx))
+                ENDIF
+              ENDIF
+            NEXT loopIdx
+            FOR loopIdx := 1 TO 3
+              IF selType <> 2 OR loopIdx <> selId THEN
+                IF sellBndQty(loopIdx) > 0 THEN
+                  prcd := sellBndQty(loopIdx) * bPar(loopIdx)
                   workCash := workCash + prcd
                 ENDIF
               ENDIF
@@ -299,19 +337,70 @@ IF NOT plyrs(p).isBankrupt THEN
             workCash := workCash - actualRpy
             workMgn := workMgn - actualRpy
             ordModeVal := 0
-            IF plyrs(p).mgnBal(s) > 0 THEN
+            IF selType = 1 THEN
+              slotQty := sellStkQty(selId)
+            ELSE
+              slotQty := sellBndQty(selId)
+            ENDIF
+            IF selType = 1 AND plyrs(p).mgnBal(s) > 0 THEN
               ordModeVal := 2
             ENDIF
-            ! Line exceeds 79 chars; RUN statement cannot be split.
-            RUN promptEditOrderQty(title, mapType(selIdx), sNam(s), plyrs(p).stckShrs(s), mkt.stckPrice(s), ordModeVal, workCash, workMgn, workBal(s), bPar(s), plyrs(p).bondUnts(s), 0, slotIdx, ordQty, qty, keyCode)
-            RUN commitOrderQty(ordTyp, ordId, ordQty, ordCnt, slotIdx, mapType(selIdx), mapId(selIdx), qty)
+            qty := slotQty
+            IF selType = 1 THEN
+              ! Line exceeds 79 chars; RUN statement cannot be split.
+              RUN getLotQty(title, sNam(s), plyrs(p).stckShrs(s), mkt.stckPrice(s), qty, ordModeVal, 0, plyrs(p).stckShrs(s), workCash, workMgn, workBal(s), 0, keyCode)
+            ELSE
+              valid := FALSE
+              WHILE NOT valid DO
+                RUN fmtMoney(bPar(selId), pStr)
+                PRINT "$"; pStr; " bond  "; plyrs(p).bondUnts(selId); " unit(s) held"
+                INPUT "  Sell units (0/Enter=clear): ", qIn
+                IF qIn = "" THEN
+                  qty := 0
+                  valid := TRUE
+                ELSE
+                  RUN getNumIn(qIn, qty, numOk)
+                  IF NOT numOk THEN
+                    PRINT "  Invalid: enter a number."
+                  ELSE IF qty < 0 THEN
+                    PRINT "  Invalid: enter 0 or a positive amount."
+                  ELSE IF qty > plyrs(p).bondUnts(selId) THEN
+                    PRINT "  Invalid: you hold only ";
+                    PRINT plyrs(p).bondUnts(selId); " unit(s)."
+                  ELSE
+                    valid := TRUE
+                  ENDIF \ENDIF \ENDIF
+                ENDIF
+              ENDWHILE
+            ENDIF
+            IF selType = 1 THEN
+              sellStkQty(selId) := qty
+            ELSE
+              sellBndQty(selId) := qty
+            ENDIF
           ENDIF
         ENDIF \ENDIF \ENDIF
       ENDLOOP
       IF clrAct = 1 THEN
-        IF ordCnt > 0 THEN
-          RUN applySells(plyrs(p), mkt, ordTyp, ordId, ordQty, ordCnt)
-        ENDIF
+        FOR s := 1 TO 9
+          IF sellStkQty(s) > 0 THEN
+            prcd := sellStkQty(s) * mkt.stckPrice(s)
+            IF plyrs(p).mgnBal(s) > 0 THEN
+              RUN calcSaleMgnRpy(plyrs(p).mgnBal(s), prcd, actualRpy)
+              plyrs(p).mgnBal(s) := plyrs(p).mgnBal(s) - actualRpy
+              plyrs(p).cashBal := plyrs(p).cashBal + (prcd - actualRpy)
+            ELSE
+              plyrs(p).cashBal := plyrs(p).cashBal + prcd
+            ENDIF
+            plyrs(p).stckShrs(s) := plyrs(p).stckShrs(s) - sellStkQty(s)
+          ENDIF
+        NEXT s
+        FOR loopIdx := 1 TO 3
+          IF sellBndQty(loopIdx) > 0 THEN
+            plyrs(p).cashBal := plyrs(p).cashBal + (sellBndQty(loopIdx) * bPar(loopIdx))
+            plyrs(p).bondUnts(loopIdx) := plyrs(p).bondUnts(loopIdx) - sellBndQty(loopIdx)
+          ENDIF
+        NEXT loopIdx
         RUN applyCashMgnRepay(plyrs(p), repay, actualRpy)
       ENDIF
       IF clrAct = 2 THEN

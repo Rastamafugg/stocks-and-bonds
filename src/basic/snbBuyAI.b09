@@ -10,8 +10,8 @@ PROCEDURE snbBuyAI
 (*             cash, margin, holdings, hadCashPur, and         *)
 (*             hdr.gameStage.                                  *)
 (* NOTE      : snbPhaseCore, snbTradeShared, snbGameData,     *)
-(*             snbBuyExec, and snbBuyAI must be pre-loaded by *)
-(*             the coordinator before fork.                   *)
+(*             and snbBuyAI must be pre-loaded by the         *)
+(*             coordinator before fork.                       *)
 (* ============================================================ *)
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
@@ -27,22 +27,29 @@ DIM iCYr       : INTEGER
 DIM iMaxYr     : INTEGER
 DIM iPCnt      : INTEGER
 DIM activePlrs : INTEGER
-DIM ordTyp(12) : INTEGER
-DIM ordId(12)  : INTEGER
-DIM ordQty(12) : INTEGER
-DIM ordPur(12) : INTEGER
-DIM decAct(12) : BYTE
-DIM ordCnt     : INTEGER
+DIM buyStkCsh(9): INTEGER
+DIM buyStkMgn(9): INTEGER
+DIM buyBndQty(3): INTEGER
+DIM decAct(20) : BYTE
+DIM decTyp(20) : INTEGER
+DIM decId(20)  : INTEGER
+DIM decQty(20) : INTEGER
 DIM decCnt     : INTEGER
 DIM mgnRpy     : INTEGER
 DIM pNam       : STRING[27]
 DIM navAct     : BYTE
+DIM bPar(3)    : INTEGER
 DIM tInt       : INTEGER
-DIM actualRpy  : INTEGER
 DIM aiTierVal  : INTEGER
 DIM pTypeVal   : INTEGER
 DIM savePhaseVal : INTEGER
 DIM savePlyrVal  : INTEGER
+DIM s          : INTEGER
+DIM b          : INTEGER
+DIM qty        : INTEGER
+DIM cost       : INTEGER
+DIM cashPay    : INTEGER
+DIM mgnPay     : INTEGER
 DIM p          : INTEGER
 DIM nextP      : INTEGER
 
@@ -57,6 +64,7 @@ ENDIF
 iCYr   := hdr.currYear
 iMaxYr := hdr.maxYears
 iPCnt  := hdr.plyrCount
+RUN initBondPar(bPar)
 p := 1
 IF hdr.savedPhase = 2 THEN
   p := hdr.savedPlyr
@@ -72,7 +80,6 @@ IF NOT plyrs(p).isBankrupt THEN
   pTypeVal  := plyrs(p).plyrType
   aiTierVal := plyrs(p).aiTier
   RUN fmtPlyrName(plyrs(p).plyrName, pTypeVal, aiTierVal, pNam)
-  ordCnt := 0
   mgnRpy := 0
 
   aiTierVal := plyrs(p).aiTier
@@ -85,28 +92,70 @@ IF NOT plyrs(p).isBankrupt THEN
   IF hdr.mgnRule = 0 THEN
     prof.useMargin := FALSE
   ENDIF
-  RUN aiBuy(iCYr, plyrs(p), mkt, prof, ordTyp, ordId, ordQty, ordPur, ordCnt, mgnRpy)
-  IF ordCnt > 0 THEN
-    RUN applyBuys(plyrs(p), mkt, ordTyp, ordId, ordQty, ordPur, ordCnt)
-  ENDIF
+  RUN aiBuy(iCYr, plyrs(p), mkt, prof, buyStkCsh, buyStkMgn, buyBndQty, mgnRpy)
+  FOR s := 1 TO 9
+    qty := buyStkCsh(s)
+    IF qty > 0 THEN
+      cost := qty * mkt.stckPrice(s)
+      plyrs(p).cashBal    := plyrs(p).cashBal - cost
+      plyrs(p).hadCashPur := TRUE
+      plyrs(p).stckShrs(s) := plyrs(p).stckShrs(s) + qty
+    ENDIF
+    qty := buyStkMgn(s)
+    IF qty > 0 THEN
+      cost := qty * mkt.stckPrice(s)
+      cashPay := cost / 2
+      mgnPay  := cost - cashPay
+      plyrs(p).cashBal    := plyrs(p).cashBal - cashPay
+      plyrs(p).mgnBal(s)  := plyrs(p).mgnBal(s) + mgnPay
+      plyrs(p).stckShrs(s) := plyrs(p).stckShrs(s) + qty
+    ENDIF
+  NEXT s
+  FOR b := 1 TO 3
+    qty := buyBndQty(b)
+    IF qty > 0 THEN
+      plyrs(p).cashBal := plyrs(p).cashBal - (qty * bPar(b))
+      plyrs(p).bondUnts(b) := plyrs(p).bondUnts(b) + qty
+    ENDIF
+  NEXT b
   plyrs(p).obligation := mgnRpy
 
-  FOR tInt := 1 TO ordCnt
-    decAct(tInt) := 2
-  NEXT tInt
-  decCnt := ordCnt
-  IF mgnRpy > 0 THEN
-    IF decCnt < 12 THEN
-      decCnt         := decCnt + 1
-      decAct(decCnt) := 3
-      ordTyp(decCnt) := 0
-      ordId(decCnt)  := 0
-      ordQty(decCnt) := mgnRpy
+  decCnt := 0
+  FOR s := 1 TO 9
+    IF buyStkCsh(s) > 0 THEN
+      decCnt := decCnt + 1
+      decAct(decCnt) := 2
+      decTyp(decCnt) := 1
+      decId(decCnt)  := s
+      decQty(decCnt) := buyStkCsh(s)
     ENDIF
+    IF buyStkMgn(s) > 0 THEN
+      decCnt := decCnt + 1
+      decAct(decCnt) := 2
+      decTyp(decCnt) := 1
+      decId(decCnt)  := s
+      decQty(decCnt) := buyStkMgn(s)
+    ENDIF
+  NEXT s
+  FOR b := 1 TO 3
+    IF buyBndQty(b) > 0 THEN
+      decCnt := decCnt + 1
+      decAct(decCnt) := 2
+      decTyp(decCnt) := 2
+      decId(decCnt)  := b
+      decQty(decCnt) := buyBndQty(b)
+    ENDIF
+  NEXT b
+  IF mgnRpy > 0 THEN
+    decCnt         := decCnt + 1
+    decAct(decCnt) := 3
+    decTyp(decCnt) := 0
+    decId(decCnt)  := 0
+    decQty(decCnt) := mgnRpy
   ENDIF
 
   navAct := 1
-  RUN scrAIBuyTurn(pNam, decAct, ordTyp, ordId, ordQty, decCnt, navAct)
+  RUN scrAIBuyTurn(pNam, decAct, decTyp, decId, decQty, decCnt, navAct)
   IF navAct = 2 THEN
     savePhaseVal := 0
     savePlyrVal  := 1
@@ -170,15 +219,12 @@ PROCEDURE aiBuy
 (*             plyr          - player record (READ ONLY)       *)
 (*             mkt           - market state (READ ONLY)        *)
 (*             prof          - AI difficulty profile (READ ONLY*)
-(*             ordType(12)   - output: 1=STOCK 2=BOND          *)
-(*             ordId(12)     - output: asset index (1-9 / 1-3) *)
-(*             ordQty(12)    - output: quantity per order       *)
-(*             ordPurch(12)  - output: 1=CASH 2=MARGIN         *)
-(*             ordCnt        - output: number of orders (0..12)*)
+(*             buyStkCsh(9)  - output: stock cash qty by id    *)
+(*             buyStkMgn(9)  - output: stock margin qty by id  *)
+(*             buyBndQty(3)  - output: bond qty by id          *)
 (*             mgnRepay      - output: voluntary repay amount  *)
 (* SIDE EFX  : None. plyr and mkt are not modified.            *)
-(* NOTE      : ordCnt=0 and mgnRepay=0 is valid (all pass).   *)
-(*             Array slots cap at 12; extras silently dropped. *)
+(* NOTE      : zeroed buy arrays and mgnRepay=0 is valid.     *)
 (* ============================================================ *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
@@ -189,11 +235,9 @@ PARAM currYear      : INTEGER
 PARAM plyr          : PlyrRec
 PARAM mkt           : MktState
 PARAM prof          : AIProfile
-PARAM ordType(12)   : INTEGER
-PARAM ordId(12)     : INTEGER
-PARAM ordQty(12)    : INTEGER
-PARAM ordPurch(12)  : INTEGER
-PARAM ordCnt        : INTEGER
+PARAM buyStkCsh(9)  : INTEGER
+PARAM buyStkMgn(9)  : INTEGER
+PARAM buyBndQty(3)  : INTEGER
 PARAM mgnRepay      : INTEGER
 
 ! Endgame-overrideable working variables.
@@ -234,6 +278,7 @@ DIM stocksBought : BOOLEAN
 DIM i            : INTEGER
 DIM j            : INTEGER
 DIM s            : INTEGER
+DIM b            : INTEGER
 DIM tmp          : INTEGER
 
 ! --- AIProfile field loading (ai-player-logic.md Sec 3) --------
@@ -272,8 +317,14 @@ bPar(2) := 5000
 bPar(3) := 10000
 
 ! --- Init outputs -------------------------------------------
-ordCnt   := 0
 mgnRepay := 0
+FOR s := 1 TO 9
+  buyStkCsh(s) := 0
+  buyStkMgn(s) := 0
+NEXT s
+FOR b := 1 TO 3
+  buyBndQty(b) := 0
+NEXT b
 
 ! ============================================================
 ! Step 1 - Voluntary margin repayment check.
@@ -397,12 +448,8 @@ FOR i := 1 TO candCnt
     maxCash := simCash / 100 * concentCapW
     maxLots := maxCash / mkt.stckPrice(s)
     maxLots := (maxLots / 10) * 10
-    IF maxLots >= 10 AND ordCnt < 12 THEN
-      ordCnt           := ordCnt + 1
-      ordType(ordCnt)  := 1
-      ordId(ordCnt)    := s
-      ordQty(ordCnt)   := maxLots
-      ordPurch(ordCnt) := 1 \ ! CASH
+    IF maxLots >= 10 THEN
+      buyStkCsh(s)     := maxLots
       simCash          := simCash - (maxLots * mkt.stckPrice(s))
       cashPassLt(s)    := maxLots
       stocksBought     := TRUE
@@ -448,12 +495,8 @@ IF margAllwd THEN
           ENDIF
           maxLots := maxFull / mkt.stckPrice(s)
           maxLots := (maxLots / 10) * 10
-          IF maxLots >= 10 AND ordCnt < 12 THEN
-            ordCnt           := ordCnt + 1
-            ordType(ordCnt)  := 1
-            ordId(ordCnt)    := s
-            ordQty(ordCnt)   := maxLots
-            ordPurch(ordCnt) := 2 \ ! MARGIN
+          IF maxLots >= 10 THEN
+            buyStkMgn(s)   := maxLots
             ! Deduct 50% cash portion (MarginRate = 0.50).
             simCash    := simCash - maxLots * mkt.stckPrice(s) / 2
             stocksBought := TRUE
@@ -474,24 +517,12 @@ ENDIF
 
 IF simCash >= bondIdlCshW THEN
   IF prof.bondPriory OR NOT stocksBought THEN
-    IF simCash >= 10000 AND ordCnt < 12 THEN
-      ordCnt           := ordCnt + 1
-      ordType(ordCnt)  := 2
-      ordId(ordCnt)    := 3 \ ! Large bond par 10000
-      ordQty(ordCnt)   := 1
-      ordPurch(ordCnt) := 1 \ ! CASH
-    ELSE IF simCash >= 5000 AND ordCnt < 12 THEN
-      ordCnt           := ordCnt + 1
-      ordType(ordCnt)  := 2
-      ordId(ordCnt)    := 2 \ ! Medium bond par 5000
-      ordQty(ordCnt)   := 1
-      ordPurch(ordCnt) := 1
-    ELSE IF simCash >= 1000 AND ordCnt < 12 THEN
-      ordCnt           := ordCnt + 1
-      ordType(ordCnt)  := 2
-      ordId(ordCnt)    := 1 \ ! Small bond par 1000
-      ordQty(ordCnt)   := 1
-      ordPurch(ordCnt) := 1
+    IF simCash >= 10000 THEN
+      buyBndQty(3) := 1 \ ! Large bond par 10000
+    ELSE IF simCash >= 5000 THEN
+      buyBndQty(2) := 1 \ ! Medium bond par 5000
+    ELSE IF simCash >= 1000 THEN
+      buyBndQty(1) := 1 \ ! Small bond par 1000
     ENDIF \ENDIF \ENDIF
   ENDIF
 ENDIF
@@ -513,15 +544,15 @@ PROCEDURE scrAIBuyTurn
 (*             decId    - asset index (1-9 stock, 1-3 bond,   *)
 (*                        0 for REPAY)                         *)
 (*             decQty   - quantity (shares, units, or $ repay) *)
-(*             decCnt   - number of entries in arrays (0..12)  *)
+(*             decCnt   - number of entries in arrays (0..20)  *)
 (*             action   - 1=CONTINUE 2=SAVE 3=QUIT            *)
 (* SIDE EFX  : Clears screen. Waits for navigation key.        *)
 (* ============================================================ *)
 PARAM plyrNam    : STRING[27]
-PARAM decAct(12) : BYTE
-PARAM decType(12): INTEGER
-PARAM decId(12)  : INTEGER
-PARAM decQty(12) : INTEGER
+PARAM decAct(20) : BYTE
+PARAM decType(20): INTEGER
+PARAM decId(20)  : INTEGER
+PARAM decQty(20) : INTEGER
 PARAM decCnt     : INTEGER
 PARAM action     : BYTE
 DIM sNam(9) : STRING[14]
