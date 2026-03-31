@@ -666,6 +666,7 @@ TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepa
 PARAM sum : DraftSum
 DIM s     : INTEGER
 DIM b     : INTEGER
+DIM chkSum: INTEGER
 
 sum.dsPhase := 1
 sum.dsPlyr := 1
@@ -681,7 +682,16 @@ NEXT s
 FOR b := 1 TO 3
   sum.dsBndQty(b) := 0
 NEXT b
-sum.dsChk := 0
+chkSum := sum.dsPhase + sum.dsPlyr + sum.dsHas
+chkSum := chkSum + sum.dsActCnt + sum.dsCashDl
+chkSum := chkSum + sum.dsMgnDl + sum.dsRepay
+FOR s := 1 TO 9
+  chkSum := chkSum + sum.dsStkQty(s) + sum.dsStkMgn(s)
+NEXT s
+FOR b := 1 TO 3
+  chkSum := chkSum + sum.dsBndQty(b)
+NEXT b
+sum.dsChk := LAND(chkSum, 255)
 END
 
 PROCEDURE loadDraftHdr
