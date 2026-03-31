@@ -30,10 +30,6 @@ DIM ordId(12)  : INTEGER
 DIM ordQty(12) : INTEGER
 DIM ordCnt     : INTEGER
 DIM usrAct     : INTEGER
-DIM navAct     : BYTE
-DIM aiTierVal  : INTEGER
-DIM pTypeVal   : INTEGER
-DIM pNam       : STRING[27]
 DIM sNam(9)    : STRING[14]
 DIM bPar(3)    : INTEGER
 DIM repay      : INTEGER
@@ -96,9 +92,6 @@ IF p < 1 OR p > iPCnt THEN
 ENDIF
 
 IF NOT plyrs(p).isBankrupt THEN
-  pTypeVal  := plyrs(p).plyrType
-  aiTierVal := plyrs(p).aiTier
-  RUN fmtPlyrName(plyrs(p).plyrName, pTypeVal, aiTierVal, pNam)
   ordCnt := 0
   IF iCYr > 1 THEN
     divRate(1) := 1
@@ -143,7 +136,7 @@ IF NOT plyrs(p).isBankrupt THEN
 
       RUN clrScr
       PRINT "=== SELL PHASE - YEAR "; iCYr; " ==="
-      PRINT "  Player: "; pNam
+      PRINT "  Player: "; plyrs(p).plyrName
       RUN fmtMoney(plyrs(p).cashBal, pStr)
       RUN fmtMoney(workCash, pStr2)
       PRINT "  Cash: $"; pStr; " [$"; pStr2; "]";
@@ -230,11 +223,14 @@ IF NOT plyrs(p).isBankrupt THEN
         PRINT
         PRINT "Nothing to sell this turn."
         IF currMgnTot <= 0 THEN
-          RUN getPhaseNav(navAct)
+          PRINT
+          PRINT "  Any key=continue  S=save+exit  Q=quit: ";
+          GET #0, kIn
+          PRINT
           ordCnt := 0
-          IF navAct = 2 THEN
+          IF kIn = "S" OR kIn = "s" THEN
             usrAct := 3
-          ELSE IF navAct = 3 THEN
+          ELSE IF kIn = "Q" OR kIn = "q" THEN
             usrAct := 4
           ELSE
             usrAct := 2
@@ -253,7 +249,12 @@ IF NOT plyrs(p).isBankrupt THEN
       GET #0, kIn
       PRINT
 
-      RUN getSaveQuitAct(kIn, sqAct)
+      sqAct := 0
+      IF kIn = "S" OR kIn = "s" THEN
+        sqAct := 3
+      ELSE IF kIn = "Q" OR kIn = "q" THEN
+        sqAct := 4
+      ENDIF \ENDIF
       IF sqAct = 3 THEN
         ordCnt := 0
         usrAct := 3
@@ -341,10 +342,17 @@ IF NOT plyrs(p).isBankrupt THEN
     ENDLOOP
 
     IF usrAct = 3 THEN
-      RUN saveQuitToMenu(1, p, hdr, deckOrd, plyrs, mkt)
+      hdr.savedPhase := 1
+      hdr.savedPlyr  := p
+      RUN saveGame("SNBGAME", hdr, deckOrd, plyrs, mkt)
+      hdr.savedPhase := 9
+      hdr.savedPlyr  := 0
+      RUN saveGame("SNBSTATE", hdr, deckOrd, plyrs, mkt)
       END
     ELSE IF usrAct = 4 THEN
-      RUN quitToMenu(hdr, deckOrd, plyrs, mkt)
+      hdr.savedPhase := 9
+      hdr.savedPlyr  := 0
+      RUN saveGame("SNBSTATE", hdr, deckOrd, plyrs, mkt)
       END
     ENDIF \ENDIF
     IF ordCnt > 0 THEN
