@@ -20,10 +20,8 @@ PROCEDURE aiLiqOrdr
 (* PARAMS    : plyr      - player record (read-only)            *)
 (*             mkt       - market state (read-only)             *)
 (*             oblgRem   - obligation to cover                  *)
-(*             ordType   - OUT: 1=STOCK 2=BOND                  *)
-(*             ordId     - OUT: asset index per order           *)
-(*             ordQty    - OUT: quantity per order              *)
-(*             ordCnt    - OUT: number of orders                *)
+(*             sellStkQty - OUT: staged stock qty per stock id  *)
+(*             sellBndQty - OUT: staged bond qty per bond id    *)
 (* SIDE EFX  : None beyond output PARAM population.             *)
 (* ============================================================ *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
@@ -32,20 +30,22 @@ TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 PARAM plyr        : PlyrRec
 PARAM mkt         : MktState
 PARAM oblgRem     : INTEGER
-PARAM ordType(12) : INTEGER
-PARAM ordId(12)   : INTEGER
-PARAM ordQty(12)  : INTEGER
-PARAM ordCnt      : INTEGER
+PARAM sellStkQty(9): INTEGER
+PARAM sellBndQty(3): INTEGER
 DIM bPar(3) : INTEGER
 DIM needed  : INTEGER
 DIM qty     : INTEGER
 DIM prcd    : INTEGER
-DIM i       : INTEGER
 DIM s       : INTEGER
 DIM b       : INTEGER
 
 RUN initBondPar(bPar)
-RUN clrOrders(ordType, ordId, ordQty, ordCnt)
+FOR s := 1 TO 9
+  sellStkQty(s) := 0
+NEXT s
+FOR b := 1 TO 3
+  sellBndQty(b) := 0
+NEXT b
 
 needed := oblgRem
 IF needed < 0 THEN
@@ -61,13 +61,10 @@ FOR s := 1 TO 9
       IF qty > plyr.stckShrs(s) THEN
         qty := plyr.stckShrs(s)
       ENDIF
-      IF qty >= 10 AND ordCnt < 12 THEN
-        ordCnt          := ordCnt + 1
-        ordType(ordCnt) := 1
-        ordId(ordCnt)   := s
-        ordQty(ordCnt)  := qty
-        prcd            := qty * mkt.stckPrice(s)
-        needed          := needed - prcd
+      IF qty >= 10 THEN
+        sellStkQty(s) := qty
+        prcd := qty * mkt.stckPrice(s)
+        needed := needed - prcd
       ENDIF
     ENDIF
   ENDIF
@@ -79,13 +76,8 @@ FOR b := 1 TO 3
     ENDEXIT
     EXITIF plyr.bondUnts(b) <= 0 THEN
     ENDEXIT
-    EXITIF ordCnt >= 12 THEN
-    ENDEXIT
-    ordCnt          := ordCnt + 1
-    ordType(ordCnt) := 2
-    ordId(ordCnt)   := b
-    ordQty(ordCnt)  := 1
-    needed          := needed - bPar(b)
+    sellBndQty(b) := sellBndQty(b) + 1
+    needed := needed - bPar(b)
   ENDLOOP
 NEXT b
 

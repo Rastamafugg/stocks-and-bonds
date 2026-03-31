@@ -129,15 +129,13 @@ PROCEDURE scrForceLiq
 (*             positive integer <=bondUnts. Zero/Enter clears  *)
 (*             the pending order for that asset.               *)
 (*             Does NOT modify plyr or oblgRem; caller handles *)
-(*             via applyLiqOrdr.                               *)
+(*             the submitted sell arrays.                      *)
 (* PARAMS    : plyrNam    - player name for display            *)
 (*             oblgRem    - current obligation remaining       *)
 (*             plyr       - player record (read-only)          *)
 (*             mkt        - market state (read-only)           *)
-(*             ordType    - OUT: 1=STOCK 2=BOND per order      *)
-(*             ordId      - OUT: asset index per order         *)
-(*             ordQty     - OUT: quantity per order            *)
-(*             ordCnt     - OUT: number of orders (0..12)      *)
+(*             sellStkQty - OUT: staged stock qty per stock id *)
+(*             sellBndQty - OUT: staged bond qty per bond id   *)
 (*             action     - OUT: 1=SUBMIT 2=DECLARE_BANKRUPTCY *)
 (* SIDE EFX  : Clears screen. Uses INPUT for order quantities. *)
 (* ============================================================ *)
@@ -148,64 +146,71 @@ PARAM plyrNam     : STRING[20]
 PARAM oblgRem     : INTEGER
 PARAM plyr        : PlyrRec
 PARAM mkt         : MktState
-PARAM ordType(12) : INTEGER
-PARAM ordId(12)   : INTEGER
-PARAM ordQty(12)  : INTEGER
-PARAM ordCnt      : INTEGER
+PARAM sellStkQty(9) : INTEGER
+PARAM sellBndQty(3) : INTEGER
 PARAM action      : BYTE
-DIM sNam(9) : STRING[14]
-DIM bPar(3) : INTEGER
-DIM i       : INTEGER
-DIM s       : INTEGER
-DIM b       : INTEGER
-DIM qty     : INTEGER
-DIM pStr    : STRING[8]
-DIM pStr2   : STRING[8]
-DIM keyCode : INTEGER
-DIM mapCnt  : INTEGER
-DIM mapType(12): INTEGER
-DIM mapId(12)  : INTEGER
-DIM mapKey(12) : INTEGER
-DIM mapQty(12) : INTEGER
-DIM stockCnt : INTEGER
-DIM bondCnt  : INTEGER
-DIM keyLbl   : STRING[1]
-DIM slotIdx : INTEGER
-DIM slotQty : INTEGER
-DIM selIdx  : INTEGER
-DIM kIn     : STRING[1]
-DIM simCash : INTEGER
-DIM simOblg : INTEGER
-DIM repay   : INTEGER
-DIM prcd    : INTEGER
-DIM baseCash : INTEGER
-DIM baseOblg : INTEGER
-DIM currMgnTot : INTEGER
+DIM sNam(9)       : STRING[14]
+DIM bPar(3)       : INTEGER
+DIM s             : INTEGER
+DIM b             : INTEGER
+DIM qty           : INTEGER
+DIM pStr          : STRING[8]
+DIM pStr2         : STRING[8]
+DIM keyCode       : INTEGER
+DIM stockCnt      : INTEGER
+DIM bondCnt       : INTEGER
+DIM keyLbl        : STRING[1]
+DIM slotQty       : INTEGER
+DIM kIn           : STRING[1]
+DIM simCash       : INTEGER
+DIM simOblg       : INTEGER
+DIM repay         : INTEGER
+DIM prcd          : INTEGER
+DIM baseCash      : INTEGER
+DIM baseOblg      : INTEGER
+DIM currMgnTot    : INTEGER
+DIM pendCnt       : INTEGER
+DIM dispIdx       : INTEGER
+DIM selType       : INTEGER
+DIM selId         : INTEGER
+DIM selQty        : INTEGER
+DIM qIn           : STRING[8]
+DIM numOk         : BOOLEAN
+DIM valid         : BOOLEAN
 
 ON ERROR GOTO 900
 
 RUN initStockNames(sNam)
 RUN initBondPar(bPar)
-RUN clrOrders(ordType, ordId, ordQty, ordCnt)
 
 LOOP
 
   simCash := plyr.cashBal
   RUN calcMgnTot(plyr, currMgnTot)
   simOblg := oblgRem
-  FOR i := 1 TO ordCnt
-    IF ordType(i) = 1 THEN
-      prcd := ordQty(i) * mkt.stckPrice(ordId(i))
+  pendCnt := 0
+  FOR s := 1 TO 9
+    IF sellStkQty(s) > 0 THEN
+      pendCnt := pendCnt + 1
+      prcd := sellStkQty(s) * mkt.stckPrice(s)
       simCash := simCash + prcd
-    ELSE
-      prcd := ordQty(i) * bPar(ordId(i))
+      simOblg := simOblg - prcd
+      IF simOblg < 0 THEN
+        simOblg := 0
+      ENDIF
+    ENDIF
+  NEXT s
+  FOR b := 1 TO 3
+    IF sellBndQty(b) > 0 THEN
+      pendCnt := pendCnt + 1
+      prcd := sellBndQty(b) * bPar(b)
       simCash := simCash + prcd
+      simOblg := simOblg - prcd
+      IF simOblg < 0 THEN
+        simOblg := 0
+      ENDIF
     ENDIF
-    simOblg := simOblg - prcd
-    IF simOblg < 0 THEN
-      simOblg := 0
-    ENDIF
-  NEXT i
+  NEXT b
 
   RUN clrScr
   PRINT "=== FORCED LIQUIDATION ==="
@@ -221,9 +226,13 @@ LOOP
   PRINT "  Obligation remaining : $"; pStr; " [$"; pStr2; "]"
   PRINT
 
-  RUN prepAssetMaps(plyr, mkt, 2, ordType, ordId, ordQty, ordCnt, mapType, mapId, mapKey, mapQty, mapCnt, stockCnt, bondCnt)
-
+  stockCnt := 0
   PRINT "  STOCKS:";
+  FOR s := 1 TO 9
+    IF plyr.stckShrs(s) > 0 THEN
+      stockCnt := stockCnt + 1
+    ENDIF
+  NEXT s
   IF stockCnt = 1 THEN
     PRINT " press 1"
   ELSE IF stockCnt > 1 THEN
@@ -231,11 +240,12 @@ LOOP
   ELSE
     PRINT
   ENDIF \ENDIF
-  FOR i := 1 TO mapCnt
-    IF mapType(i) = 1 THEN
-      s := mapId(i)
-      slotQty := mapQty(i)
-      keyLbl := CHR$(mapKey(i))
+  stockCnt := 0
+  FOR s := 1 TO 9
+    IF plyr.stckShrs(s) > 0 THEN
+      stockCnt := stockCnt + 1
+      slotQty := sellStkQty(s)
+      keyLbl := CHR$(ASC("0") + stockCnt)
       ! Line exceeds 79 chars; PRINT USING row format requires single line.
       PRINT USING "'  ',S1<,' ',S12<,I5>,' shrs @ $',I4>", keyLbl, sNam(s), plyr.stckShrs(s), mkt.stckPrice(s);
       IF plyr.mgnBal(s) > 0 THEN
@@ -246,8 +256,14 @@ LOOP
       ENDIF
       PRINT
     ENDIF
-  NEXT i
+  NEXT s
   PRINT
+  bondCnt := 0
+  FOR b := 1 TO 3
+    IF plyr.bondUnts(b) > 0 THEN
+      bondCnt := bondCnt + 1
+    ENDIF
+  NEXT b
   PRINT "  BONDS:";
   IF bondCnt = 1 THEN
     PRINT " press A"
@@ -256,11 +272,12 @@ LOOP
   ELSE
     PRINT
   ENDIF \ENDIF
-  FOR i := 1 TO mapCnt
-    IF mapType(i) = 2 THEN
-      b := mapId(i)
-      slotQty := mapQty(i)
-      keyLbl := CHR$(mapKey(i))
+  bondCnt := 0
+  FOR b := 1 TO 3
+    IF plyr.bondUnts(b) > 0 THEN
+      bondCnt := bondCnt + 1
+      slotQty := sellBndQty(b)
+      keyLbl := CHR$(ASC("A") + bondCnt - 1)
       ! Line exceeds 79 chars; PRINT USING row format requires single line.
       PRINT USING "'  ',S1<,' $',I6>,' bond  ',I3>,' unit(s)'", keyLbl, bPar(b), plyr.bondUnts(b);
       IF slotQty > 0 THEN
@@ -268,47 +285,127 @@ LOOP
       ENDIF
       PRINT
     ENDIF
-  NEXT i
+  NEXT b
   PRINT
   PRINT "  Enter=confirm  D=bankrupt"
   GET #0, kIn
   PRINT
 
-  RUN resolveOrderEditSel(kIn, mapType, mapId, mapKey, mapCnt, ordType, ordId, ordQty, ordCnt, keyCode, selIdx, slotIdx, slotQty)
+  IF kIn <> "" THEN
+    keyCode := ASC(kIn)
+    IF keyCode >= ASC("a") AND keyCode <= ASC("z") THEN
+      keyCode := keyCode - 32
+    ENDIF
+  ELSE
+    keyCode := 0
+  ENDIF
+
+  selType := 0
+  selId   := 0
+  selQty  := 0
+  dispIdx := 0
+  FOR s := 1 TO 9
+    IF selType = 0 THEN
+      IF plyr.stckShrs(s) > 0 THEN
+        dispIdx := dispIdx + 1
+        IF keyCode = ASC("0") + dispIdx THEN
+          selType := 1
+          selId   := s
+          selQty  := sellStkQty(s)
+        ENDIF
+      ENDIF
+    ENDIF
+  NEXT s
+  dispIdx := 0
+  FOR b := 1 TO 3
+    IF selType = 0 THEN
+      IF plyr.bondUnts(b) > 0 THEN
+        dispIdx := dispIdx + 1
+        IF keyCode = ASC("A") + dispIdx - 1 THEN
+          selType := 2
+          selId   := b
+          selQty  := sellBndQty(b)
+        ENDIF
+      ENDIF
+    ENDIF
+  NEXT b
 
   IF keyCode = ASC("D") THEN
     action := 2
-    ordCnt := 0
     END
   ELSE IF keyCode = 13 THEN
     action := 1
     END
   ELSE
-    IF selIdx > 0 THEN
-      s := mapId(selIdx)
-      b := mapId(selIdx)
+    IF selType > 0 THEN
       baseCash := plyr.cashBal
       baseOblg := oblgRem
-      FOR i := 1 TO ordCnt
-        IF i <> slotIdx THEN
-          IF ordType(i) = 1 THEN
-            prcd := ordQty(i) * mkt.stckPrice(ordId(i))
-          ELSE
-            prcd := ordQty(i) * bPar(ordId(i))
-          ENDIF
-          repay := baseOblg
-          IF prcd < repay THEN
-            repay := prcd
-          ENDIF
-          baseOblg := baseOblg - repay
-          baseCash := baseCash + (prcd - repay)
-          IF baseOblg < 0 THEN
-            baseOblg := 0
+      FOR s := 1 TO 9
+        IF selType <> 1 OR s <> selId THEN
+          IF sellStkQty(s) > 0 THEN
+            prcd := sellStkQty(s) * mkt.stckPrice(s)
+            repay := baseOblg
+            IF prcd < repay THEN
+              repay := prcd
+            ENDIF
+            baseOblg := baseOblg - repay
+            baseCash := baseCash + (prcd - repay)
+            IF baseOblg < 0 THEN
+              baseOblg := 0
+            ENDIF
           ENDIF
         ENDIF
-      NEXT i
-      RUN promptEditOrderQty("=== FORCED LIQUIDATION ===", mapType(selIdx), sNam(s), plyr.stckShrs(s), mkt.stckPrice(s), 3, baseCash, baseOblg, -1, bPar(b), plyr.bondUnts(b), 0, slotIdx, ordQty, qty, keyCode)
-      RUN commitOrderQty(ordType, ordId, ordQty, ordCnt, slotIdx, mapType(selIdx), mapId(selIdx), qty)
+      NEXT s
+      FOR b := 1 TO 3
+        IF selType <> 2 OR b <> selId THEN
+          IF sellBndQty(b) > 0 THEN
+            prcd := sellBndQty(b) * bPar(b)
+            repay := baseOblg
+            IF prcd < repay THEN
+              repay := prcd
+            ENDIF
+            baseOblg := baseOblg - repay
+            baseCash := baseCash + (prcd - repay)
+            IF baseOblg < 0 THEN
+              baseOblg := 0
+            ENDIF
+          ENDIF
+        ENDIF
+      NEXT b
+      qty := selQty
+      keyCode := 0
+      IF selType = 1 THEN
+        ! Line exceeds 79 chars; RUN statement cannot be split.
+        RUN getLotQty("=== FORCED LIQUIDATION ===", sNam(selId), plyr.stckShrs(selId), mkt.stckPrice(selId), qty, 3, 0, plyr.stckShrs(selId), baseCash, baseOblg, -1, 0, keyCode)
+      ELSE
+        valid := FALSE
+        WHILE NOT valid DO
+          RUN fmtMoney(bPar(selId), pStr)
+          PRINT "$"; pStr; " bond  "; plyr.bondUnts(selId); " unit(s) held"
+          INPUT "  Sell units (0/Enter=clear): ", qIn
+          IF qIn = "" THEN
+            qty := 0
+            valid := TRUE
+          ELSE
+            RUN getNumIn(qIn, qty, numOk)
+            IF NOT numOk THEN
+              PRINT "  Invalid: enter a number."
+            ELSE IF qty < 0 THEN
+              PRINT "  Invalid: enter 0 or a positive amount."
+            ELSE IF qty > plyr.bondUnts(selId) THEN
+              PRINT "  Invalid: you hold only ";
+              PRINT plyr.bondUnts(selId); " unit(s)."
+            ELSE
+              valid := TRUE
+            ENDIF \ENDIF \ENDIF
+          ENDIF
+        ENDWHILE
+      ENDIF
+      IF selType = 1 THEN
+        sellStkQty(selId) := qty
+      ELSE
+        sellBndQty(selId) := qty
+      ENDIF
     ENDIF
   ENDIF \ENDIF
 

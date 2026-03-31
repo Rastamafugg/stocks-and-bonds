@@ -30,6 +30,9 @@ DIM ordTyp(12) : INTEGER
 DIM ordId(12)  : INTEGER
 DIM ordQty(12) : INTEGER
 DIM ordCnt     : INTEGER
+DIM liqSellStk(9): INTEGER
+DIM liqSellBnd(3): INTEGER
+DIM liqHasSell : BOOLEAN
 DIM navAct     : BYTE
 DIM liqAct     : BYTE
 DIM tInt       : INTEGER
@@ -43,6 +46,7 @@ DIM totalMgn   : INTEGER
 DIM savePhaseVal : INTEGER
 DIM savePlyrVal  : INTEGER
 DIM s          : INTEGER
+DIM b          : INTEGER
 DIM p          : INTEGER
 DIM nextP      : INTEGER
 
@@ -105,41 +109,6 @@ IF NOT plyrs(p).isBankrupt THEN
 
   IF hdr.mgnRule = 1 THEN
     IF NOT plyrs(p).isBankrupt THEN
-      IF iCYr < 10 THEN
-        FOR s := 1 TO 9
-          IF NOT plyrs(p).isBankrupt THEN
-            IF plyrs(p).mgnBal(s) > 0 THEN
-              IF plyrs(p).stckShrs(s) = 0 OR mkt.stckPrice(s) <= 25 THEN
-                oblgRem := plyrs(p).mgnBal(s)
-                IF plyrs(p).stckShrs(s) > 0 THEN
-                  ! Line exceeds 79 chars; RUN statement cannot be split.
-                  RUN scrMgnCall(plyrs(p).plyrName, sNam(s), mkt.stckPrice(s), 25, oblgRem)
-                ENDIF
-                LOOP
-                  plyrs(p).obligation := oblgRem
-                  ! Line exceeds 79 chars; RUN statement cannot be split.
-                  RUN aiLiqOrdr(plyrs(p), mkt, oblgRem, ordTyp, ordId, ordQty, ordCnt)
-                  IF ordCnt = 0 THEN
-                    RUN scrBankrupt(plyrs(p), plyrs(p).cashBal, 2, iCYr)
-                    plyrs(p).obligation := 0
-                    EXITIF TRUE THEN
-                    ENDEXIT
-                  ENDIF
-                  RUN applySells(plyrs(p), mkt, ordTyp, ordId, ordQty, ordCnt)
-                  RUN applyStockMgnRepay(plyrs(p), s, plyrs(p).cashBal, payAmt)
-                  oblgRem := plyrs(p).mgnBal(s)
-                  EXITIF oblgRem <= 0 THEN
-                  ENDEXIT
-                ENDLOOP
-                plyrs(p).obligation := 0
-              ENDIF
-            ENDIF
-          ENDIF
-        NEXT s
-      ENDIF
-    ENDIF
-
-    IF NOT plyrs(p).isBankrupt THEN
       IF iCYr = 10 THEN
         LOOP
           RUN calcMgnTot(plyrs(p), totalMgn)
@@ -149,12 +118,42 @@ IF NOT plyrs(p).isBankrupt THEN
           ENDEXIT
           oblgRem := totalMgn
           ! Line exceeds 79 chars; RUN statement cannot be split.
-          RUN aiLiqOrdr(plyrs(p), mkt, oblgRem, ordTyp, ordId, ordQty, ordCnt)
-          IF ordCnt = 0 THEN
+          RUN aiLiqOrdr(plyrs(p), mkt, oblgRem, liqSellStk, liqSellBnd)
+          liqHasSell := FALSE
+          FOR s := 1 TO 9
+            IF liqSellStk(s) > 0 THEN
+              liqHasSell := TRUE
+            ENDIF
+          NEXT s
+          IF NOT liqHasSell THEN
+            FOR b := 1 TO 3
+              IF liqSellBnd(b) > 0 THEN
+                liqHasSell := TRUE
+              ENDIF
+            NEXT b
+          ENDIF
+          IF NOT liqHasSell THEN
             RUN scrBankrupt(plyrs(p), plyrs(p).cashBal, 2, iCYr)
             EXITIF TRUE THEN
             ENDEXIT
           ENDIF
+          ordCnt := 0
+          FOR s := 1 TO 9
+            IF liqSellStk(s) > 0 THEN
+              ordCnt := ordCnt + 1
+              ordTyp(ordCnt) := 1
+              ordId(ordCnt)  := s
+              ordQty(ordCnt) := liqSellStk(s)
+            ENDIF
+          NEXT s
+          FOR b := 1 TO 3
+            IF liqSellBnd(b) > 0 THEN
+              ordCnt := ordCnt + 1
+              ordTyp(ordCnt) := 2
+              ordId(ordCnt)  := b
+              ordQty(ordCnt) := liqSellBnd(b)
+            ENDIF
+          NEXT b
           RUN applySells(plyrs(p), mkt, ordTyp, ordId, ordQty, ordCnt)
         ENDLOOP
       ENDIF

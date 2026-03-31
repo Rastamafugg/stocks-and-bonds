@@ -16,8 +16,6 @@ PROCEDURE snb
 (*                           years for increment)     *)
 (*              snbMarket  - market resolution        *)
 (*              snbSell or snbSellAI - sell phase     *)
-(*              snbSellForceLiq      - optional human *)
-(*                                      forced liq    *)
 (*              snbYear10Clear       - optional       *)
 (*                                      year-10 clear *)
 (*              snbBuy or snbBuyAI   - buy phase      *)
@@ -195,7 +193,7 @@ LOOP
       EXITIF (iCYr >= iMaxYr AND iSavPh = 0) OR gameOver THEN
       ENDEXIT
 
-    IF iSavPh = 0 THEN \ ! YEAR_START
+    IF iSavPh = 0 OR iSavPh = 4 OR iSavPh = 6 THEN
       modNam := "snbPhaseCore"
       RUN ensureModule(modNam, TRUE, debugLog, ok)
       IF NOT ok THEN
@@ -223,14 +221,6 @@ LOOP
         RUN ensureModule(modNam, TRUE, debugLog, ok)
         IF NOT ok THEN
           PRINT "SNB: failed to ensure snbTradeHumanUI (snbDividend)"
-          gameOver := TRUE
-        ENDIF
-      ENDIF
-      IF NOT gameOver THEN
-        modNam := "snbSellMargin"
-        RUN ensureModule(modNam, TRUE, debugLog, ok)
-        IF NOT ok THEN
-          PRINT "SNB: failed to ensure snbSellMargin (snbDividend)"
           gameOver := TRUE
         ENDIF
       ENDIF
@@ -263,7 +253,7 @@ LOOP
     ENDIF
 
     IF NOT gameOver THEN
-      IF iSavPh = 0 THEN \ ! YEAR_START
+      IF iSavPh = 0 OR iSavPh = 7 THEN
         modNam := "snbPhaseCore"
         RUN ensureModule(modNam, TRUE, debugLog, ok)
         IF NOT ok THEN
@@ -346,14 +336,6 @@ LOOP
               ENDIF
             ENDIF
             IF NOT gameOver THEN
-              modNam := "snbSellForceUI"
-              RUN ensureModule(modNam, TRUE, debugLog, ok)
-              IF NOT ok THEN
-                PRINT "SNB: failed to ensure snbSellForceUI (snbSellAI)"
-                gameOver := TRUE
-              ENDIF
-            ENDIF
-            IF NOT gameOver THEN
               modNam := "snbTradeMgn"
               RUN ensureModule(modNam, TRUE, debugLog, ok)
               IF NOT ok THEN
@@ -385,77 +367,6 @@ LOOP
         ENDIF
         IF NOT gameOver THEN
           RUN forkPhase(modNam, debugLog, exitStat)
-          GOSUB 100
-        ENDIF
-      ENDIF
-    ENDIF
-
-    IF NOT gameOver THEN
-      IF iSavPh = 4 THEN \ ! SELL_FORCE_LIQ
-        modNam := "snbPhaseCore"
-        RUN ensureModule(modNam, TRUE, debugLog, ok)
-        IF NOT ok THEN
-          PRINT "SNB: failed to ensure snbPhaseCore (snbSellForceLiq)"
-          gameOver := TRUE
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbTradeShared"
-          RUN ensureModule(modNam, TRUE, debugLog, ok)
-          IF NOT ok THEN
-            PRINT "SNB: failed to ensure snbTradeShared (snbSellForceLiq)"
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbGameData"
-          RUN ensureModule(modNam, TRUE, debugLog, ok)
-          IF NOT ok THEN
-            PRINT "SNB: failed to ensure snbGameData (snbSellForceLiq)"
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbTradeHumanUI"
-          RUN ensureModule(modNam, TRUE, debugLog, ok)
-          IF NOT ok THEN
-            PRINT "SNB: failed to ensure snbTradeHumanUI (snbSellForceLiq)"
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbSellMargin"
-          RUN ensureModule(modNam, TRUE, debugLog, ok)
-          IF NOT ok THEN
-            PRINT "SNB: failed to ensure snbSellMargin (snbSellForceLiq)"
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbSellForceUI"
-          RUN ensureModule(modNam, TRUE, debugLog, ok)
-          IF NOT ok THEN
-            PRINT "SNB: failed to ensure snbSellForceUI (snbSellForceLiq)"
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbTradeMgn"
-          RUN ensureModule(modNam, TRUE, debugLog, ok)
-          IF NOT ok THEN
-            PRINT "SNB: failed to ensure snbTradeMgn (snbSellForceLiq)"
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbSellForceLiq"
-          RUN ensureModule(modNam, TRUE, debugLog, ok)
-          IF NOT ok THEN
-            PRINT "SNB: failed to ensure snbSellForceLiq"
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          RUN forkPhase("snbSellForceLiq", debugLog, exitStat)
           GOSUB 100
         ENDIF
       ENDIF

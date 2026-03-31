@@ -122,27 +122,6 @@ LOOP
 
   IF hdr.mgnRule = 1 THEN
     IF NOT plyr.isBankrupt THEN
-      IF iCYr < 10 THEN
-        FOR s := 1 TO 9
-          IF NOT plyr.isBankrupt THEN
-            IF plyr.mgnBal(s) > 0 THEN
-              IF plyr.stckShrs(s) = 0 OR mkt.stckPrice(s) <= 25 THEN
-                hdr.savedPhase := 4
-                hdr.savedPlyr  := p
-                hdr.gameStage  := 2
-                RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
-                IF NOT saveOK THEN
-                  PRINT "snbSell: saveHdrOnly failed"
-                ENDIF
-                END
-              ENDIF
-            ENDIF
-          ENDIF
-        NEXT s
-      ENDIF
-    ENDIF
-
-    IF NOT plyr.isBankrupt THEN
       IF iCYr = 10 THEN
         RUN calcMgnTot(plyr, currMgnTot)
         IF currMgnTot > 0 THEN
