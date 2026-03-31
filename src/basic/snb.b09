@@ -93,7 +93,7 @@ debugLog := FALSE
 ! Bootstrap snbForkUtil into the current process so shared
 ! child-process helpers are available to SNB.
 modNam := "snbForkUtil"
-RUN ensureModuleLib(modNam, FALSE, debugLog, ok)
+RUN ensureModule(modNam, FALSE, debugLog, ok)
 IF NOT ok THEN
   PRINT "SNB: failed to load snbForkUtil"
   END
@@ -101,7 +101,7 @@ ENDIF
 
 ! Load snbPhaseCore as permanent resident for SNB's lifetime.
 modNam := "snbPhaseCore"
-RUN ensureModuleLib(modNam, FALSE, debugLog, ok)
+RUN ensureModule(modNam, FALSE, debugLog, ok)
 IF NOT ok THEN
   PRINT "SNB: failed to load snbPhaseCore"
   END
@@ -131,19 +131,19 @@ LOOP
     ! directory before forking. forChild=TRUE uses F$NMLink /
     ! F$NMLoad.
     modNam := "snbPhaseCore"
-RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+RUN ensureModule(modNam, TRUE, debugLog, ok)
     IF NOT ok THEN
       PRINT "SNB: failed to ensure snbPhaseCore for snbSetup"
       END
     ENDIF
     modNam := "snbDeckUtil"
-    RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+    RUN ensureModule(modNam, TRUE, debugLog, ok)
     IF NOT ok THEN
       PRINT "SNB: failed to ensure snbDeckUtil for snbSetup"
       END
     ENDIF
     modNam := "snbMenuUtil"
-    RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+    RUN ensureModule(modNam, TRUE, debugLog, ok)
     IF NOT ok THEN
       PRINT "SNB: failed to ensure snbMenuUtil for snbSetup"
       END
@@ -155,7 +155,7 @@ RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
       END
     ENDIF
 
-RUN forkPhaseLib("snbSetup", debugLog, exitStat)
+RUN forkPhase("snbSetup", debugLog, exitStat)
     IF exitStat <> 0 THEN
       PRINT "SNB: snbSetup failed exitStat="; exitStat
       END
@@ -318,7 +318,7 @@ RUN forkPhaseLib("snbSetup", debugLog, exitStat)
         ENDIF
         IF NOT gameOver THEN
           modNam := "snbSellMargin"
-          RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+          RUN ensureModule(modNam, TRUE, debugLog, ok)
           IF NOT ok THEN
             PRINT "SNB: failed to ensure snbSellMargin (snbSell)"
             gameOver := TRUE
@@ -365,14 +365,14 @@ RUN forkPhaseLib("snbSetup", debugLog, exitStat)
             ENDIF
           ELSE
             modNam := "snbForkUtil"
-            RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+            RUN ensureModule(modNam, TRUE, debugLog, ok)
             IF NOT ok THEN
               PRINT "SNB: failed to ensure snbForkUtil (snbSell)"
               gameOver := TRUE
             ENDIF
             IF NOT gameOver THEN
               modNam := "snbSellLot"
-              RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+              RUN ensureModule(modNam, TRUE, debugLog, ok)
               IF NOT ok THEN
                 PRINT "SNB: failed to ensure snbSellLot (snbSell)"
                 gameOver := TRUE
@@ -380,7 +380,7 @@ RUN forkPhaseLib("snbSetup", debugLog, exitStat)
             ENDIF
             IF NOT gameOver THEN
             modNam := "snbTradeHumanUI"
-            RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+            RUN ensureModule(modNam, TRUE, debugLog, ok)
             IF NOT ok THEN
               PRINT "SNB: failed to ensure snbTradeHumanUI (snbSell)"
               gameOver := TRUE
@@ -392,14 +392,14 @@ RUN forkPhaseLib("snbSetup", debugLog, exitStat)
           ENDIF \ENDIF
         ENDIF
         IF NOT gameOver THEN
-          RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+          RUN ensureModule(modNam, TRUE, debugLog, ok)
           IF NOT ok THEN
             PRINT "SNB: failed to ensure "; modNam
             gameOver := TRUE
           ENDIF
         ENDIF
         IF NOT gameOver THEN
-          RUN forkPhaseLib(modNam, debugLog, exitStat)
+          RUN forkPhase(modNam, debugLog, exitStat)
           GOSUB 100
         ENDIF
       ENDIF
@@ -669,7 +669,7 @@ RUN forkPhaseLib("snbSetup", debugLog, exitStat)
     ENDIF
 
     modNam := "snbPhaseCore"
-    RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+    RUN ensureModule(modNam, TRUE, debugLog, ok)
     IF NOT ok THEN
       PRINT "SNB: failed to ensure snbPhaseCore for snbEndGame"
       END
