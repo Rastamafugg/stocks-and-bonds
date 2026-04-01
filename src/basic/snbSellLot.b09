@@ -8,7 +8,8 @@ PROCEDURE snbSellLot
 (*             draft files.                                     *)
 (* PARAMS    : None                                             *)
 (* NOTE      : snbStateIO, snbTradeShared, snbGameData,         *)
-(*             snbTradeHumanUI, and snbSellLot must be loaded.  *)
+(*             snbPhaseCore, snbScreenUtil, snbTradeHumanUI,    *)
+(*             and snbSellLot must be loaded.                   *)
 (* ============================================================ *)
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER

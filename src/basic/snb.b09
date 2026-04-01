@@ -226,6 +226,14 @@ RUN forkPhase("snbSetup", debugLog, exitStat)
         ENDIF
       ENDIF
       IF NOT gameOver THEN
+        modNam := "snbScreenUtil"
+        RUN ensureModule(modNam, TRUE, debugLog, ok)
+        IF NOT ok THEN
+          PRINT "SNB: failed to ensure snbScreenUtil (snbDividend)"
+          gameOver := TRUE
+        ENDIF
+      ENDIF
+      IF NOT gameOver THEN
         modNam := "snbTradeHumanUI"
         RUN ensureModule(modNam, TRUE, debugLog, ok)
         IF NOT ok THEN
@@ -317,10 +325,10 @@ RUN forkPhase("snbSetup", debugLog, exitStat)
           ENDIF
         ENDIF
         IF NOT gameOver THEN
-          modNam := "snbPhaseCore"
+          modNam := "snbScreenUtil"
           RUN ensureModule(modNam, TRUE, debugLog, ok)
           IF NOT ok THEN
-            PRINT "SNB: failed to ensure snbPhaseCore (snbSell)"
+            PRINT "SNB: failed to ensure snbScreenUtil (snbSell)"
             gameOver := TRUE
           ENDIF
         ENDIF
@@ -330,10 +338,10 @@ RUN forkPhase("snbSetup", debugLog, exitStat)
             PRINT "SNB: failed to read sell turn player type"
             gameOver := TRUE
           ELSE IF turnPType = 2 THEN
-            modNam := "snbPhaseCore"
+            modNam := "snbScreenUtil"
             RUN ensureModule(modNam, TRUE, debugLog, ok)
             IF NOT ok THEN
-              PRINT "SNB: failed to ensure snbPhaseCore (snbSellAI)"
+              PRINT "SNB: failed to ensure snbScreenUtil (snbSellAI)"
               gameOver := TRUE
             ENDIF
             IF NOT gameOver THEN
@@ -414,6 +422,14 @@ RUN forkPhase("snbSetup", debugLog, exitStat)
           ENDIF
         ENDIF
         IF NOT gameOver THEN
+          modNam := "snbScreenUtil"
+          RUN ensureModule(modNam, TRUE, debugLog, ok)
+          IF NOT ok THEN
+            PRINT "SNB: failed to ensure snbScreenUtil (snbYear10Clear)"
+            gameOver := TRUE
+          ENDIF
+        ENDIF
+        IF NOT gameOver THEN
           modNam := "snbTradeHumanUI"
           RUN ensureModule(modNam, TRUE, debugLog, ok)
           IF NOT ok THEN
@@ -477,6 +493,22 @@ RUN forkPhase("snbSetup", debugLog, exitStat)
           ENDIF
         ENDIF
         IF NOT gameOver THEN
+          modNam := "snbPhaseCore"
+          RUN ensureModule(modNam, TRUE, debugLog, ok)
+          IF NOT ok THEN
+            PRINT "SNB: failed to ensure snbPhaseCore (snbBuy)"
+            gameOver := TRUE
+          ENDIF
+        ENDIF
+        IF NOT gameOver THEN
+          modNam := "snbScreenUtil"
+          RUN ensureModule(modNam, TRUE, debugLog, ok)
+          IF NOT ok THEN
+            PRINT "SNB: failed to ensure snbScreenUtil (snbBuy)"
+            gameOver := TRUE
+          ENDIF
+        ENDIF
+        IF NOT gameOver THEN
           modNam := "snbTradeHumanUI"
           RUN ensureModule(modNam, TRUE, debugLog, ok)
           IF NOT ok THEN
@@ -490,10 +522,10 @@ RUN forkPhase("snbSetup", debugLog, exitStat)
             PRINT "SNB: failed to read buy turn player type"
             gameOver := TRUE
           ELSE IF turnPType = 2 THEN
-            modNam := "snbPhaseCore"
+            modNam := "snbScreenUtil"
             RUN ensureModule(modNam, TRUE, debugLog, ok)
             IF NOT ok THEN
-              PRINT "SNB: failed to ensure snbPhaseCore (snbBuyAI)"
+              PRINT "SNB: failed to ensure snbScreenUtil (snbBuyAI)"
               gameOver := TRUE
             ENDIF
             IF NOT gameOver THEN
@@ -548,6 +580,14 @@ RUN forkPhase("snbSetup", debugLog, exitStat)
           RUN ensureModule(modNam, TRUE, debugLog, ok)
           IF NOT ok THEN
             PRINT "SNB: failed to ensure snbTradeShared (snbMarginPay)"
+            gameOver := TRUE
+          ENDIF
+        ENDIF
+        IF NOT gameOver THEN
+          modNam := "snbScreenUtil"
+          RUN ensureModule(modNam, TRUE, debugLog, ok)
+          IF NOT ok THEN
+            PRINT "SNB: failed to ensure snbScreenUtil (snbMarginPay)"
             gameOver := TRUE
           ENDIF
         ENDIF
@@ -652,10 +692,10 @@ RUN forkPhase("snbSetup", debugLog, exitStat)
       ENDIF
     ENDIF
 
-    modNam := "snbPhaseCore"
+    modNam := "snbScreenUtil"
     RUN ensureModule(modNam, TRUE, debugLog, ok)
     IF NOT ok THEN
-      PRINT "SNB: failed to ensure snbPhaseCore for snbEndGame"
+      PRINT "SNB: failed to ensure snbScreenUtil for snbEndGame"
       END
     ENDIF
     modNam := "snbMenuUtil"

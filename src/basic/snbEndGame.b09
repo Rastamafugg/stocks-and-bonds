@@ -15,7 +15,7 @@ PROCEDURE snbEndGame
 (* PARAMS    : None (child process; no PARAM handoff)          *)
 (* SIDE EFX  : Reads SNBSTATE. Displays screens. Writes       *)
 (*             SNBSTATE for menu return or quit.              *)
-(* NOTE      : snbPhaseCore and snbEndGame must be             *)
+(* NOTE      : snbScreenUtil and snbEndGame must be            *)
 (*             pre-loaded by coordinator. All four screen      *)
 (*             procedures are in this same packed file.        *)
 (* ============================================================ *)

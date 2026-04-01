@@ -12,10 +12,10 @@ PROCEDURE snbSell
 (* SIDE EFX  : Reads and writes SNBSTATE. Copies SNBSTATE to    *)
 (*             SNBGAME on save.                                 *)
 (* NOTE      : snbStateIO, snbTradeShared, snbGameData,         *)
-(*             snbPhaseCore, snbForkUtil, and snbSell must be   *)
+(*             snbScreenUtil, snbForkUtil, and snbSell must be  *)
 (*             pre-loaded by the coordinator before fork.       *)
-(*             snbTradeHumanUI and snbSellLot are ensured only  *)
-(*             when the lot-editor child is forked.             *)
+(*             snbPhaseCore, snbTradeHumanUI, and snbSellLot    *)
+(*             are ensured for the lot-editor child before fork.*)
 (* ============================================================ *)
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
@@ -486,6 +486,36 @@ LOOP
       RUN saveDraftCtx(hdrPath, dCtx, draftOK)
       IF NOT draftOK THEN
         PRINT "runSellPlyr: saveDraftCtx failed"
+        END
+      ENDIF
+      modNam := "snbStateIO"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "runSellPlyr: failed to ensure snbStateIO"
+        END
+      ENDIF
+      modNam := "snbTradeShared"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "runSellPlyr: failed to ensure snbTradeShared"
+        END
+      ENDIF
+      modNam := "snbGameData"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "runSellPlyr: failed to ensure snbGameData"
+        END
+      ENDIF
+      modNam := "snbPhaseCore"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "runSellPlyr: failed to ensure snbPhaseCore"
+        END
+      ENDIF
+      modNam := "snbScreenUtil"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "runSellPlyr: failed to ensure snbScreenUtil"
         END
       ENDIF
       modNam := "snbTradeHumanUI"
