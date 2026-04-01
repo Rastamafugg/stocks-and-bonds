@@ -125,11 +125,12 @@ LOOP
     ! Ensure snbSetup dependencies are in the OS module
     ! directory before forking. forChild=TRUE uses F$NMLink /
     ! F$NMLoad.
-    modCnt := 4
+    modCnt := 5
     modList(1) := "snbPhaseCore"
-    modList(2) := "snbDeckUtil"
-    modList(3) := "snbMenuUtil"
-    modList(4) := "snbSetup"
+    modList(2) := "snbScreenUtil"
+    modList(3) := "snbDeckUtil"
+    modList(4) := "snbMenuUtil"
+    modList(5) := "snbSetup"
     RUN ensureModule(modList, modCnt, "snbSetup", TRUE, debugLog, ok)
     IF NOT ok THEN
       END
