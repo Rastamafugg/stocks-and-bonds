@@ -317,10 +317,10 @@ RUN forkPhase("snbSetup", debugLog, exitStat)
           ENDIF
         ENDIF
         IF NOT gameOver THEN
-          modNam := "snbSellMargin"
+          modNam := "snbPhaseCore"
           RUN ensureModule(modNam, TRUE, debugLog, ok)
           IF NOT ok THEN
-            PRINT "SNB: failed to ensure snbSellMargin (snbSell)"
+            PRINT "SNB: failed to ensure snbPhaseCore (snbSell)"
             gameOver := TRUE
           ENDIF
         ENDIF
@@ -369,22 +369,6 @@ RUN forkPhase("snbSetup", debugLog, exitStat)
             IF NOT ok THEN
               PRINT "SNB: failed to ensure snbForkUtil (snbSell)"
               gameOver := TRUE
-            ENDIF
-            IF NOT gameOver THEN
-              modNam := "snbSellLot"
-              RUN ensureModule(modNam, TRUE, debugLog, ok)
-              IF NOT ok THEN
-                PRINT "SNB: failed to ensure snbSellLot (snbSell)"
-                gameOver := TRUE
-              ENDIF
-            ENDIF
-            IF NOT gameOver THEN
-            modNam := "snbTradeHumanUI"
-            RUN ensureModule(modNam, TRUE, debugLog, ok)
-            IF NOT ok THEN
-              PRINT "SNB: failed to ensure snbTradeHumanUI (snbSell)"
-              gameOver := TRUE
-            ENDIF
             ENDIF
             IF NOT gameOver THEN
               modNam := "snbSell"

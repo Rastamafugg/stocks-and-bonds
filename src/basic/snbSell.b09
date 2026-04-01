@@ -11,10 +11,11 @@ PROCEDURE snbSell
 (* PARAMS    : None (child process; no PARAM handoff)           *)
 (* SIDE EFX  : Reads and writes SNBSTATE. Copies SNBSTATE to    *)
 (*             SNBGAME on save.                                 *)
-(* NOTE      : snbStateIO, snbTradeShared, snbGameData,        *)
-(*             snbTradeHumanUI, snbSellMargin, snbForkUtil,     *)
-(*             snbSellLot, and snbSell must be pre-loaded by    *)
-(*             the coordinator before fork.                     *)
+(* NOTE      : snbStateIO, snbTradeShared, snbGameData,         *)
+(*             snbPhaseCore, snbForkUtil, and snbSell must be   *)
+(*             pre-loaded by the coordinator before fork.       *)
+(*             snbTradeHumanUI and snbSellLot are ensured only  *)
+(*             when the lot-editor child is forked.             *)
 (* ============================================================ *)
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
@@ -485,6 +486,12 @@ LOOP
       RUN saveDraftCtx(hdrPath, dCtx, draftOK)
       IF NOT draftOK THEN
         PRINT "runSellPlyr: saveDraftCtx failed"
+        END
+      ENDIF
+      modNam := "snbTradeHumanUI"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "runSellPlyr: failed to ensure snbTradeHumanUI"
         END
       ENDIF
       modNam := "snbSellLot"
