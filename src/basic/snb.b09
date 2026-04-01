@@ -28,7 +28,7 @@ PROCEDURE snb
 (*            forks snbEndGame (end-game screens).   *)
 (*            Before each fork: ensures required     *)
 (*            modules are in the OS module directory  *)
-(*            via ensureModule(forChild=TRUE).        *)
+(*            via ensureModule(..., TRUE, ...).       *)
 (*                                                   *)
 (*            currYear convention:                   *)
 (*              snbSetup writes currYear=0.          *)
@@ -75,7 +75,9 @@ DIM iBnkr      : INTEGER  \ ! staged hdr.bnkrFlgs for bit scan
 DIM iSavPh     : INTEGER  \ ! staged hdr.savedPhase
 DIM bankrCnt   : INTEGER  \ ! count of bankrupt players
 DIM activePlrs : INTEGER  \ ! plyrCount - bankrCnt
-DIM modNam     : STRING[20]
+DIM modList(8) : STRING[20]
+DIM modCnt     : INTEGER
+DIM childNam   : STRING[20]
 DIM gameOver   : BOOLEAN
 DIM runEndGame : BOOLEAN
 DIM doClsgMkt  : BOOLEAN
@@ -92,15 +94,10 @@ debugLog := FALSE
 
 ! Bootstrap snbForkUtil into the current process so shared
 ! child-process helpers are available to SNB.
-modNam := "snbForkUtil"
-RUN ensureSnbModule(modNam, "bootstrap", FALSE, debugLog, ok)
-IF NOT ok THEN
-  END
-ENDIF
-
-! Load snbPhaseCore as permanent resident for SNB's lifetime.
-modNam := "snbPhaseCore"
-RUN ensureSnbModule(modNam, "bootstrap", FALSE, debugLog, ok)
+modCnt := 2
+modList(1) := "snbForkUtil"
+modList(2) := "snbPhaseCore"
+RUN ensureModule(modList, modCnt, "", FALSE, debugLog, ok)
 IF NOT ok THEN
   END
 ENDIF
@@ -128,23 +125,12 @@ LOOP
     ! Ensure snbSetup dependencies are in the OS module
     ! directory before forking. forChild=TRUE uses F$NMLink /
     ! F$NMLoad.
-    modNam := "snbPhaseCore"
-    RUN ensureSnbModule(modNam, "snbSetup", TRUE, debugLog, ok)
-    IF NOT ok THEN
-      END
-    ENDIF
-    modNam := "snbDeckUtil"
-    RUN ensureSnbModule(modNam, "snbSetup", TRUE, debugLog, ok)
-    IF NOT ok THEN
-      END
-    ENDIF
-    modNam := "snbMenuUtil"
-    RUN ensureSnbModule(modNam, "snbSetup", TRUE, debugLog, ok)
-    IF NOT ok THEN
-      END
-    ENDIF
-    modNam := "snbSetup"
-    RUN ensureSnbModule(modNam, "snbSetup", TRUE, debugLog, ok)
+    modCnt := 4
+    modList(1) := "snbPhaseCore"
+    modList(2) := "snbDeckUtil"
+    modList(3) := "snbMenuUtil"
+    modList(4) := "snbSetup"
+    RUN ensureModule(modList, modCnt, "snbSetup", TRUE, debugLog, ok)
     IF NOT ok THEN
       END
     ENDIF
@@ -197,55 +183,16 @@ RUN forkPhase("snbSetup", debugLog, exitStat)
       ENDEXIT
 
     IF iSavPh = 0 OR iSavPh = 4 OR iSavPh = 6 THEN
-      modNam := "snbStateIO"
-      RUN ensureSnbModule(modNam, "snbDividend", TRUE, debugLog, ok)
-      IF NOT ok THEN
-        gameOver := TRUE
-      ENDIF
-      IF NOT gameOver THEN
-        modNam := "snbTradeShared"
-        RUN ensureSnbModule(modNam, "snbDividend", TRUE, debugLog, ok)
-        IF NOT ok THEN
-          gameOver := TRUE
-        ENDIF
-      ENDIF
-      IF NOT gameOver THEN
-        modNam := "snbGameData"
-        RUN ensureSnbModule(modNam, "snbDividend", TRUE, debugLog, ok)
-        IF NOT ok THEN
-          gameOver := TRUE
-        ENDIF
-      ENDIF
-      IF NOT gameOver THEN
-        modNam := "snbScreenUtil"
-        RUN ensureSnbModule(modNam, "snbDividend", TRUE, debugLog, ok)
-        IF NOT ok THEN
-          gameOver := TRUE
-        ENDIF
-      ENDIF
-      IF NOT gameOver THEN
-        modNam := "snbTradeHumanUI"
-        RUN ensureSnbModule(modNam, "snbDividend", TRUE, debugLog, ok)
-        IF NOT ok THEN
-          gameOver := TRUE
-        ENDIF
-      ENDIF
-      IF NOT gameOver THEN
-        modNam := "snbSellForceUI"
-        RUN ensureSnbModule(modNam, "snbDividend", TRUE, debugLog, ok)
-        IF NOT ok THEN
-          gameOver := TRUE
-        ENDIF
-      ENDIF
-      IF NOT gameOver THEN
-        modNam := "snbSellAIUtil"
-        RUN ensureSnbModule(modNam, "snbDividend", TRUE, debugLog, ok)
-        IF NOT ok THEN
-          gameOver := TRUE
-        ENDIF
-      ENDIF
-      modNam := "snbDividend"
-      RUN ensureSnbModule(modNam, "", TRUE, debugLog, ok)
+      modCnt := 8
+      modList(1) := "snbStateIO"
+      modList(2) := "snbTradeShared"
+      modList(3) := "snbGameData"
+      modList(4) := "snbScreenUtil"
+      modList(5) := "snbTradeHumanUI"
+      modList(6) := "snbSellForceUI"
+      modList(7) := "snbSellAIUtil"
+      modList(8) := "snbDividend"
+      RUN ensureModule(modList, modCnt, "snbDividend", TRUE, debugLog, ok)
       IF NOT ok THEN
         gameOver := TRUE
       ENDIF
@@ -257,24 +204,13 @@ RUN forkPhase("snbSetup", debugLog, exitStat)
 
     IF NOT gameOver THEN
       IF iSavPh = 0 OR iSavPh = 7 THEN
-        modNam := "snbStateIO"
-        RUN ensureSnbModule(modNam, "snbMarket", TRUE, debugLog, ok)
+        modCnt := 3
+        modList(1) := "snbStateIO"
+        modList(2) := "snbDeckUtil"
+        modList(3) := "snbMarket"
+        RUN ensureModule(modList, modCnt, "snbMarket", TRUE, debugLog, ok)
         IF NOT ok THEN
           gameOver := TRUE
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbDeckUtil"
-          RUN ensureSnbModule(modNam, "snbMarket", TRUE, debugLog, ok)
-          IF NOT ok THEN
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbMarket"
-          RUN ensureSnbModule(modNam, "", TRUE, debugLog, ok)
-          IF NOT ok THEN
-            gameOver := TRUE
-          ENDIF
         ENDIF
         IF NOT gameOver THEN
           RUN forkPhase("snbMarket", debugLog, exitStat)
@@ -285,31 +221,14 @@ RUN forkPhase("snbSetup", debugLog, exitStat)
 
     IF NOT gameOver THEN
       IF iSavPh = 1 THEN \ ! SELL_PHASE
-        modNam := "snbStateIO"
-        RUN ensureSnbModule(modNam, "snbSell", TRUE, debugLog, ok)
+        modCnt := 4
+        modList(1) := "snbStateIO"
+        modList(2) := "snbTradeShared"
+        modList(3) := "snbGameData"
+        modList(4) := "snbScreenUtil"
+        RUN ensureModule(modList, modCnt, "snbSell", TRUE, debugLog, ok)
         IF NOT ok THEN
           gameOver := TRUE
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbTradeShared"
-          RUN ensureSnbModule(modNam, "snbSell", TRUE, debugLog, ok)
-          IF NOT ok THEN
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbGameData"
-          RUN ensureSnbModule(modNam, "snbSell", TRUE, debugLog, ok)
-          IF NOT ok THEN
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbScreenUtil"
-          RUN ensureSnbModule(modNam, "snbSell", TRUE, debugLog, ok)
-          IF NOT ok THEN
-            gameOver := TRUE
-          ENDIF
         ENDIF
         IF NOT gameOver THEN
           RUN readTurnPlyrType(turnPType, loadOK)
@@ -317,54 +236,27 @@ RUN forkPhase("snbSetup", debugLog, exitStat)
             PRINT "SNB: failed to read sell turn player type"
             gameOver := TRUE
           ELSE IF turnPType = 2 THEN
-            modNam := "snbScreenUtil"
-            RUN ensureSnbModule(modNam, "snbSellAI", TRUE, debugLog, ok)
-            IF NOT ok THEN
-              gameOver := TRUE
-            ENDIF
-            IF NOT gameOver THEN
-            modNam := "snbTradeAI"
-            RUN ensureSnbModule(modNam, "snbSellAI", TRUE, debugLog, ok)
-            IF NOT ok THEN
-              gameOver := TRUE
-            ENDIF
-            ENDIF
-            IF NOT gameOver THEN
-              modNam := "snbSellAIUtil"
-              RUN ensureSnbModule(modNam, "snbSellAI", TRUE, debugLog, ok)
-              IF NOT ok THEN
-                gameOver := TRUE
-              ENDIF
-            ENDIF
-            IF NOT gameOver THEN
-              modNam := "snbTradeMgn"
-              RUN ensureSnbModule(modNam, "snbSellAI", TRUE, debugLog, ok)
-              IF NOT ok THEN
-                gameOver := TRUE
-              ENDIF
-            ENDIF
-            IF NOT gameOver THEN
-              modNam := "snbSellAI"
-            ENDIF
+            modCnt := 4
+            modList(1) := "snbTradeAI"
+            modList(2) := "snbSellAIUtil"
+            modList(3) := "snbTradeMgn"
+            modList(4) := "snbSellAI"
+            childNam := "snbSellAI"
           ELSE
-            modNam := "snbForkUtil"
-            RUN ensureSnbModule(modNam, "snbSell", TRUE, debugLog, ok)
-            IF NOT ok THEN
-              gameOver := TRUE
-            ENDIF
-            IF NOT gameOver THEN
-              modNam := "snbSell"
-            ENDIF
+            modCnt := 2
+            modList(1) := "snbForkUtil"
+            modList(2) := "snbSell"
+            childNam := "snbSell"
           ENDIF \ENDIF
         ENDIF
         IF NOT gameOver THEN
-          RUN ensureSnbModule(modNam, "", TRUE, debugLog, ok)
+          RUN ensureModule(modList, modCnt, childNam, TRUE, debugLog, ok)
           IF NOT ok THEN
             gameOver := TRUE
           ENDIF
         ENDIF
         IF NOT gameOver THEN
-          RUN forkPhase(modNam, debugLog, exitStat)
+          RUN forkPhase(childNam, debugLog, exitStat)
           GOSUB 100
         ENDIF
       ENDIF
@@ -372,63 +264,23 @@ RUN forkPhase("snbSetup", debugLog, exitStat)
 
     IF NOT gameOver THEN
       IF iSavPh = 3 THEN \ ! YEAR10_CLEAR
-        modNam := "snbPhaseCore"
-        RUN ensureSnbModule(modNam, "snbYear10Clear", TRUE, debugLog, ok)
+        modCnt := 8
+        modList(1) := "snbPhaseCore"
+        modList(2) := "snbTradeShared"
+        modList(3) := "snbGameData"
+        modList(4) := "snbScreenUtil"
+        modList(5) := "snbTradeHumanUI"
+        modList(6) := "snbSellMargin"
+        modList(7) := "snbTradeAI"
+        modList(8) := "snbSellForceUI"
+        RUN ensureModule(modList, modCnt, "snbYear10Clear", TRUE, debugLog, ok)
         IF NOT ok THEN
           gameOver := TRUE
         ENDIF
         IF NOT gameOver THEN
-          modNam := "snbTradeShared"
-          RUN ensureSnbModule(modNam, "snbYear10Clear", TRUE, debugLog, ok)
-          IF NOT ok THEN
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbGameData"
-          RUN ensureSnbModule(modNam, "snbYear10Clear", TRUE, debugLog, ok)
-          IF NOT ok THEN
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbScreenUtil"
-          RUN ensureSnbModule(modNam, "snbYear10Clear", TRUE, debugLog, ok)
-          IF NOT ok THEN
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbTradeHumanUI"
-          RUN ensureSnbModule(modNam, "snbYear10Clear", TRUE, debugLog, ok)
-          IF NOT ok THEN
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbSellMargin"
-          RUN ensureSnbModule(modNam, "snbYear10Clear", TRUE, debugLog, ok)
-          IF NOT ok THEN
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbTradeAI"
-          RUN ensureSnbModule(modNam, "snbYear10Clear", TRUE, debugLog, ok)
-          IF NOT ok THEN
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbSellForceUI"
-          RUN ensureSnbModule(modNam, "snbYear10Clear", TRUE, debugLog, ok)
-          IF NOT ok THEN
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbYear10Clear"
-          RUN ensureSnbModule(modNam, "", TRUE, debugLog, ok)
+          modCnt := 1
+          modList(1) := "snbYear10Clear"
+          RUN ensureModule(modList, modCnt, "snbYear10Clear", TRUE, debugLog, ok)
           IF NOT ok THEN
             gameOver := TRUE
           ENDIF
@@ -442,38 +294,15 @@ RUN forkPhase("snbSetup", debugLog, exitStat)
 
     IF NOT gameOver THEN
       IF iSavPh = 2 THEN \ ! BUY_PHASE
-        modNam := "snbStateIO"
-        RUN ensureSnbModule(modNam, "snbBuy", TRUE, debugLog, ok)
+        modCnt := 5
+        modList(1) := "snbStateIO"
+        modList(2) := "snbTradeShared"
+        modList(3) := "snbPhaseCore"
+        modList(4) := "snbScreenUtil"
+        modList(5) := "snbTradeHumanUI"
+        RUN ensureModule(modList, modCnt, "snbBuy", TRUE, debugLog, ok)
         IF NOT ok THEN
           gameOver := TRUE
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbTradeShared"
-          RUN ensureSnbModule(modNam, "snbBuy", TRUE, debugLog, ok)
-          IF NOT ok THEN
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbPhaseCore"
-          RUN ensureSnbModule(modNam, "snbBuy", TRUE, debugLog, ok)
-          IF NOT ok THEN
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbScreenUtil"
-          RUN ensureSnbModule(modNam, "snbBuy", TRUE, debugLog, ok)
-          IF NOT ok THEN
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbTradeHumanUI"
-          RUN ensureSnbModule(modNam, "snbBuy", TRUE, debugLog, ok)
-          IF NOT ok THEN
-            gameOver := TRUE
-          ENDIF
         ENDIF
         IF NOT gameOver THEN
           RUN readTurnPlyrType(turnPType, loadOK)
@@ -481,42 +310,25 @@ RUN forkPhase("snbSetup", debugLog, exitStat)
             PRINT "SNB: failed to read buy turn player type"
             gameOver := TRUE
           ELSE IF turnPType = 2 THEN
-            modNam := "snbScreenUtil"
-            RUN ensureSnbModule(modNam, "snbBuyAI", TRUE, debugLog, ok)
-            IF NOT ok THEN
-              gameOver := TRUE
-            ENDIF
-            IF NOT gameOver THEN
-            modNam := "snbGameData"
-            RUN ensureSnbModule(modNam, "snbBuyAI", TRUE, debugLog, ok)
-            IF NOT ok THEN
-              gameOver := TRUE
-            ENDIF
-            ENDIF
-            IF NOT gameOver THEN
-              modNam := "snbTradeAI"
-              RUN ensureSnbModule(modNam, "snbBuyAI", TRUE, debugLog, ok)
-              IF NOT ok THEN
-                gameOver := TRUE
-              ENDIF
-            ENDIF
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          IF turnPType = 2 THEN
-            modNam := "snbBuyAI"
+            modCnt := 3
+            modList(1) := "snbGameData"
+            modList(2) := "snbTradeAI"
+            modList(3) := "snbBuyAI"
+            childNam := "snbBuyAI"
           ELSE
-            modNam := "snbBuy"
+            modCnt := 1
+            modList(1) := "snbBuy"
+            childNam := "snbBuy"
           ENDIF \ENDIF
         ENDIF
         IF NOT gameOver THEN
-          RUN ensureSnbModule(modNam, "", TRUE, debugLog, ok)
+          RUN ensureModule(modList, modCnt, childNam, TRUE, debugLog, ok)
           IF NOT ok THEN
             gameOver := TRUE
           ENDIF
         ENDIF
         IF NOT gameOver THEN
-          RUN forkPhase(modNam, debugLog, exitStat)
+          RUN forkPhase(childNam, debugLog, exitStat)
           GOSUB 100
         ENDIF
       ENDIF
@@ -524,52 +336,17 @@ RUN forkPhase("snbSetup", debugLog, exitStat)
 
     IF NOT gameOver THEN
       IF iSavPh = 5 THEN \ ! MARGIN_PAY
-        modNam := "snbPhaseCore"
-        RUN ensureSnbModule(modNam, "snbMarginPay", TRUE, debugLog, ok)
+        modCnt := 7
+        modList(1) := "snbPhaseCore"
+        modList(2) := "snbTradeShared"
+        modList(3) := "snbScreenUtil"
+        modList(4) := "snbTradeAI"
+        modList(5) := "snbGameData"
+        modList(6) := "snbTradeMgn"
+        modList(7) := "snbMarginPay"
+        RUN ensureModule(modList, modCnt, "snbMarginPay", TRUE, debugLog, ok)
         IF NOT ok THEN
           gameOver := TRUE
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbTradeShared"
-          RUN ensureSnbModule(modNam, "snbMarginPay", TRUE, debugLog, ok)
-          IF NOT ok THEN
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbScreenUtil"
-          RUN ensureSnbModule(modNam, "snbMarginPay", TRUE, debugLog, ok)
-          IF NOT ok THEN
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbTradeAI"
-          RUN ensureSnbModule(modNam, "snbMarginPay", TRUE, debugLog, ok)
-          IF NOT ok THEN
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbGameData"
-          RUN ensureSnbModule(modNam, "snbMarginPay", TRUE, debugLog, ok)
-          IF NOT ok THEN
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbTradeMgn"
-          RUN ensureSnbModule(modNam, "snbMarginPay", TRUE, debugLog, ok)
-          IF NOT ok THEN
-            gameOver := TRUE
-          ENDIF
-        ENDIF
-        IF NOT gameOver THEN
-          modNam := "snbMarginPay"
-          RUN ensureSnbModule(modNam, "", TRUE, debugLog, ok)
-          IF NOT ok THEN
-            gameOver := TRUE
-          ENDIF
         ENDIF
         IF NOT gameOver THEN
           RUN forkPhase("snbMarginPay", debugLog, exitStat)
@@ -615,18 +392,11 @@ RUN forkPhase("snbSetup", debugLog, exitStat)
     ENDIF
 
     IF doClsgMkt THEN
-      modNam := "snbStateIO"
-      RUN ensureSnbModule(modNam, "closing snbMarket", TRUE, debugLog, ok)
-      IF NOT ok THEN
-        END
-      ENDIF
-      modNam := "snbDeckUtil"
-      RUN ensureSnbModule(modNam, "closing snbMarket", TRUE, debugLog, ok)
-      IF NOT ok THEN
-        END
-      ENDIF
-      modNam := "snbMarket"
-      RUN ensureSnbModule(modNam, "closing draw", TRUE, debugLog, ok)
+      modCnt := 3
+      modList(1) := "snbStateIO"
+      modList(2) := "snbDeckUtil"
+      modList(3) := "snbMarket"
+      RUN ensureModule(modList, modCnt, "closing snbMarket", TRUE, debugLog, ok)
       IF NOT ok THEN
         END
       ENDIF
@@ -637,18 +407,11 @@ RUN forkPhase("snbSetup", debugLog, exitStat)
       ENDIF
     ENDIF
 
-    modNam := "snbScreenUtil"
-    RUN ensureSnbModule(modNam, "snbEndGame", TRUE, debugLog, ok)
-    IF NOT ok THEN
-      END
-    ENDIF
-    modNam := "snbMenuUtil"
-    RUN ensureSnbModule(modNam, "snbEndGame", TRUE, debugLog, ok)
-    IF NOT ok THEN
-      END
-    ENDIF
-    modNam := "snbEndGame"
-    RUN ensureSnbModule(modNam, "", TRUE, debugLog, ok)
+    modCnt := 3
+    modList(1) := "snbScreenUtil"
+    modList(2) := "snbMenuUtil"
+    modList(3) := "snbEndGame"
+    RUN ensureModule(modList, modCnt, "snbEndGame", TRUE, debugLog, ok)
     IF NOT ok THEN
       END
     ENDIF
@@ -930,32 +693,47 @@ END
     hasState := FALSE
 END
 
-PROCEDURE ensureSnbModule
+PROCEDURE ensureModule
 (* ============================================================ *)
-(* PROCEDURE : ensureSnbModule                                  *)
-(* PURPOSE   : Wrap ensureModule with standardized SNB failure  *)
-(*             diagnostics for both current-process and child   *)
-(*             module loads.                                    *)
-(* PARAMS    : modName  - module name to ensure resident        *)
+(* PROCEDURE : ensureModule                                     *)
+(* PURPOSE   : Ensure a list of modules is resident for either  *)
+(*             the current process or a child process.          *)
+(*             Prints standardized SNB diagnostics for the      *)
+(*             first failed module and returns ok=FALSE.        *)
+(* PARAMS    : modList  - module-name array                     *)
+(*             modCnt   - active entries in modList             *)
 (*             ctxName  - phase/load context; blank for none    *)
 (*             forChild - FALSE=current process; TRUE=child     *)
 (*             debugLog - enable ensure logging                 *)
-(*             ok       - TRUE if module is resident            *)
+(*             ok       - TRUE if all modules are resident      *)
 (* ============================================================ *)
-PARAM modName  : STRING[20]
+PARAM modList(8): STRING[20]
+PARAM modCnt   : INTEGER
 PARAM ctxName  : STRING[20]
 PARAM forChild : BOOLEAN
 PARAM debugLog : BOOLEAN
 PARAM ok       : BOOLEAN
+DIM modName    : STRING[20]
+DIM i          : INTEGER
 
-RUN ensureModule(modName, forChild, debugLog, ok)
-IF NOT ok THEN
-  IF ctxName = "" THEN
-    PRINT "SNB: failed to ensure "; modName
-  ELSE
-    PRINT "SNB: failed to ensure "; modName; " ("; ctxName; ")"
+ok := FALSE
+FOR i := 1 TO modCnt
+  modName := modList(i)
+  RUN ensureOneModule(modName, forChild, debugLog, ok)
+  IF NOT ok THEN
+    IF forChild THEN
+      IF ctxName = "" OR modName = ctxName THEN
+        PRINT "SNB: failed to ensure "; modName
+      ELSE
+        PRINT "SNB: failed to ensure "; modName; " ("; ctxName; ")"
+      ENDIF
+    ELSE
+      PRINT "SNB: failed to load "; modName
+    ENDIF
+    END
   ENDIF
-ENDIF
+NEXT i
+ok := TRUE
 END
 
 PROCEDURE forkPhase
@@ -989,7 +767,8 @@ PROCEDURE forkPhase
 (* NOTE      : Requires SysCall machine-lang module resident.  *)
 (*             RunB must be in the execution directory.         *)
 (*             Child module must already be in OS module        *)
-(*             directory; call ensureModule(TRUE) before fork.  *)
+(*             directory; call ensureModule(..., TRUE, ...)     *)
+(*             before fork.                                     *)
 (* ============================================================ *)
 TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
 PARAM childName : STRING[20]
@@ -1089,9 +868,9 @@ END
     exitStat := ERR
 END
 
-PROCEDURE ensureModule
+PROCEDURE ensureOneModule
 (* ============================================================ *)
-(* PROCEDURE : ensureModule                                     *)
+(* PROCEDURE : ensureOneModule                                  *)
 (* PURPOSE   : Ensure a named module is resident, using one of *)
 (*             two strategies selected by the forChild flag.   *)
 (*                                                             *)
@@ -1155,8 +934,8 @@ ENDIF
 ! character has bit 7 set to signal end-of-name to the OS.
 nameLen := LEN(modNam)
 IF nameLen = 0 THEN
-  PRINT "ensureModule: empty module name"
-  END
+    PRINT "ensureOneModule: empty module name"
+    END
 ENDIF
 FOR i := 1 TO nameLen - 1
   namBuf(i) := ASC(MID$(modNam, i, 1))
@@ -1185,7 +964,7 @@ IF NOT ok THEN
   iCC := regs.cc  \ ! stage BYTE -> INTEGER for LAND
   IF LAND(iCC, 1) <> 0 THEN
     errB := regs.b  \ ! stage BYTE -> INTEGER
-    PRINT "ensureModule: load failed: "; modNam; " err: "; errB
+    PRINT "ensureOneModule: load failed: "; modNam; " err: "; errB
     END
   ENDIF
 
@@ -1196,5 +975,5 @@ IF NOT ok THEN
 ENDIF
 END
 
-900 PRINT "ensureModule error ("; ERR; ")"
+900 PRINT "ensureOneModule error ("; ERR; ")"
 END
