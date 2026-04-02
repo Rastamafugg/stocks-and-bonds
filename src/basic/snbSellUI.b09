@@ -10,8 +10,9 @@ PROCEDURE snbSellUI
 (* SIDE EFX  : Reads SNBSTATE and updates SNBDRFTH / SNBDRFTD.  *)
 (* NOTE      : snbStateIO, snbTradeShared, snbGameData,         *)
 (*             snbPhaseCore, snbScreenUtil, snbTradeHumanUI,    *)
-(*             snbForkUtil, snbSellDraft, and snbSellUI must    *)
-(*             be loaded. snbSellLot is ensured before fork.    *)
+(*             snbForkUtil, snbSellDraftIO, and snbSellUI must  *)
+(*             be loaded. snbSellLot plus its draft helpers are *)
+(*             ensured before fork.                             *)
 (* ============================================================ *)
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
@@ -67,10 +68,10 @@ ON ERROR GOTO 900
 debugLog := FALSE
 hdrPath := "SNBDRFTH"
 RUN initBondPar(bPar)
-modNam := "snbSellDraft"
+modNam := "snbSellDraftIO"
 RUN ensureModuleLib(modNam, FALSE, debugLog, ok)
 IF NOT ok THEN
-  PRINT "snbSellUI: failed to load snbSellDraft"
+  PRINT "snbSellUI: failed to load snbSellDraftIO"
   END
 ENDIF
 
@@ -380,10 +381,16 @@ LOOP
         PRINT "snbSellUI: failed to ensure snbForkUtil"
         END
       ENDIF
-      modNam := "snbSellDraft"
+      modNam := "snbSellDraftIO"
       RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
       IF NOT ok THEN
-        PRINT "snbSellUI: failed to ensure snbSellDraft"
+        PRINT "snbSellUI: failed to ensure snbSellDraftIO"
+        END
+      ENDIF
+      modNam := "snbSellDraftEdit"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "snbSellUI: failed to ensure snbSellDraftEdit"
         END
       ENDIF
       modNam := "snbSellLot"

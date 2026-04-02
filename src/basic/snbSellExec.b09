@@ -12,8 +12,8 @@ PROCEDURE snbSellExec
 (* NOTE      : snbStateIO, snbTradeShared, snbGameData,         *)
 (*             snbPhaseCore, snbScreenUtil, snbTradeHumanUI,    *)
 (*             snbForkUtil, and snbSellExec must be loaded.     *)
-(*             snbSellDraft and snbSellUI are ensured before    *)
-(*             forking the interactive child.                   *)
+(*             snbSellDraftIO, snbSellDraftApply, and           *)
+(*             snbSellUI are ensured as needed.                 *)
 (* ============================================================ *)
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
@@ -45,10 +45,16 @@ ON ERROR GOTO 900
 debugLog := FALSE
 hdrPath := "SNBDRFTH"
 ordPath := "SNBDRFTD"
-modNam := "snbSellDraft"
+modNam := "snbSellDraftIO"
 RUN ensureModuleLib(modNam, FALSE, debugLog, ok)
 IF NOT ok THEN
-  PRINT "snbSellExec: failed to load snbSellDraft"
+  PRINT "snbSellExec: failed to load snbSellDraftIO"
+  END
+ENDIF
+modNam := "snbSellDraftApply"
+RUN ensureModuleLib(modNam, FALSE, debugLog, ok)
+IF NOT ok THEN
+  PRINT "snbSellExec: failed to load snbSellDraftApply"
   END
 ENDIF
 
@@ -119,10 +125,10 @@ IF NOT ok THEN
   PRINT "snbSellExec: failed to ensure snbForkUtil"
   END
 ENDIF
-modNam := "snbSellDraft"
+modNam := "snbSellDraftIO"
 RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
 IF NOT ok THEN
-  PRINT "snbSellExec: failed to ensure snbSellDraft"
+  PRINT "snbSellExec: failed to ensure snbSellDraftIO"
   END
 ENDIF
 modNam := "snbSellUI"

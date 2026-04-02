@@ -229,7 +229,9 @@ Notes:
 | `snbSell.b09` | `snbSell` | Human sell-phase child |
 | `snbSellExec.b09` | `snbSellExec` | Human sell-turn child |
 | `snbSellUI.b09` | `snbSellUI` | Human sell-turn UI child |
-| `snbSellDraft.b09` | `snbSellDraft` | Shared sell-draft helpers |
+| `snbSellDraftIO.b09` | `snbSellDraftIO` | Sell draft file I/O helpers |
+| `snbSellDraftEdit.b09` | `snbSellDraftEdit` | Sell draft order edit helpers |
+| `snbSellDraftApply.b09` | `snbSellDraftApply` | Sell draft replay/apply helpers |
 | `snbSellAI.b09` | `snbSellAI` | AI sell-phase child |
 | `snbBuy.b09` | `snbBuy` | Human buy-phase child and shared buy apply logic |
 | `snbBuyAI.b09` | `snbBuyAI` | AI buy-phase child |
@@ -252,7 +254,9 @@ Several helpers now live inside the child module that uses them:
 - `snbMarket.b09`: market tables, card decoding, roll generation, market screens
 - `snbSellExec.b09`: sell-turn orchestration and apply/writeback
 - `snbSellUI.b09`: sell-turn editor loop
-- `snbSellDraft.b09`: shared sell draft I/O and rebuild/apply helpers
+- `snbSellDraftIO.b09`: draft bootstrap, file I/O, and cleanup
+- `snbSellDraftEdit.b09`: order mutation and summary rebuild helpers
+- `snbSellDraftApply.b09`: confirmed draft replay into the live player record
 - `snbSellAI.b09`: `aiSell`, `scrAISellTurn`
 - `snbBuy.b09`: `applyBuys`, `scrMgnRepay`, `scrBuy`
 - `snbBuyAI.b09`: `aiBuy`, `scrAIBuyTurn`
