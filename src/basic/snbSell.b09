@@ -3,38 +3,48 @@ PROCEDURE snbSell
 (* PROCEDURE : snbSell                                          *)
 (* PURPOSE   : Human sell-phase child process. Loads SNBSTATE   *)
 (*             header and market state once, then processes     *)
-(*             consecutive human players by loading and saving   *)
-(*             one player record at a time. Exits when the next *)
-(*             active player is AI, when a sell-driven margin   *)
-(*             checkpoint is reached, or when the buy phase     *)
-(*             begins.                                          *)
+(*             consecutive human players by loading and         *)
+(*             reloading one player record at a time. Forks     *)
+(*             snbSellExec for each active human sell turn.     *)
+(*             Exits when the next active player is AI, when a  *)
+(*             sell-driven margin checkpoint is reached, or     *)
+(*             when the buy phase begins.                       *)
 (* PARAMS    : None (child process; no PARAM handoff)           *)
 (* SIDE EFX  : Reads and writes SNBSTATE. Copies SNBSTATE to    *)
-(*             SNBGAME on save.                                 *)
+(*             SNBGAME on save. Uses SNBDRFTH and SNBDRFTD as   *)
+(*             per-turn handoff files with snbSellExec.         *)
 (* NOTE      : snbStateIO, snbTradeShared, snbGameData,         *)
 (*             snbScreenUtil, snbForkUtil, and snbSell must be  *)
 (*             pre-loaded by the coordinator before fork.       *)
-(*             snbPhaseCore, snbTradeHumanUI, and snbSellLot    *)
-(*             are ensured for the lot-editor child before fork.*)
+(*             snbPhaseCore, snbTradeHumanUI, and snbSellExec   *)
+(*             are ensured before forking the human turn child. *)
 (* ============================================================ *)
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
-DIM hdr      : SaveHdr
-DIM plyr     : PlyrRec
-DIM mkt      : MktState
-DIM loadOK   : BOOLEAN
-DIM saveOK   : BOOLEAN
-DIM iCYr     : INTEGER
-DIM iPCnt    : INTEGER
-DIM p        : INTEGER
-DIM nextP    : INTEGER
-DIM scanP    : INTEGER
-DIM usrAct   : INTEGER
+TYPE DraftCtx = dcType,dcAsset,dcAct,dcChk:BYTE
+DIM hdr        : SaveHdr
+DIM plyr       : PlyrRec
+DIM mkt        : MktState
+DIM dCtx       : DraftCtx
+DIM loadOK     : BOOLEAN
+DIM saveOK     : BOOLEAN
+DIM draftOK    : BOOLEAN
+DIM iCYr       : INTEGER
+DIM iPCnt      : INTEGER
+DIM p          : INTEGER
+DIM nextP      : INTEGER
+DIM scanP      : INTEGER
+DIM usrAct     : INTEGER
 DIM currMgnTot : INTEGER
-DIM s        : INTEGER
+DIM exitStat   : INTEGER
+DIM ok         : BOOLEAN
+DIM debugLog   : BOOLEAN
+DIM modNam     : STRING[20]
 
 ON ERROR GOTO 900
+
+debugLog := FALSE
 
 RUN loadHdrMkt("SNBSTATE", hdr, mkt, loadOK)
 IF NOT loadOK THEN
@@ -78,14 +88,75 @@ LOOP
   usrAct := 1
   IF NOT plyr.isBankrupt THEN
     IF iCYr > 1 THEN
-      RUN runSellPlyr(iCYr, p, plyr, mkt, usrAct)
+      modNam := "snbStateIO"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "snbSell: failed to ensure snbStateIO"
+        END
+      ENDIF
+      modNam := "snbTradeShared"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "snbSell: failed to ensure snbTradeShared"
+        END
+      ENDIF
+      modNam := "snbGameData"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "snbSell: failed to ensure snbGameData"
+        END
+      ENDIF
+      modNam := "snbPhaseCore"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "snbSell: failed to ensure snbPhaseCore"
+        END
+      ENDIF
+      modNam := "snbScreenUtil"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "snbSell: failed to ensure snbScreenUtil"
+        END
+      ENDIF
+      modNam := "snbTradeHumanUI"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "snbSell: failed to ensure snbTradeHumanUI"
+        END
+      ENDIF
+      modNam := "snbForkUtil"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "snbSell: failed to ensure snbForkUtil"
+        END
+      ENDIF
+      modNam := "snbSellExec"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "snbSell: failed to ensure snbSellExec"
+        END
+      ENDIF
+      RUN forkPhaseLib("snbSellExec", debugLog, exitStat)
+      IF exitStat <> 0 THEN
+        PRINT "snbSell: snbSellExec failed exitStat="; exitStat
+        END
+      ENDIF
+      RUN loadDraftCtx("SNBDRFTH", dCtx, draftOK)
+      IF NOT draftOK THEN
+        PRINT "snbSell: loadDraftCtx failed"
+        END
+      ENDIF
+      usrAct := dCtx.dcAct
+      IF usrAct = 0 THEN
+        usrAct := 1
+      ENDIF
+      RUN clearDraftFiles("SNBDRFTH", "SNBDRFTD", draftOK)
+      RUN loadPlyrRec("SNBSTATE", hdr, p, plyr, loadOK)
+      IF NOT loadOK THEN
+        PRINT "snbSell: loadPlyrRec failed"
+        END
+      ENDIF
     ENDIF
-  ENDIF
-
-  RUN savePlyrRec("SNBSTATE", hdr, p, plyr, saveOK)
-  IF NOT saveOK THEN
-    PRINT "snbSell: savePlyrRec failed"
-    END
   ENDIF
 
   IF usrAct = 3 THEN
@@ -185,654 +256,11 @@ END
 RUN waitKey
 END
 
-PROCEDURE runSellPlyr
-(* ============================================================ *)
-(* PROCEDURE : runSellPlyr                                      *)
-(* PURPOSE   : Run the human sell-phase editor for one player   *)
-(*             record only. Uses file-backed draft orders plus  *)
-(*             a cached projected summary so the screen redraws *)
-(*             from committed player state instead of keeping   *)
-(*             the transactional draft in memory. Applies       *)
-(*             confirmed sell orders to the passed-in player    *)
-(*             record only after Enter confirms the draft.      *)
-(* PARAMS    : currYear - current game year                     *)
-(*             plyr     - player record for the active turn     *)
-(*             mkt      - market state                          *)
-(*             action   - 1=continue 3=save+exit 4=quit         *)
-(* SIDE EFX  : Modifies plyr cash, holdings, and margin state   *)
-(*             on confirmed orders. Uses temporary files        *)
-(*             SNBDRFTH and SNBDRFTD during the edit session.   *)
-(* ============================================================ *)
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
-TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
-TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
-TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
-TYPE DraftCtx = dcType,dcAsset,dcAct,dcChk:BYTE
-PARAM curYear    : INTEGER
-PARAM plyrIdx    : INTEGER
-PARAM plyr       : PlyrRec
-PARAM mkt        : MktState
-PARAM action     : INTEGER
-DIM stockNm      : STRING[14]
-DIM bPar(3)      : INTEGER
-DIM s            : INTEGER
-DIM b            : INTEGER
-DIM pStr         : STRING[8]
-DIM pStr2        : STRING[8]
-DIM keyCode      : INTEGER
-DIM stockCnt     : INTEGER
-DIM bondCnt      : INTEGER
-DIM keyLbl       : STRING[1]
-DIM slotQty      : INTEGER
-DIM kIn          : STRING[1]
-DIM workCash     : INTEGER
-DIM workMgn      : INTEGER
-DIM dispIdx      : INTEGER
-DIM selType      : INTEGER
-DIM selId        : INTEGER
-DIM currMgnTot   : INTEGER
-DIM yldPct       : INTEGER
-DIM divVal       : INTEGER
-DIM hasSell      : BOOLEAN
-DIM sqAct        : INTEGER
-DIM cnfIn        : STRING[1]
-DIM holdQty      : INTEGER
-DIM prjQty       : INTEGER
-DIM divPrj       : INTEGER
-DIM projTxt      : STRING[8]
-DIM mgnTxt       : STRING[7]
-DIM ordTxt       : STRING[24]
-DIM hdrPath      : STRING[20]
-DIM ordPath      : STRING[20]
-DIM dHdr         : DraftHdr
-DIM dSum         : DraftSum
-DIM dCtx         : DraftCtx
-DIM draftOK      : BOOLEAN
-DIM exitStat     : INTEGER
-DIM ok           : BOOLEAN
-DIM debugLog     : BOOLEAN
-DIM modNam       : STRING[20]
-
-ON ERROR GOTO 900
-
-action := 1
-debugLog := FALSE
-RUN initBondPar(bPar)
-hdrPath := "SNBDRFTH"
-ordPath := "SNBDRFTD"
-RUN initSellDraft(hdrPath, ordPath, curYear, plyrIdx, draftOK)
-IF NOT draftOK THEN
-  PRINT "runSellPlyr: initSellDraft failed"
-  END
-ENDIF
-
-LOOP
-
-  RUN loadDraftSum(hdrPath, dSum, draftOK)
-  IF NOT draftOK THEN
-    PRINT "runSellPlyr: loadDraftSum failed"
-    END
-  ENDIF
-  hasSell := FALSE
-  RUN calcMgnTot(plyr, currMgnTot)
-  workCash := plyr.cashBal + dSum.dsCashDl
-  workMgn := currMgnTot + dSum.dsMgnDl
-
-  RUN clrScr
-  PRINT "=== SELL PHASE - YEAR "; curYear; " ==="
-  PRINT "  Player: "; plyr.plyrName
-  RUN fmtMoney(plyr.cashBal, pStr)
-  RUN fmtMoney(workCash, pStr2)
-  PRINT "  Cash: $"; pStr; " [$"; pStr2; "]";
-  RUN fmtMoney(currMgnTot, pStr)
-  RUN fmtMoney(workMgn, pStr2)
-  PRINT "  Margin: $"; pStr; " [$"; pStr2; "]"
-  PRINT
-
-  stockCnt := 0
-  PRINT "  STOCKS:";
-  FOR s := 1 TO 9
-    IF plyr.stckShrs(s) > 0 AND mkt.stckPrice(s) > 0 THEN
-      stockCnt := stockCnt + 1
-    ENDIF
-  NEXT s
-  IF stockCnt = 1 THEN
-    PRINT " press 1"
-  ELSE IF stockCnt > 1 THEN
-    PRINT " press 1-"; stockCnt
-  ELSE
-    PRINT
-  ENDIF \ENDIF
-  stockCnt := 0
-  FOR s := 1 TO 9
-    IF plyr.stckShrs(s) > 0 THEN
-      IF mkt.stckPrice(s) > 0 THEN
-        stockCnt := stockCnt + 1
-        hasSell := TRUE
-        RUN getStockName(s, stockNm)
-        slotQty := 0 - dSum.dsStkQty(s)
-        keyLbl := CHR$(ASC("0") + stockCnt)
-        RUN getStockDivRate(s, yldPct)
-        divVal := (mkt.stckPrice(s) * yldPct) / 100
-        holdQty := plyr.stckShrs(s)
-        prjQty := holdQty + dSum.dsStkQty(s)
-        divPrj := 0
-        IF slotQty > 0 THEN
-          IF holdQty > 0 THEN
-            divPrj := (divVal * prjQty) / holdQty
-          ENDIF
-        ENDIF
-        projTxt := ""
-        IF slotQty > 0 THEN
-          RUN padNumber(divPrj, 2, pStr)
-          projTxt := "[$" + pStr + "]"
-        ENDIF
-        mgnTxt := ""
-        IF plyr.mgnBal(s) + dSum.dsStkMgn(s) > 0 THEN
-          mgnTxt := "[ MGN]"
-        ENDIF
-        IF dSum.dsStkMgn(s) < 0 THEN
-          mgnTxt := "[-MGN]"
-        ENDIF
-        ordTxt := ""
-        IF slotQty > 0 THEN
-          ordTxt := "- SELL " + TRIM$(STR$(slotQty))
-          ordTxt := ordTxt + " = TOT " + TRIM$(STR$(prjQty))
-        ENDIF
-        ! Line exceeds 79 chars; PRINT USING row format requires single line.
-        PRINT USING "'  ',S1<,' ',S12<,'  $',I4>,' ',I2>,'% -> $',I2>,' ',S5<,' ',S6<,' OWN ',I3>,' ',S18<", keyLbl, stockNm, mkt.stckPrice(s), yldPct, divVal, projTxt, mgnTxt, holdQty, ordTxt
-      ENDIF
-    ENDIF
-  NEXT s
-
-  PRINT
-  bondCnt := 0
-  FOR b := 1 TO 3
-    IF plyr.bondUnts(b) > 0 THEN
-      bondCnt := bondCnt + 1
-    ENDIF
-  NEXT b
-  PRINT "  BONDS:";
-  IF bondCnt = 1 THEN
-    PRINT " press A"
-  ELSE IF bondCnt > 1 THEN
-    PRINT " press A-"; CHR$(ASC("A") + bondCnt - 1)
-  ELSE
-    PRINT
-  ENDIF \ENDIF
-  bondCnt := 0
-  FOR b := 1 TO 3
-    IF plyr.bondUnts(b) > 0 THEN
-      bondCnt := bondCnt + 1
-      hasSell := TRUE
-      slotQty := 0 - dSum.dsBndQty(b)
-      keyLbl := CHR$(ASC("A") + bondCnt - 1)
-      ! Line exceeds 79 chars; PRINT USING row format requires single line.
-      PRINT USING "'  ',S1<,' $',I6>,'  ',I3>,' unit(s)'", keyLbl, bPar(b), plyr.bondUnts(b);
-      IF slotQty > 0 THEN
-        PRINT "  [Sell "; slotQty; "]"
-      ELSE
-        PRINT
-      ENDIF
-    ENDIF
-  NEXT b
-
-  IF NOT hasSell THEN
-    PRINT
-    PRINT "Nothing to sell this turn."
-    IF currMgnTot <= 0 THEN
-      PRINT
-      PRINT "  Any key=continue  S=save+exit  Q=quit: ";
-      GET #0, kIn
-      PRINT
-      IF kIn = "S" OR kIn = "s" THEN
-        action := 3
-      ELSE IF kIn = "Q" OR kIn = "q" THEN
-        action := 4
-      ELSE
-        action := 1
-      ENDIF \ENDIF
-      RUN clearDraftFiles(hdrPath, ordPath, draftOK)
-      END
-    ENDIF
-  ENDIF
-
-  PRINT
-  IF dSum.dsActCnt > 0 THEN
-    PRINT "  Enter=confirm orders  P=pass  S=save+exit  Q=quit"
-  ELSE
-    PRINT "  P=pass  S=save+exit  Q=quit"
-  ENDIF
-  GET #0, kIn
-  PRINT
-
-  sqAct := 0
-  IF kIn = "S" OR kIn = "s" THEN
-    sqAct := 3
-  ELSE IF kIn = "Q" OR kIn = "q" THEN
-    sqAct := 4
-  ENDIF \ENDIF
-  IF sqAct = 3 THEN
-    action := 3
-    RUN clearDraftFiles(hdrPath, ordPath, draftOK)
-    END
-  ELSE IF sqAct = 4 THEN
-    action := 4
-    RUN clearDraftFiles(hdrPath, ordPath, draftOK)
-    END
-  ENDIF \ENDIF
-
-  IF kIn <> "" THEN
-    keyCode := ASC(kIn)
-    IF keyCode >= ASC("a") AND keyCode <= ASC("z") THEN
-      keyCode := keyCode - 32
-    ENDIF
-  ELSE
-    keyCode := 0
-  ENDIF
-
-  selType := 0
-  selId   := 0
-  dispIdx := 0
-  FOR s := 1 TO 9
-    IF selType = 0 THEN
-      IF plyr.stckShrs(s) > 0 AND mkt.stckPrice(s) > 0 THEN
-        dispIdx := dispIdx + 1
-        IF keyCode = ASC("0") + dispIdx THEN
-          selType := 1
-          selId   := s
-        ENDIF
-      ENDIF
-    ENDIF
-  NEXT s
-  dispIdx := 0
-  FOR b := 1 TO 3
-    IF selType = 0 THEN
-      IF plyr.bondUnts(b) > 0 THEN
-        dispIdx := dispIdx + 1
-        IF keyCode = ASC("A") + dispIdx - 1 THEN
-          selType := 2
-          selId   := b
-        ENDIF
-      ENDIF
-    ENDIF
-  NEXT b
-
-  IF keyCode = ASC("P") THEN
-    IF dSum.dsActCnt > 0 THEN
-      PRINT "Pending orders will be discarded. Press Y to pass."
-      GET #0, cnfIn
-      PRINT
-      IF cnfIn = "Y" OR cnfIn = "y" THEN
-        RUN clearDraftFiles(hdrPath, ordPath, draftOK)
-        action := 1
-        END
-      ENDIF
-    ELSE
-      RUN clearDraftFiles(hdrPath, ordPath, draftOK)
-      action := 1
-      END
-    ENDIF
-  ELSE IF keyCode = 13 THEN
-    IF dSum.dsActCnt > 0 THEN
-      EXITIF TRUE THEN
-      ENDEXIT
-    ENDIF
-  ELSE
-    IF selType > 0 THEN
-      dCtx.dcType := selType
-      dCtx.dcAsset := selId
-      dCtx.dcAct := 0
-      RUN saveDraftCtx(hdrPath, dCtx, draftOK)
-      IF NOT draftOK THEN
-        PRINT "runSellPlyr: saveDraftCtx failed"
-        END
-      ENDIF
-      modNam := "snbStateIO"
-      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
-      IF NOT ok THEN
-        PRINT "runSellPlyr: failed to ensure snbStateIO"
-        END
-      ENDIF
-      modNam := "snbTradeShared"
-      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
-      IF NOT ok THEN
-        PRINT "runSellPlyr: failed to ensure snbTradeShared"
-        END
-      ENDIF
-      modNam := "snbGameData"
-      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
-      IF NOT ok THEN
-        PRINT "runSellPlyr: failed to ensure snbGameData"
-        END
-      ENDIF
-      modNam := "snbPhaseCore"
-      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
-      IF NOT ok THEN
-        PRINT "runSellPlyr: failed to ensure snbPhaseCore"
-        END
-      ENDIF
-      modNam := "snbScreenUtil"
-      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
-      IF NOT ok THEN
-        PRINT "runSellPlyr: failed to ensure snbScreenUtil"
-        END
-      ENDIF
-      modNam := "snbTradeHumanUI"
-      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
-      IF NOT ok THEN
-        PRINT "runSellPlyr: failed to ensure snbTradeHumanUI"
-        END
-      ENDIF
-      modNam := "snbSellLot"
-      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
-      IF NOT ok THEN
-        PRINT "runSellPlyr: failed to ensure snbSellLot"
-        END
-      ENDIF
-      RUN forkPhaseLib("snbSellLot", debugLog, exitStat)
-      IF exitStat <> 0 THEN
-        PRINT "runSellPlyr: snbSellLot failed exitStat="; exitStat
-        END
-      ENDIF
-      RUN loadDraftCtx(hdrPath, dCtx, draftOK)
-      IF NOT draftOK THEN
-        PRINT "runSellPlyr: loadDraftCtx failed"
-        END
-      ENDIF
-      IF dCtx.dcAct = 3 THEN
-        action := 3
-        RUN clearDraftFiles(hdrPath, ordPath, draftOK)
-        END
-      ELSE IF dCtx.dcAct = 4 THEN
-        action := 4
-        RUN clearDraftFiles(hdrPath, ordPath, draftOK)
-        END
-      ENDIF \ENDIF
-    ENDIF
-  ENDIF \ENDIF
-
-ENDLOOP
-
-RUN loadDraftHdr(hdrPath, dHdr, draftOK)
-IF NOT draftOK THEN
-  PRINT "runSellPlyr: loadDraftHdr failed"
-  END
-ENDIF
-RUN replaySellDraft(ordPath, dHdr, plyr, mkt, draftOK)
-IF NOT draftOK THEN
-  PRINT "runSellPlyr: replaySellDraft failed"
-  END
-ENDIF
-RUN clearDraftFiles(hdrPath, ordPath, draftOK)
-
-action := 1
-END
-
-900 PRINT "runSellPlyr error ("; ERR; ")"
-RUN waitKey
-END
-
-PROCEDURE initSellDraft
-(* ============================================================ *)
-(* PROCEDURE : initSellDraft                                    *)
-(* PURPOSE   : Create fresh sell-draft files with an empty      *)
-(*             summary cache.                                   *)
-(* ============================================================ *)
-TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
-TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
-TYPE DraftCtx = dcType,dcAsset,dcAct,dcChk:BYTE
-PARAM hdrPath : STRING[20]
-PARAM ordPath : STRING[20]
-PARAM currYr  : INTEGER
-PARAM playerIdx : INTEGER
-PARAM ok      : BOOLEAN
-DIM hdr       : DraftHdr
-DIM sum       : DraftSum
-DIM ctx       : DraftCtx
-DIM path      : BYTE
-DIM pathOpen  : BOOLEAN
-DIM chkSum    : INTEGER
-
-ON ERROR GOTO 900
-
-pathOpen := FALSE
-ok := FALSE
-
-RUN clearDraftFiles(hdrPath, ordPath, ok)
-
-CREATE #path, hdrPath:UPDATE
-pathOpen := TRUE
-hdr.dhMagic      := $44
-hdr.dhFmtVer := 1
-hdr.dhPhase  := 1
-hdr.dhPlyr  := playerIdx
-hdr.dhStatus     := 1
-hdr.dhRecCnt   := 0
-hdr.dhNextSeq    := 1
-hdr.dhYear   := currYr
-hdr.dhMaxYr   := 10
-chkSum := hdr.dhMagic + hdr.dhFmtVer + hdr.dhPhase
-chkSum := chkSum + hdr.dhPlyr + hdr.dhStatus + hdr.dhRecCnt
-chkSum := chkSum + hdr.dhNextSeq + hdr.dhYear + hdr.dhMaxYr
-hdr.dhChk := LAND(chkSum, 255)
-PUT #path, hdr
-
-RUN initDraftSum(sum)
-PUT #path, sum
-ctx.dcType := 0
-ctx.dcAsset := 0
-ctx.dcAct := 0
-ctx.dcChk := 0
-ctx.dcChk := LAND(ctx.dcType + ctx.dcAsset + ctx.dcAct, 255)
-PUT #path, ctx
-CLOSE #path
-pathOpen := FALSE
-
-CREATE #path, ordPath:UPDATE
-pathOpen := TRUE
-CLOSE #path
-pathOpen := FALSE
-
-ok := TRUE
-END
-
-900 IF pathOpen THEN
-      CLOSE #path
-    ENDIF
-    PRINT "initSellDraft error ("; ERR; ")"
-    ok := FALSE
-END
-
-PROCEDURE initDraftSum
-(* ============================================================ *)
-(* PROCEDURE : initDraftSum                                     *)
-(* PURPOSE   : Zero one sell-draft summary record.              *)
-(* ============================================================ *)
-TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
-PARAM sum : DraftSum
-DIM s     : INTEGER
-DIM b     : INTEGER
-DIM chkSum: INTEGER
-
-sum.dsPhase := 1
-sum.dsPlyr := 1
-sum.dsHas := 0
-sum.dsActCnt := 0
-sum.dsCashDl := 0
-sum.dsMgnDl := 0
-sum.dsRepay := 0
-FOR s := 1 TO 9
-  sum.dsStkQty(s) := 0
-  sum.dsStkMgn(s) := 0
-NEXT s
-FOR b := 1 TO 3
-  sum.dsBndQty(b) := 0
-NEXT b
-chkSum := sum.dsPhase + sum.dsPlyr + sum.dsHas
-chkSum := chkSum + sum.dsActCnt + sum.dsCashDl
-chkSum := chkSum + sum.dsMgnDl + sum.dsRepay
-FOR s := 1 TO 9
-  chkSum := chkSum + sum.dsStkQty(s) + sum.dsStkMgn(s)
-NEXT s
-FOR b := 1 TO 3
-  chkSum := chkSum + sum.dsBndQty(b)
-NEXT b
-sum.dsChk := LAND(chkSum, 255)
-END
-
-PROCEDURE loadDraftHdr
-(* ============================================================ *)
-(* PROCEDURE : loadDraftHdr                                     *)
-(* PURPOSE   : Read and validate the sell-draft header.         *)
-(* ============================================================ *)
-TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
-PARAM hdrPath : STRING[20]
-PARAM hdr     : DraftHdr
-PARAM ok      : BOOLEAN
-DIM path      : BYTE
-DIM pathOpen  : BOOLEAN
-DIM chkExp    : INTEGER
-
-ON ERROR GOTO 900
-
-pathOpen := FALSE
-ok := FALSE
-
-OPEN #path, hdrPath:READ
-pathOpen := TRUE
-GET #path, hdr
-
-IF hdr.dhMagic <> $44 THEN
-  PRINT "loadDraftHdr: invalid magic"
-  END
-ENDIF
-IF hdr.dhFmtVer <> 1 THEN
-  PRINT "loadDraftHdr: invalid version"
-  END
-ENDIF
-
-chkExp := hdr.dhMagic + hdr.dhFmtVer + hdr.dhPhase
-chkExp := chkExp + hdr.dhPlyr + hdr.dhStatus + hdr.dhRecCnt
-chkExp := chkExp + hdr.dhNextSeq + hdr.dhYear + hdr.dhMaxYr
-chkExp := LAND(chkExp, 255)
-IF chkExp <> hdr.dhChk THEN
-  PRINT "loadDraftHdr: corrupt header"
-  END
-ENDIF
-
-CLOSE #path
-pathOpen := FALSE
-ok := TRUE
-END
-
-900 IF pathOpen THEN
-      CLOSE #path
-    ENDIF
-    PRINT "loadDraftHdr error ("; ERR; ")"
-    ok := FALSE
-END
-
-PROCEDURE loadDraftSum
-(* ============================================================ *)
-(* PROCEDURE : loadDraftSum                                     *)
-(* PURPOSE   : Read and validate the cached sell-draft summary. *)
-(* ============================================================ *)
-TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
-TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
-PARAM hdrPath : STRING[20]
-PARAM sum     : DraftSum
-PARAM ok      : BOOLEAN
-DIM hdrStub   : DraftHdr
-DIM path      : BYTE
-DIM pathOpen  : BOOLEAN
-DIM seekPos   : INTEGER
-DIM chkExp    : INTEGER
-DIM s         : INTEGER
-DIM b         : INTEGER
-
-ON ERROR GOTO 900
-
-pathOpen := FALSE
-ok := FALSE
-seekPos := SIZE(hdrStub)
-
-OPEN #path, hdrPath:READ
-pathOpen := TRUE
-SEEK #path, seekPos
-GET #path, sum
-
-chkExp := sum.dsPhase + sum.dsPlyr + sum.dsHas
-chkExp := chkExp + sum.dsActCnt + sum.dsCashDl
-chkExp := chkExp + sum.dsMgnDl + sum.dsRepay
-FOR s := 1 TO 9
-  chkExp := chkExp + sum.dsStkQty(s) + sum.dsStkMgn(s)
-NEXT s
-FOR b := 1 TO 3
-  chkExp := chkExp + sum.dsBndQty(b)
-NEXT b
-chkExp := LAND(chkExp, 255)
-IF chkExp <> sum.dsChk THEN
-  PRINT "loadDraftSum: corrupt summary"
-  END
-ENDIF
-
-CLOSE #path
-pathOpen := FALSE
-ok := TRUE
-END
-
-900 IF pathOpen THEN
-      CLOSE #path
-    ENDIF
-    PRINT "loadDraftSum error ("; ERR; ")"
-    ok := FALSE
-END
-
-PROCEDURE saveDraftCtx
-(* ============================================================ *)
-(* PROCEDURE : saveDraftCtx                                     *)
-(* PURPOSE   : Write asset-edit child context after DraftSum.   *)
-(* ============================================================ *)
-TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
-TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
-TYPE DraftCtx = dcType,dcAsset,dcAct,dcChk:BYTE
-PARAM hdrPath : STRING[20]
-PARAM ctx     : DraftCtx
-PARAM ok      : BOOLEAN
-DIM hdrStub   : DraftHdr
-DIM sumStub   : DraftSum
-DIM path      : BYTE
-DIM pathOpen  : BOOLEAN
-DIM seekPos   : INTEGER
-
-ON ERROR GOTO 900
-
-pathOpen := FALSE
-ok := FALSE
-seekPos := SIZE(hdrStub) + SIZE(sumStub)
-ctx.dcChk := LAND(ctx.dcType + ctx.dcAsset + ctx.dcAct, 255)
-
-OPEN #path, hdrPath:UPDATE
-pathOpen := TRUE
-SEEK #path, seekPos
-PUT #path, ctx
-CLOSE #path
-pathOpen := FALSE
-ok := TRUE
-END
-
-900 IF pathOpen THEN
-      CLOSE #path
-    ENDIF
-    PRINT "saveDraftCtx error ("; ERR; ")"
-    ok := FALSE
-END
-
 PROCEDURE loadDraftCtx
 (* ============================================================ *)
 (* PROCEDURE : loadDraftCtx                                     *)
-(* PURPOSE   : Read the current child edit context.             *)
+(* PURPOSE   : Read the sell-exec handoff action from the       *)
+(*             draft context record.                            *)
 (* ============================================================ *)
 TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
 TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
@@ -874,130 +302,6 @@ END
     ENDIF
     PRINT "loadDraftCtx error ("; ERR; ")"
     ok := FALSE
-END
-
-PROCEDURE loadDraftOrd
-(* ============================================================ *)
-(* PROCEDURE : loadDraftOrd                                     *)
-(* PURPOSE   : Read one fixed-size draft order record.          *)
-(* ============================================================ *)
-TYPE DraftOrd = doSeq,doPhase,doPlyr,doType,doAsset,doMode,doStatus,doChk:BYTE;doQty,doPrice,doCashDl,doMgnDl,doResv1,doResv2:INTEGER
-PARAM ordPath : STRING[20]
-PARAM recIdx  : INTEGER
-PARAM ord     : DraftOrd
-PARAM ok      : BOOLEAN
-DIM path      : BYTE
-DIM pathOpen  : BOOLEAN
-DIM seekPos   : INTEGER
-DIM chkExp    : INTEGER
-
-ON ERROR GOTO 900
-
-pathOpen := FALSE
-ok := FALSE
-seekPos := (recIdx - 1) * SIZE(ord)
-
-OPEN #path, ordPath:READ
-pathOpen := TRUE
-SEEK #path, seekPos
-GET #path, ord
-
-chkExp := ord.doSeq + ord.doPhase + ord.doPlyr + ord.doType
-chkExp := chkExp + ord.doAsset + ord.doMode + ord.doStatus
-chkExp := chkExp + ord.doQty + ord.doPrice
-chkExp := chkExp + ord.doCashDl + ord.doMgnDl
-chkExp := chkExp + ord.doResv1 + ord.doResv2
-chkExp := LAND(chkExp, 255)
-IF chkExp <> ord.doChk THEN
-  PRINT "loadDraftOrd: corrupt order"
-  END
-ENDIF
-
-CLOSE #path
-pathOpen := FALSE
-ok := TRUE
-END
-
-900 IF pathOpen THEN
-      CLOSE #path
-    ENDIF
-    PRINT "loadDraftOrd error ("; ERR; ")"
-    ok := FALSE
-END
-
-PROCEDURE replaySellDraft
-(* ============================================================ *)
-(* PROCEDURE : replaySellDraft                                  *)
-(* PURPOSE   : Apply active sell-draft orders to one player     *)
-(*             record on final confirm.                         *)
-(* ============================================================ *)
-TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
-TYPE DraftOrd = doSeq,doPhase,doPlyr,doType,doAsset,doMode,doStatus,doChk:BYTE;doQty,doPrice,doCashDl,doMgnDl,doResv1,doResv2:INTEGER
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
-TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
-PARAM ordPath : STRING[20]
-PARAM hdr     : DraftHdr
-PARAM plyr    : PlyrRec
-PARAM mkt     : MktState
-PARAM ok      : BOOLEAN
-DIM ord       : DraftOrd
-DIM bPar(3)   : INTEGER
-DIM recIdx    : INTEGER
-DIM loadOK    : BOOLEAN
-DIM proceeds  : INTEGER
-DIM repayAmt  : INTEGER
-
-ON ERROR GOTO 900
-
-ok := FALSE
-RUN initBondPar(bPar)
-
-FOR recIdx := 1 TO hdr.dhRecCnt
-  RUN loadDraftOrd(ordPath, recIdx, ord, loadOK)
-  IF NOT loadOK THEN
-    END
-  ENDIF
-  IF ord.doStatus = 1 THEN
-    IF ord.doType = 1 THEN
-      IF ord.doAsset < 1 OR ord.doAsset > 9 THEN
-        END
-      ENDIF
-      IF ord.doQty > plyr.stckShrs(ord.doAsset) THEN
-        END
-      ENDIF
-      IF ord.doPrice <> mkt.stckPrice(ord.doAsset) THEN
-        END
-      ENDIF
-      proceeds := ord.doQty * ord.doPrice
-      IF plyr.mgnBal(ord.doAsset) > 0 THEN
-        RUN calcSaleMgnRpy(plyr.mgnBal(ord.doAsset), proceeds, repayAmt)
-        plyr.mgnBal(ord.doAsset) := plyr.mgnBal(ord.doAsset) - repayAmt
-        plyr.cashBal := plyr.cashBal + (proceeds - repayAmt)
-      ELSE
-        plyr.cashBal := plyr.cashBal + proceeds
-      ENDIF
-      plyr.stckShrs(ord.doAsset) := plyr.stckShrs(ord.doAsset) - ord.doQty
-    ELSE IF ord.doType = 2 THEN
-      IF ord.doAsset < 1 OR ord.doAsset > 3 THEN
-        END
-      ENDIF
-      IF ord.doQty > plyr.bondUnts(ord.doAsset) THEN
-        END
-      ENDIF
-      IF ord.doPrice <> bPar(ord.doAsset) THEN
-        END
-      ENDIF
-      plyr.cashBal := plyr.cashBal + (ord.doQty * ord.doPrice)
-      plyr.bondUnts(ord.doAsset) := plyr.bondUnts(ord.doAsset) - ord.doQty
-    ENDIF \ENDIF
-  ENDIF
-NEXT recIdx
-
-ok := TRUE
-END
-
-900 PRINT "replaySellDraft error ("; ERR; ")"
-ok := FALSE
 END
 
 PROCEDURE clearDraftFiles

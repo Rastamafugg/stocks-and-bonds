@@ -110,10 +110,21 @@ value and distinguishes itself by running after `GS_DONE`.
 - Responsibility:
   - Runs the sell phase for one current saved-turn player
   - Skips the sell editor in Year 1
-  - `snbSell` handles human turns with `scrSell`
+  - `snbSell` handles human turns by forking `snbSellExec`
   - `snbSellAI` handles AI turns with `aiSell` plus `scrAISellTurn`
   - Applies sell orders to `SNBSTATE`
   - Advances `savedPlyr` within sell phase or transitions to buy phase
+
+### 4.4a `snbSellExec`
+- File: `src/basic/snbSellExec.b09`
+- Entry procedure: `snbSellExec`
+- Writes: updated player sell results in `SNBSTATE`
+- Responsibility:
+  - Runs the human sell-turn editor for the active saved-turn player
+  - Uses `SNBDRFTH` and `SNBDRFTD` as per-turn draft files
+  - Forks `snbSellLot` for per-asset quantity edits
+  - Replays confirmed sell orders into the active player record
+  - Writes the turn action back to `SNBDRFTH` for `snbSell`
 
 ### 4.5 `snbBuy` and `snbBuyAI`
 - Files: `src/basic/snbBuy.b09`, `src/basic/snbBuyAI.b09`
@@ -205,6 +216,7 @@ Notes:
 | `snbDividend.b09` | `snbDividend` | Dividend/year-header child |
 | `snbMarket.b09` | `snbMarket` | Market-resolution child |
 | `snbSell.b09` | `snbSell` | Human sell-phase child |
+| `snbSellExec.b09` | `snbSellExec` | Human sell-turn child |
 | `snbSellAI.b09` | `snbSellAI` | AI sell-phase child |
 | `snbBuy.b09` | `snbBuy` | Human buy-phase child and shared buy apply logic |
 | `snbBuyAI.b09` | `snbBuyAI` | AI buy-phase child |
@@ -225,7 +237,7 @@ Several helpers now live inside the child module that uses them:
 - `snbSetup.b09`: `initPlayer`, `initMkt`, setup screens
 - `snbDividend.b09`: `applyDivInt`, `scrYearHdr`, `scrDivInt`
 - `snbMarket.b09`: market tables, card decoding, roll generation, market screens
-- `snbSell.b09`: `scrSell`
+- `snbSellExec.b09`: sell-turn editor and sell draft helpers
 - `snbSellAI.b09`: `aiSell`, `scrAISellTurn`
 - `snbBuy.b09`: `applyBuys`, `scrMgnRepay`, `scrBuy`
 - `snbBuyAI.b09`: `aiBuy`, `scrAIBuyTurn`
