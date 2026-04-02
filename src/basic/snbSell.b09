@@ -138,6 +138,12 @@ LOOP
         PRINT "snbSell: failed to ensure snbForkUtil"
         END
       ENDIF
+      modNam := "snbSellDraftIO"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "snbSell: failed to ensure snbSellDraftIO"
+        END
+      ENDIF
       modNam := "snbSellExec"
       RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
       IF NOT ok THEN
@@ -263,81 +269,3 @@ END
 900 PRINT "snbSell error ("; ERR; ")"
 RUN waitKey
 END
-
-PROCEDURE loadDraftCtx
-(* ============================================================ *)
-(* PROCEDURE : loadDraftCtx                                     *)
-(* PURPOSE   : Read the sell-exec handoff action from the       *)
-(*             draft context record.                            *)
-(* ============================================================ *)
-TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
-TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
-TYPE DraftCtx = dcType,dcAsset,dcAct,dcChk:BYTE
-PARAM hdrPath : STRING[20]
-PARAM ctx     : DraftCtx
-PARAM ok      : BOOLEAN
-DIM hdrStub   : DraftHdr
-DIM sumStub   : DraftSum
-DIM path      : BYTE
-DIM pathOpen  : BOOLEAN
-DIM seekPos   : INTEGER
-DIM chkExp    : INTEGER
-
-ON ERROR GOTO 900
-
-pathOpen := FALSE
-ok := FALSE
-seekPos := SIZE(hdrStub) + SIZE(sumStub)
-
-OPEN #path, hdrPath:READ
-pathOpen := TRUE
-SEEK #path, seekPos
-GET #path, ctx
-
-chkExp := LAND(ctx.dcType + ctx.dcAsset + ctx.dcAct, 255)
-IF chkExp <> ctx.dcChk THEN
-  PRINT "loadDraftCtx: corrupt context"
-  END
-ENDIF
-
-CLOSE #path
-pathOpen := FALSE
-ok := TRUE
-END
-
-900 IF pathOpen THEN
-      CLOSE #path
-    ENDIF
-    PRINT "loadDraftCtx error ("; ERR; ")"
-    ok := FALSE
-END
-
-PROCEDURE clearDraftFiles
-(* ============================================================ *)
-(* PROCEDURE : clearDraftFiles                                  *)
-(* PURPOSE   : Best-effort cleanup of temporary sell-draft      *)
-(*             files.                                           *)
-(* ============================================================ *)
-PARAM hdrPath : STRING[20]
-PARAM ordPath : STRING[20]
-PARAM ok      : BOOLEAN
-
-RUN tryDeleteFile(hdrPath)
-RUN tryDeleteFile(ordPath)
-ok := TRUE
-END
-
-PROCEDURE tryDeleteFile
-(* ============================================================ *)
-(* PROCEDURE : tryDeleteFile                                    *)
-(* PURPOSE   : Delete a file if present. Ignore missing-file    *)
-(*             errors for temporary draft cleanup.              *)
-(* ============================================================ *)
-PARAM filePath : STRING[20]
-
-ON ERROR GOTO 900
-
-DELETE filePath
-END
-
-900 END
