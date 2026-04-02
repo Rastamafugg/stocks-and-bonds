@@ -59,6 +59,8 @@ DIM exitStat     : INTEGER
 DIM ok           : BOOLEAN
 DIM debugLog     : BOOLEAN
 DIM modNam       : STRING[20]
+DIM iPCnt        : INTEGER
+DIM pIdx         : INTEGER
 
 ON ERROR GOTO 900
 
@@ -77,11 +79,13 @@ IF NOT loadOK THEN
   PRINT "snbSellUI: loadHdrMkt failed"
   END
 ENDIF
-IF hdr.savedPlyr < 1 OR hdr.savedPlyr > hdr.plyrCount THEN
+iPCnt := hdr.plyrCount
+pIdx  := hdr.savedPlyr
+IF pIdx < 1 OR pIdx > iPCnt THEN
   PRINT "snbSellUI: invalid savedPlyr"
   END
 ENDIF
-RUN loadPlyrRec("SNBSTATE", hdr, hdr.savedPlyr, plyr, loadOK)
+RUN loadPlyrRec("SNBSTATE", hdr, pIdx, plyr, loadOK)
 IF NOT loadOK THEN
   PRINT "snbSellUI: loadPlyrRec failed"
   END

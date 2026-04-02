@@ -34,6 +34,9 @@ DIM exitStat  : INTEGER
 DIM ok        : BOOLEAN
 DIM debugLog  : BOOLEAN
 DIM modNam    : STRING[20]
+DIM currYr    : INTEGER
+DIM iPCnt     : INTEGER
+DIM pIdx      : INTEGER
 DIM uiAct     : INTEGER
 DIM parentAct : INTEGER
 
@@ -54,18 +57,21 @@ IF NOT loadOK THEN
   PRINT "snbSellExec: loadHdrMkt failed"
   END
 ENDIF
-IF hdr.savedPlyr < 1 OR hdr.savedPlyr > hdr.plyrCount THEN
+iPCnt  := hdr.plyrCount
+pIdx   := hdr.savedPlyr
+currYr := hdr.currYear
+IF pIdx < 1 OR pIdx > iPCnt THEN
   PRINT "snbSellExec: invalid savedPlyr"
   END
 ENDIF
 
-RUN loadPlyrRec("SNBSTATE", hdr, hdr.savedPlyr, plyr, loadOK)
+RUN loadPlyrRec("SNBSTATE", hdr, pIdx, plyr, loadOK)
 IF NOT loadOK THEN
   PRINT "snbSellExec: loadPlyrRec failed"
   END
 ENDIF
 
-RUN initSellDraft(hdrPath, ordPath, hdr.currYear, hdr.savedPlyr, draftOK)
+RUN initSellDraft(hdrPath, ordPath, currYr, pIdx, draftOK)
 IF NOT draftOK THEN
   PRINT "snbSellExec: initSellDraft failed"
   END
@@ -113,6 +119,7 @@ IF NOT ok THEN
   PRINT "snbSellExec: failed to ensure snbForkUtil"
   END
 ENDIF
+modNam := "snbSellDraft"
 RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
 IF NOT ok THEN
   PRINT "snbSellExec: failed to ensure snbSellDraft"
@@ -150,7 +157,7 @@ IF uiAct = 2 THEN
     PRINT "snbSellExec: replaySellDraft failed"
     END
   ENDIF
-  RUN savePlyrRec("SNBSTATE", hdr, hdr.savedPlyr, plyr, saveOK)
+  RUN savePlyrRec("SNBSTATE", hdr, pIdx, plyr, saveOK)
   IF NOT saveOK THEN
     PRINT "snbSellExec: savePlyrRec failed"
     END
