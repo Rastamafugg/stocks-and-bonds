@@ -345,6 +345,212 @@ LOOP
     ENDIF
   NEXT s
 
+  PRINT
+  bondCnt := 0
+  FOR b := 1 TO 3
+    IF plyr.bondUnts(b) > 0 THEN
+      bondCnt := bondCnt + 1
+    ENDIF
+  NEXT b
+  PRINT "  BONDS:";
+  IF bondCnt = 1 THEN
+    PRINT " press A"
+  ELSE IF bondCnt > 1 THEN
+    PRINT " press A-"; CHR$(ASC("A") + bondCnt - 1)
+  ELSE
+    PRINT
+  ENDIF \ENDIF
+  bondCnt := 0
+  FOR b := 1 TO 3
+    IF plyr.bondUnts(b) > 0 THEN
+      bondCnt := bondCnt + 1
+      hasSell := TRUE
+      slotQty := 0 - dSum.dsBndQty(b)
+      keyLbl := CHR$(ASC("A") + bondCnt - 1)
+      ! Line exceeds 79 chars; PRINT USING row format requires single line.
+      PRINT USING "'  ',S1<,' $',I6>,'  ',I3>,' unit(s)'", keyLbl, bPar(b), plyr.bondUnts(b);
+      IF slotQty > 0 THEN
+        PRINT "  [Sell "; slotQty; "]"
+      ELSE
+        PRINT
+      ENDIF
+    ENDIF
+  NEXT b
+
+  IF NOT hasSell THEN
+    PRINT
+    PRINT "Nothing to sell this turn."
+    IF currMgnTot <= 0 THEN
+      PRINT
+      PRINT "  Any key=continue  S=save+exit  Q=quit: ";
+      GET #0, kIn
+      PRINT
+      IF kIn = "S" OR kIn = "s" THEN
+        action := 3
+      ELSE IF kIn = "Q" OR kIn = "q" THEN
+        action := 4
+      ELSE
+        action := 1
+      ENDIF \ENDIF
+      RUN clearDraftFiles(hdrPath, ordPath, draftOK)
+      END
+    ENDIF
+  ENDIF
+
+  PRINT
+  IF dSum.dsActCnt > 0 THEN
+    PRINT "  Enter=confirm orders  P=pass  S=save+exit  Q=quit"
+  ELSE
+    PRINT "  P=pass  S=save+exit  Q=quit"
+  ENDIF
+  GET #0, kIn
+  PRINT
+
+  sqAct := 0
+  IF kIn = "S" OR kIn = "s" THEN
+    sqAct := 3
+  ELSE IF kIn = "Q" OR kIn = "q" THEN
+    sqAct := 4
+  ENDIF \ENDIF
+  IF sqAct = 3 THEN
+    action := 3
+    RUN clearDraftFiles(hdrPath, ordPath, draftOK)
+    END
+  ELSE IF sqAct = 4 THEN
+    action := 4
+    RUN clearDraftFiles(hdrPath, ordPath, draftOK)
+    END
+  ENDIF \ENDIF
+
+  IF kIn <> "" THEN
+    keyCode := ASC(kIn)
+    IF keyCode >= ASC("a") AND keyCode <= ASC("z") THEN
+      keyCode := keyCode - 32
+    ENDIF
+  ELSE
+    keyCode := 0
+  ENDIF
+
+  selType := 0
+  selId   := 0
+  dispIdx := 0
+  FOR s := 1 TO 9
+    IF selType = 0 THEN
+      IF plyr.stckShrs(s) > 0 AND mkt.stckPrice(s) > 0 THEN
+        dispIdx := dispIdx + 1
+        IF keyCode = ASC("0") + dispIdx THEN
+          selType := 1
+          selId   := s
+        ENDIF
+      ENDIF
+    ENDIF
+  NEXT s
+  dispIdx := 0
+  FOR b := 1 TO 3
+    IF selType = 0 THEN
+      IF plyr.bondUnts(b) > 0 THEN
+        dispIdx := dispIdx + 1
+        IF keyCode = ASC("A") + dispIdx - 1 THEN
+          selType := 2
+          selId   := b
+        ENDIF
+      ENDIF
+    ENDIF
+  NEXT b
+
+  IF keyCode = ASC("P") THEN
+    IF dSum.dsActCnt > 0 THEN
+      PRINT "Pending orders will be discarded. Press Y to pass."
+      GET #0, cnfIn
+      PRINT
+      IF cnfIn = "Y" OR cnfIn = "y" THEN
+        RUN clearDraftFiles(hdrPath, ordPath, draftOK)
+        action := 1
+        END
+      ENDIF
+    ELSE
+      RUN clearDraftFiles(hdrPath, ordPath, draftOK)
+      action := 1
+      END
+    ENDIF
+  ELSE IF keyCode = 13 THEN
+    IF dSum.dsActCnt > 0 THEN
+      EXITIF TRUE THEN
+      ENDEXIT
+    ENDIF
+  ELSE
+    IF selType > 0 THEN
+      dCtx.dcType := selType
+      dCtx.dcAsset := selId
+      dCtx.dcAct := 0
+      RUN saveDraftCtx(hdrPath, dCtx, draftOK)
+      IF NOT draftOK THEN
+        PRINT "runSellPlyr: saveDraftCtx failed"
+        END
+      ENDIF
+      modNam := "snbStateIO"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "runSellPlyr: failed to ensure snbStateIO"
+        END
+      ENDIF
+      modNam := "snbTradeShared"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "runSellPlyr: failed to ensure snbTradeShared"
+        END
+      ENDIF
+      modNam := "snbGameData"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "runSellPlyr: failed to ensure snbGameData"
+        END
+      ENDIF
+      modNam := "snbPhaseCore"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "runSellPlyr: failed to ensure snbPhaseCore"
+        END
+      ENDIF
+      modNam := "snbScreenUtil"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "runSellPlyr: failed to ensure snbScreenUtil"
+        END
+      ENDIF
+      modNam := "snbTradeHumanUI"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "runSellPlyr: failed to ensure snbTradeHumanUI"
+        END
+      ENDIF
+      modNam := "snbSellLot"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "runSellPlyr: failed to ensure snbSellLot"
+        END
+      ENDIF
+      RUN forkPhaseLib("snbSellLot", debugLog, exitStat)
+      IF exitStat <> 0 THEN
+        PRINT "runSellPlyr: snbSellLot failed exitStat="; exitStat
+        END
+      ENDIF
+      RUN loadDraftCtx(hdrPath, dCtx, draftOK)
+      IF NOT draftOK THEN
+        PRINT "runSellPlyr: loadDraftCtx failed"
+        END
+      ENDIF
+      IF dCtx.dcAct = 3 THEN
+        action := 3
+        RUN clearDraftFiles(hdrPath, ordPath, draftOK)
+        END
+      ELSE IF dCtx.dcAct = 4 THEN
+        action := 4
+        RUN clearDraftFiles(hdrPath, ordPath, draftOK)
+        END
+      ENDIF \ENDIF
+    ENDIF
+  ENDIF \ENDIF
 
 ENDLOOP
 
