@@ -88,6 +88,14 @@ LOOP
   usrAct := 1
   IF NOT plyr.isBankrupt THEN
     IF iCYr > 1 THEN
+      hdr.savedPhase := 1
+      hdr.savedPlyr  := p
+      hdr.gameStage  := 2
+      RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
+      IF NOT saveOK THEN
+        PRINT "snbSell: saveHdrOnly failed"
+        END
+      ENDIF
       modNam := "snbStateIO"
       RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
       IF NOT ok THEN
