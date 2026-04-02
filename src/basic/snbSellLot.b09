@@ -9,7 +9,7 @@ PROCEDURE snbSellLot
 (* PARAMS    : None                                             *)
 (* NOTE      : snbStateIO, snbTradeShared, snbGameData,         *)
 (*             snbPhaseCore, snbScreenUtil, snbTradeHumanUI,    *)
-(*             snbSellDraftIO, snbSellDraftEdit, and            *)
+(*             snbSellDraftState, snbSellDraftEdit, and         *)
 (*             snbSellLot must be loaded.                       *)
 (* ============================================================ *)
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
@@ -50,10 +50,10 @@ DIM pIdx       : INTEGER
 ON ERROR GOTO 900
 
 debugLog := FALSE
-modNam := "snbSellDraftIO"
+modNam := "snbSellDraftState"
 RUN ensureModuleLib(modNam, FALSE, debugLog, ok)
 IF NOT ok THEN
-  PRINT "snbSellLot: failed to load snbSellDraftIO"
+  PRINT "snbSellLot: failed to load snbSellDraftState"
   END
 ENDIF
 modNam := "snbSellDraftEdit"

@@ -122,8 +122,9 @@ value and distinguishes itself by running after `GS_DONE`.
 - Responsibility:
   - Orchestrates one human sell turn for the active saved-turn player
   - Uses `SNBDRFTH` and `SNBDRFTD` as per-turn draft files
+  - Initializes the draft files for the turn
   - Forks `snbSellUI` for the interactive editor
-  - Replays confirmed sell orders into the active player record
+  - Forks `snbSellDraftApply` only when the user confirms the draft
   - Writes the turn action back to `SNBDRFTH` for `snbSell`
 
 ### 4.4b `snbSellUI`
@@ -229,7 +230,8 @@ Notes:
 | `snbSell.b09` | `snbSell` | Human sell-phase child |
 | `snbSellExec.b09` | `snbSellExec` | Human sell-turn child |
 | `snbSellUI.b09` | `snbSellUI` | Human sell-turn UI child |
-| `snbSellDraftIO.b09` | `snbSellDraftIO` | Sell draft file I/O helpers |
+| `snbSellDraftInit.b09` | `snbSellDraftInit` | Sell draft bootstrap and cleanup helpers |
+| `snbSellDraftState.b09` | `snbSellDraftState` | Sell draft header, summary, and context helpers |
 | `snbSellDraftEdit.b09` | `snbSellDraftEdit` | Sell draft order edit helpers |
 | `snbSellDraftApply.b09` | `snbSellDraftApply` | Sell draft replay/apply helpers |
 | `snbSellAI.b09` | `snbSellAI` | AI sell-phase child |
@@ -254,7 +256,8 @@ Several helpers now live inside the child module that uses them:
 - `snbMarket.b09`: market tables, card decoding, roll generation, market screens
 - `snbSellExec.b09`: sell-turn orchestration and apply/writeback
 - `snbSellUI.b09`: sell-turn editor loop
-- `snbSellDraftIO.b09`: draft bootstrap, file I/O, and cleanup
+- `snbSellDraftInit.b09`: draft bootstrap and cleanup
+- `snbSellDraftState.b09`: draft header, summary, and context I/O
 - `snbSellDraftEdit.b09`: order mutation and summary rebuild helpers
 - `snbSellDraftApply.b09`: confirmed draft replay into the live player record
 - `snbSellAI.b09`: `aiSell`, `scrAISellTurn`

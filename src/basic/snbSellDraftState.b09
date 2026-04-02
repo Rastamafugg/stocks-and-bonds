@@ -1,10 +1,9 @@
-PROCEDURE snbSellDraftIO
+PROCEDURE snbSellDraftState
 (* ============================================================ *)
-(* PROCEDURE : snbSellDraftIO                                   *)
-(* PURPOSE   : README entry for sell draft I/O helpers.         *)
+(* PROCEDURE : snbSellDraftState                                *)
+(* PURPOSE   : README entry for sell draft state helpers.       *)
 (* ============================================================ *)
-PRINT "snbSellDraftIO"
-PRINT "  initSellDraft"
+PRINT "snbSellDraftState"
 PRINT "  initDraftSum"
 PRINT "  loadDraftHdr"
 PRINT "  saveDraftHdr"
@@ -12,66 +11,6 @@ PRINT "  loadDraftSum"
 PRINT "  saveDraftSum"
 PRINT "  loadDraftCtx"
 PRINT "  saveDraftCtx"
-PRINT "  clearDraftFiles"
-PRINT "  tryDeleteFile"
-END
-
-PROCEDURE initSellDraft
-TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
-TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
-TYPE DraftCtx = dcType,dcAsset,dcAct,dcChk:BYTE
-PARAM hdrPath   : STRING[20]
-PARAM ordPath   : STRING[20]
-PARAM currYr    : INTEGER
-PARAM playerIdx : INTEGER
-PARAM ok        : BOOLEAN
-DIM hdr         : DraftHdr
-DIM sum         : DraftSum
-DIM ctx         : DraftCtx
-DIM path        : BYTE
-DIM pathOpen    : BOOLEAN
-DIM chkSum      : INTEGER
-
-ON ERROR GOTO 900
-pathOpen := FALSE
-ok := FALSE
-RUN clearDraftFiles(hdrPath, ordPath, ok)
-CREATE #path, hdrPath:UPDATE
-pathOpen := TRUE
-hdr.dhMagic := $44
-hdr.dhFmtVer := 1
-hdr.dhPhase := 1
-hdr.dhPlyr := playerIdx
-hdr.dhStatus := 1
-hdr.dhRecCnt := 0
-hdr.dhNextSeq := 1
-hdr.dhYear := currYr
-hdr.dhMaxYr := 10
-chkSum := hdr.dhMagic + hdr.dhFmtVer + hdr.dhPhase
-chkSum := chkSum + hdr.dhPlyr + hdr.dhStatus + hdr.dhRecCnt
-chkSum := chkSum + hdr.dhNextSeq + hdr.dhYear + hdr.dhMaxYr
-hdr.dhChk := LAND(chkSum, 255)
-PUT #path, hdr
-RUN initDraftSum(sum)
-PUT #path, sum
-ctx.dcType := 0
-ctx.dcAsset := 0
-ctx.dcAct := 0
-ctx.dcChk := LAND(ctx.dcType + ctx.dcAsset + ctx.dcAct, 255)
-PUT #path, ctx
-CLOSE #path
-pathOpen := FALSE
-CREATE #path, ordPath:UPDATE
-pathOpen := TRUE
-CLOSE #path
-pathOpen := FALSE
-ok := TRUE
-END
-900 IF pathOpen THEN
-      CLOSE #path
-    ENDIF
-    PRINT "initSellDraft error ("; ERR; ")"
-    ok := FALSE
 END
 
 PROCEDURE initDraftSum
@@ -338,20 +277,3 @@ END
     PRINT "saveDraftCtx error ("; ERR; ")"
     ok := FALSE
 END
-
-PROCEDURE clearDraftFiles
-PARAM hdrPath : STRING[20]
-PARAM ordPath : STRING[20]
-PARAM ok      : BOOLEAN
-
-RUN tryDeleteFile(hdrPath)
-RUN tryDeleteFile(ordPath)
-ok := TRUE
-END
-
-PROCEDURE tryDeleteFile
-PARAM filePath : STRING[20]
-ON ERROR GOTO 900
-DELETE filePath
-END
-900 END

@@ -4,31 +4,26 @@ PROCEDURE snbSellExec
 (* PURPOSE   : Thin human sell-turn orchestrator. Loads the     *)
 (*             active player from SNBSTATE, initializes the     *)
 (*             draft files, forks snbSellUI for the interactive *)
-(*             editor, then optionally replays confirmed sell   *)
-(*             orders and writes the updated player record.     *)
+(*             editor, then optionally forks the confirm-time   *)
+(*             apply child to replay the sell orders.           *)
 (* PARAMS    : None (child process; no PARAM handoff)           *)
 (* SIDE EFX  : Reads and writes SNBSTATE. Uses SNBDRFTH and     *)
 (*             SNBDRFTD as temporary sell-turn draft files.     *)
 (* NOTE      : snbStateIO, snbTradeShared, snbGameData,         *)
 (*             snbPhaseCore, snbScreenUtil, snbTradeHumanUI,    *)
 (*             snbForkUtil, and snbSellExec must be loaded.     *)
-(*             snbSellDraftIO, snbSellDraftApply, and           *)
-(*             snbSellUI are ensured as needed.                 *)
+(*             snbSellDraftInit, snbSellDraftState, snbSellUI,  *)
+(*             snbSellDraftApply are ensured as needed.         *)
 (* ============================================================ *)
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
-TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
 TYPE DraftCtx = dcType,dcAsset,dcAct,dcChk:BYTE
 DIM hdr       : SaveHdr
-DIM plyr      : PlyrRec
 DIM mkt       : MktState
-DIM dHdr      : DraftHdr
 DIM dCtx      : DraftCtx
 DIM hdrPath   : STRING[20]
 DIM ordPath   : STRING[20]
 DIM loadOK    : BOOLEAN
-DIM saveOK    : BOOLEAN
 DIM draftOK   : BOOLEAN
 DIM exitStat  : INTEGER
 DIM ok        : BOOLEAN
@@ -45,16 +40,10 @@ ON ERROR GOTO 900
 debugLog := FALSE
 hdrPath := "SNBDRFTH"
 ordPath := "SNBDRFTD"
-modNam := "snbSellDraftIO"
+modNam := "snbSellDraftInit"
 RUN ensureModuleLib(modNam, FALSE, debugLog, ok)
 IF NOT ok THEN
-  PRINT "snbSellExec: failed to load snbSellDraftIO"
-  END
-ENDIF
-modNam := "snbSellDraftApply"
-RUN ensureModuleLib(modNam, FALSE, debugLog, ok)
-IF NOT ok THEN
-  PRINT "snbSellExec: failed to load snbSellDraftApply"
+  PRINT "snbSellExec: failed to load snbSellDraftInit"
   END
 ENDIF
 
@@ -68,12 +57,6 @@ pIdx   := hdr.savedPlyr
 currYr := hdr.currYear
 IF pIdx < 1 OR pIdx > iPCnt THEN
   PRINT "snbSellExec: invalid savedPlyr"
-  END
-ENDIF
-
-RUN loadPlyrRec("SNBSTATE", hdr, pIdx, plyr, loadOK)
-IF NOT loadOK THEN
-  PRINT "snbSellExec: loadPlyrRec failed"
   END
 ENDIF
 
@@ -125,10 +108,10 @@ IF NOT ok THEN
   PRINT "snbSellExec: failed to ensure snbForkUtil"
   END
 ENDIF
-modNam := "snbSellDraftIO"
+modNam := "snbSellDraftState"
 RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
 IF NOT ok THEN
-  PRINT "snbSellExec: failed to ensure snbSellDraftIO"
+  PRINT "snbSellExec: failed to ensure snbSellDraftState"
   END
 ENDIF
 modNam := "snbSellUI"
@@ -153,19 +136,15 @@ uiAct := dCtx.dcAct
 parentAct := 1
 
 IF uiAct = 2 THEN
-  RUN loadDraftHdr(hdrPath, dHdr, draftOK)
-  IF NOT draftOK THEN
-    PRINT "snbSellExec: loadDraftHdr failed"
+  modNam := "snbSellDraftApply"
+  RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+  IF NOT ok THEN
+    PRINT "snbSellExec: failed to ensure snbSellDraftApply"
     END
   ENDIF
-  RUN replaySellDraft(ordPath, dHdr, plyr, mkt, draftOK)
-  IF NOT draftOK THEN
-    PRINT "snbSellExec: replaySellDraft failed"
-    END
-  ENDIF
-  RUN savePlyrRec("SNBSTATE", hdr, pIdx, plyr, saveOK)
-  IF NOT saveOK THEN
-    PRINT "snbSellExec: savePlyrRec failed"
+  RUN forkPhaseLib("snbSellDraftApply", debugLog, exitStat)
+  IF exitStat <> 0 THEN
+    PRINT "snbSellExec: snbSellDraftApply failed exitStat="; exitStat
     END
   ENDIF
 ELSE IF uiAct = 3 THEN

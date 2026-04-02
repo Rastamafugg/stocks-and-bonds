@@ -138,10 +138,16 @@ LOOP
         PRINT "snbSell: failed to ensure snbForkUtil"
         END
       ENDIF
-      modNam := "snbSellDraftIO"
+      modNam := "snbSellDraftInit"
       RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
       IF NOT ok THEN
-        PRINT "snbSell: failed to ensure snbSellDraftIO"
+        PRINT "snbSell: failed to ensure snbSellDraftInit"
+        END
+      ENDIF
+      modNam := "snbSellDraftState"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "snbSell: failed to ensure snbSellDraftState"
         END
       ENDIF
       modNam := "snbSellExec"

@@ -1,0 +1,118 @@
+PROCEDURE snbSellDraftInit
+(* ============================================================ *)
+(* PROCEDURE : snbSellDraftInit                                 *)
+(* PURPOSE   : README entry for sell draft init helpers.        *)
+(* ============================================================ *)
+PRINT "snbSellDraftInit"
+PRINT "  initSellDraft"
+PRINT "  clearDraftFiles"
+PRINT "  tryDeleteFile"
+END
+
+PROCEDURE initSellDraft
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
+TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
+TYPE DraftCtx = dcType,dcAsset,dcAct,dcChk:BYTE
+PARAM hdrPath   : STRING[20]
+PARAM ordPath   : STRING[20]
+PARAM currYr    : INTEGER
+PARAM playerIdx : INTEGER
+PARAM ok        : BOOLEAN
+DIM hdr         : DraftHdr
+DIM sum         : DraftSum
+DIM ctx         : DraftCtx
+DIM path        : BYTE
+DIM pathOpen    : BOOLEAN
+DIM chkSum      : INTEGER
+
+ON ERROR GOTO 900
+pathOpen := FALSE
+ok := FALSE
+RUN clearDraftFiles(hdrPath, ordPath, ok)
+CREATE #path, hdrPath:UPDATE
+pathOpen := TRUE
+hdr.dhMagic := $44
+hdr.dhFmtVer := 1
+hdr.dhPhase := 1
+hdr.dhPlyr := playerIdx
+hdr.dhStatus := 1
+hdr.dhRecCnt := 0
+hdr.dhNextSeq := 1
+hdr.dhYear := currYr
+hdr.dhMaxYr := 10
+chkSum := hdr.dhMagic + hdr.dhFmtVer + hdr.dhPhase
+chkSum := chkSum + hdr.dhPlyr + hdr.dhStatus + hdr.dhRecCnt
+chkSum := chkSum + hdr.dhNextSeq + hdr.dhYear + hdr.dhMaxYr
+hdr.dhChk := LAND(chkSum, 255)
+PUT #path, hdr
+RUN initDraftSumInit(sum)
+PUT #path, sum
+ctx.dcType := 0
+ctx.dcAsset := 0
+ctx.dcAct := 0
+ctx.dcChk := LAND(ctx.dcType + ctx.dcAsset + ctx.dcAct, 255)
+PUT #path, ctx
+CLOSE #path
+pathOpen := FALSE
+CREATE #path, ordPath:UPDATE
+pathOpen := TRUE
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "initSellDraft error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE initDraftSumInit
+TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
+PARAM sum : DraftSum
+DIM s     : INTEGER
+DIM b     : INTEGER
+DIM chkSum: INTEGER
+
+sum.dsPhase := 1
+sum.dsPlyr := 1
+sum.dsHas := 0
+sum.dsActCnt := 0
+sum.dsCashDl := 0
+sum.dsMgnDl := 0
+sum.dsRepay := 0
+FOR s := 1 TO 9
+  sum.dsStkQty(s) := 0
+  sum.dsStkMgn(s) := 0
+NEXT s
+FOR b := 1 TO 3
+  sum.dsBndQty(b) := 0
+NEXT b
+chkSum := sum.dsPhase + sum.dsPlyr + sum.dsHas
+chkSum := chkSum + sum.dsActCnt + sum.dsCashDl
+chkSum := chkSum + sum.dsMgnDl + sum.dsRepay
+FOR s := 1 TO 9
+  chkSum := chkSum + sum.dsStkQty(s) + sum.dsStkMgn(s)
+NEXT s
+FOR b := 1 TO 3
+  chkSum := chkSum + sum.dsBndQty(b)
+NEXT b
+sum.dsChk := LAND(chkSum, 255)
+END
+
+PROCEDURE clearDraftFiles
+PARAM hdrPath : STRING[20]
+PARAM ordPath : STRING[20]
+PARAM ok      : BOOLEAN
+
+RUN tryDeleteFile(hdrPath)
+RUN tryDeleteFile(ordPath)
+ok := TRUE
+END
+
+PROCEDURE tryDeleteFile
+PARAM filePath : STRING[20]
+ON ERROR GOTO 900
+DELETE filePath
+END
+900 END

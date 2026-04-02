@@ -1,10 +1,70 @@
 PROCEDURE snbSellDraftApply
 (* ============================================================ *)
 (* PROCEDURE : snbSellDraftApply                                *)
-(* PURPOSE   : README entry for sell draft apply helpers.       *)
+(* PURPOSE   : Confirm-time sell draft apply child. Loads the   *)
+(*             active player and draft files, replays the       *)
+(*             confirmed draft orders, and writes the updated   *)
+(*             player record back to SNBSTATE.                  *)
 (* ============================================================ *)
-PRINT "snbSellDraftApply"
-PRINT "  replaySellDraft"
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
+DIM hdr       : SaveHdr
+DIM plyr      : PlyrRec
+DIM mkt       : MktState
+DIM dHdr      : DraftHdr
+DIM hdrPath   : STRING[20]
+DIM ordPath   : STRING[20]
+DIM loadOK    : BOOLEAN
+DIM saveOK    : BOOLEAN
+DIM draftOK   : BOOLEAN
+DIM pIdx      : INTEGER
+DIM iPCnt     : INTEGER
+
+ON ERROR GOTO 900
+
+hdrPath := "SNBDRFTH"
+ordPath := "SNBDRFTD"
+
+RUN loadHdrMkt("SNBSTATE", hdr, mkt, loadOK)
+IF NOT loadOK THEN
+  PRINT "snbSellDraftApply: loadHdrMkt failed"
+  END
+ENDIF
+iPCnt := hdr.plyrCount
+pIdx := hdr.savedPlyr
+IF pIdx < 1 OR pIdx > iPCnt THEN
+  PRINT "snbSellDraftApply: invalid savedPlyr"
+  END
+ENDIF
+
+RUN loadPlyrRec("SNBSTATE", hdr, pIdx, plyr, loadOK)
+IF NOT loadOK THEN
+  PRINT "snbSellDraftApply: loadPlyrRec failed"
+  END
+ENDIF
+
+RUN loadDraftHdrAp(hdrPath, dHdr, draftOK)
+IF NOT draftOK THEN
+  PRINT "snbSellDraftApply: loadDraftHdrAp failed"
+  END
+ENDIF
+
+RUN replaySellDraft(ordPath, dHdr, plyr, mkt, draftOK)
+IF NOT draftOK THEN
+  PRINT "snbSellDraftApply: replaySellDraft failed"
+  END
+ENDIF
+
+RUN savePlyrRec("SNBSTATE", hdr, pIdx, plyr, saveOK)
+IF NOT saveOK THEN
+  PRINT "snbSellDraftApply: savePlyrRec failed"
+  END
+ENDIF
+END
+
+900 PRINT "snbSellDraftApply error ("; ERR; ")"
 END
 
 PROCEDURE replaySellDraft
@@ -70,6 +130,48 @@ NEXT recIdx
 ok := TRUE
 END
 900 PRINT "replaySellDraft error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE loadDraftHdrAp
+TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
+PARAM hdrPath : STRING[20]
+PARAM hdr     : DraftHdr
+PARAM ok      : BOOLEAN
+DIM path      : BYTE
+DIM pathOpen  : BOOLEAN
+DIM chkExp    : INTEGER
+
+ON ERROR GOTO 900
+pathOpen := FALSE
+ok := FALSE
+OPEN #path, hdrPath:READ
+pathOpen := TRUE
+GET #path, hdr
+IF hdr.dhMagic <> $44 THEN
+  PRINT "loadDraftHdrAp: invalid magic"
+  END
+ENDIF
+IF hdr.dhFmtVer <> 1 THEN
+  PRINT "loadDraftHdrAp: invalid version"
+  END
+ENDIF
+chkExp := hdr.dhMagic + hdr.dhFmtVer + hdr.dhPhase
+chkExp := chkExp + hdr.dhPlyr + hdr.dhStatus + hdr.dhRecCnt
+chkExp := chkExp + hdr.dhNextSeq + hdr.dhYear + hdr.dhMaxYr
+chkExp := LAND(chkExp, 255)
+IF chkExp <> hdr.dhChk THEN
+  PRINT "loadDraftHdrAp: corrupt header"
+  END
+ENDIF
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "loadDraftHdrAp error ("; ERR; ")"
     ok := FALSE
 END
 
