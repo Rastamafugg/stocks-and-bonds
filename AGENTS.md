@@ -4,6 +4,18 @@ These instructions apply to all work in this repository.
 
 ## Durable Behavior Changes
 
+- When diagnosing Basic09 runtime `ERR=43` in NitrOS-9, do not assume the
+  root cause is a genuinely missing procedure. In this project, if the target
+  procedure should exist in a packed module but too many modules are already
+  loaded to fit in memory, the procedure may fail to load and Basic09 will
+  still surface only `ERR=43` when the code tries to access it.
+- Treat that `ERR=43` situation as an effective out-of-memory diagnosis unless
+  current-task evidence shows the procedure is actually absent, misnamed, or
+  packed incorrectly.
+- When discussing this case, state explicitly that Basic09 running under
+  NitrOS-9 does not provide a distinct out-of-memory error for this failed
+  procedure-load path; the observable failure appears only later as
+  `Unknown Procedure` at the attempted access site.
 - If the assistant agrees to change its own ongoing working behavior, review
   method, patching method, disclosure method, or response protocol in a
   durable way, it must update the relevant AGENTS file(s) in the same task
