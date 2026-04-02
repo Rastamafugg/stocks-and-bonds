@@ -120,11 +120,22 @@ value and distinguishes itself by running after `GS_DONE`.
 - Entry procedure: `snbSellExec`
 - Writes: updated player sell results in `SNBSTATE`
 - Responsibility:
-  - Runs the human sell-turn editor for the active saved-turn player
+  - Orchestrates one human sell turn for the active saved-turn player
   - Uses `SNBDRFTH` and `SNBDRFTD` as per-turn draft files
-  - Forks `snbSellLot` for per-asset quantity edits
+  - Forks `snbSellUI` for the interactive editor
   - Replays confirmed sell orders into the active player record
   - Writes the turn action back to `SNBDRFTH` for `snbSell`
+
+### 4.4b `snbSellUI`
+- File: `src/basic/snbSellUI.b09`
+- Entry procedure: `snbSellUI`
+- Writes: draft action/result in `SNBDRFTH`
+- Responsibility:
+  - Runs the human sell-turn interactive screen loop
+  - Reads the active player from `SNBSTATE`
+  - Reads the current draft summary from `SNBDRFTH`
+  - Forks `snbSellLot` for per-asset quantity edits
+  - Reports pass, confirm, save, or quit back to `snbSellExec`
 
 ### 4.5 `snbBuy` and `snbBuyAI`
 - Files: `src/basic/snbBuy.b09`, `src/basic/snbBuyAI.b09`
@@ -217,6 +228,8 @@ Notes:
 | `snbMarket.b09` | `snbMarket` | Market-resolution child |
 | `snbSell.b09` | `snbSell` | Human sell-phase child |
 | `snbSellExec.b09` | `snbSellExec` | Human sell-turn child |
+| `snbSellUI.b09` | `snbSellUI` | Human sell-turn UI child |
+| `snbSellDraft.b09` | `snbSellDraft` | Shared sell-draft helpers |
 | `snbSellAI.b09` | `snbSellAI` | AI sell-phase child |
 | `snbBuy.b09` | `snbBuy` | Human buy-phase child and shared buy apply logic |
 | `snbBuyAI.b09` | `snbBuyAI` | AI buy-phase child |
@@ -237,7 +250,9 @@ Several helpers now live inside the child module that uses them:
 - `snbSetup.b09`: `initPlayer`, `initMkt`, setup screens
 - `snbDividend.b09`: `applyDivInt`, `scrYearHdr`, `scrDivInt`
 - `snbMarket.b09`: market tables, card decoding, roll generation, market screens
-- `snbSellExec.b09`: sell-turn editor and sell draft helpers
+- `snbSellExec.b09`: sell-turn orchestration and apply/writeback
+- `snbSellUI.b09`: sell-turn editor loop
+- `snbSellDraft.b09`: shared sell draft I/O and rebuild/apply helpers
 - `snbSellAI.b09`: `aiSell`, `scrAISellTurn`
 - `snbBuy.b09`: `applyBuys`, `scrMgnRepay`, `scrBuy`
 - `snbBuyAI.b09`: `aiBuy`, `scrAIBuyTurn`

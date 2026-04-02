@@ -1,0 +1,413 @@
+PROCEDURE snbSellUI
+(* ============================================================ *)
+(* PROCEDURE : snbSellUI                                        *)
+(* PURPOSE   : Human sell-turn interactive child. Loads the     *)
+(*             active player and current draft summary, renders *)
+(*             the sell screen, handles pass/confirm/save/quit, *)
+(*             and forks snbSellLot for per-asset quantity      *)
+(*             edits. Writes the UI action to SNBDRFTH.         *)
+(* PARAMS    : None                                             *)
+(* SIDE EFX  : Reads SNBSTATE and updates SNBDRFTH / SNBDRFTD.  *)
+(* NOTE      : snbStateIO, snbTradeShared, snbGameData,         *)
+(*             snbPhaseCore, snbScreenUtil, snbTradeHumanUI,    *)
+(*             snbForkUtil, snbSellDraft, and snbSellUI must    *)
+(*             be loaded. snbSellLot is ensured before fork.    *)
+(* ============================================================ *)
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
+TYPE DraftCtx = dcType,dcAsset,dcAct,dcChk:BYTE
+DIM hdr          : SaveHdr
+DIM plyr         : PlyrRec
+DIM mkt          : MktState
+DIM stockNm      : STRING[14]
+DIM bPar(3)      : INTEGER
+DIM s            : INTEGER
+DIM b            : INTEGER
+DIM pStr         : STRING[8]
+DIM pStr2        : STRING[8]
+DIM keyCode      : INTEGER
+DIM stockCnt     : INTEGER
+DIM bondCnt      : INTEGER
+DIM keyLbl       : STRING[1]
+DIM slotQty      : INTEGER
+DIM kIn          : STRING[1]
+DIM workCash     : INTEGER
+DIM workMgn      : INTEGER
+DIM dispIdx      : INTEGER
+DIM selType      : INTEGER
+DIM selId        : INTEGER
+DIM currMgnTot   : INTEGER
+DIM yldPct       : INTEGER
+DIM divVal       : INTEGER
+DIM hasSell      : BOOLEAN
+DIM sqAct        : INTEGER
+DIM cnfIn        : STRING[1]
+DIM holdQty      : INTEGER
+DIM prjQty       : INTEGER
+DIM divPrj       : INTEGER
+DIM projTxt      : STRING[8]
+DIM mgnTxt       : STRING[7]
+DIM ordTxt       : STRING[24]
+DIM hdrPath      : STRING[20]
+DIM dSum         : DraftSum
+DIM dCtx         : DraftCtx
+DIM draftOK      : BOOLEAN
+DIM loadOK       : BOOLEAN
+DIM exitStat     : INTEGER
+DIM ok           : BOOLEAN
+DIM debugLog     : BOOLEAN
+DIM modNam       : STRING[20]
+
+ON ERROR GOTO 900
+
+debugLog := FALSE
+hdrPath := "SNBDRFTH"
+RUN initBondPar(bPar)
+modNam := "snbSellDraft"
+RUN ensureModuleLib(modNam, FALSE, debugLog, ok)
+IF NOT ok THEN
+  PRINT "snbSellUI: failed to load snbSellDraft"
+  END
+ENDIF
+
+RUN loadHdrMkt("SNBSTATE", hdr, mkt, loadOK)
+IF NOT loadOK THEN
+  PRINT "snbSellUI: loadHdrMkt failed"
+  END
+ENDIF
+IF hdr.savedPlyr < 1 OR hdr.savedPlyr > hdr.plyrCount THEN
+  PRINT "snbSellUI: invalid savedPlyr"
+  END
+ENDIF
+RUN loadPlyrRec("SNBSTATE", hdr, hdr.savedPlyr, plyr, loadOK)
+IF NOT loadOK THEN
+  PRINT "snbSellUI: loadPlyrRec failed"
+  END
+ENDIF
+
+LOOP
+
+  RUN loadDraftSum(hdrPath, dSum, draftOK)
+  IF NOT draftOK THEN
+    PRINT "snbSellUI: loadDraftSum failed"
+    END
+  ENDIF
+  hasSell := FALSE
+  RUN calcMgnTot(plyr, currMgnTot)
+  workCash := plyr.cashBal + dSum.dsCashDl
+  workMgn := currMgnTot + dSum.dsMgnDl
+
+  RUN clrScr
+  PRINT "=== SELL PHASE - YEAR "; hdr.currYear; " ==="
+  PRINT "  Player: "; plyr.plyrName
+  RUN fmtMoney(plyr.cashBal, pStr)
+  RUN fmtMoney(workCash, pStr2)
+  PRINT "  Cash: $"; pStr; " [$"; pStr2; "]";
+  RUN fmtMoney(currMgnTot, pStr)
+  RUN fmtMoney(workMgn, pStr2)
+  PRINT "  Margin: $"; pStr; " [$"; pStr2; "]"
+  PRINT
+
+  stockCnt := 0
+  PRINT "  STOCKS:";
+  FOR s := 1 TO 9
+    IF plyr.stckShrs(s) > 0 AND mkt.stckPrice(s) > 0 THEN
+      stockCnt := stockCnt + 1
+    ENDIF
+  NEXT s
+  IF stockCnt = 1 THEN
+    PRINT " press 1"
+  ELSE IF stockCnt > 1 THEN
+    PRINT " press 1-"; stockCnt
+  ELSE
+    PRINT
+  ENDIF \ENDIF
+  stockCnt := 0
+  FOR s := 1 TO 9
+    IF plyr.stckShrs(s) > 0 THEN
+      IF mkt.stckPrice(s) > 0 THEN
+        stockCnt := stockCnt + 1
+        hasSell := TRUE
+        RUN getStockName(s, stockNm)
+        slotQty := 0 - dSum.dsStkQty(s)
+        keyLbl := CHR$(ASC("0") + stockCnt)
+        RUN getStockDivRate(s, yldPct)
+        divVal := (mkt.stckPrice(s) * yldPct) / 100
+        holdQty := plyr.stckShrs(s)
+        prjQty := holdQty + dSum.dsStkQty(s)
+        divPrj := 0
+        IF slotQty > 0 THEN
+          IF holdQty > 0 THEN
+            divPrj := (divVal * prjQty) / holdQty
+          ENDIF
+        ENDIF
+        projTxt := ""
+        IF slotQty > 0 THEN
+          RUN padNumber(divPrj, 2, pStr)
+          projTxt := "[$" + pStr + "]"
+        ENDIF
+        mgnTxt := ""
+        IF plyr.mgnBal(s) + dSum.dsStkMgn(s) > 0 THEN
+          mgnTxt := "[ MGN]"
+        ENDIF
+        IF dSum.dsStkMgn(s) < 0 THEN
+          mgnTxt := "[-MGN]"
+        ENDIF
+        ordTxt := ""
+        IF slotQty > 0 THEN
+          ordTxt := "- SELL " + TRIM$(STR$(slotQty))
+          ordTxt := ordTxt + " = TOT " + TRIM$(STR$(prjQty))
+        ENDIF
+        ! Line exceeds 79 chars; PRINT USING row format requires single line.
+        PRINT USING "'  ',S1<,' ',S12<,'  $',I4>,' ',I2>,'% -> $',I2>,' ',S5<,' ',S6<,' OWN ',I3>,' ',S18<", keyLbl, stockNm, mkt.stckPrice(s), yldPct, divVal, projTxt, mgnTxt, holdQty, ordTxt
+      ENDIF
+    ENDIF
+  NEXT s
+
+  PRINT
+  bondCnt := 0
+  FOR b := 1 TO 3
+    IF plyr.bondUnts(b) > 0 THEN
+      bondCnt := bondCnt + 1
+    ENDIF
+  NEXT b
+  PRINT "  BONDS:";
+  IF bondCnt = 1 THEN
+    PRINT " press A"
+  ELSE IF bondCnt > 1 THEN
+    PRINT " press A-"; CHR$(ASC("A") + bondCnt - 1)
+  ELSE
+    PRINT
+  ENDIF \ENDIF
+  bondCnt := 0
+  FOR b := 1 TO 3
+    IF plyr.bondUnts(b) > 0 THEN
+      bondCnt := bondCnt + 1
+      hasSell := TRUE
+      slotQty := 0 - dSum.dsBndQty(b)
+      keyLbl := CHR$(ASC("A") + bondCnt - 1)
+      ! Line exceeds 79 chars; PRINT USING row format requires single line.
+      PRINT USING "'  ',S1<,' $',I6>,'  ',I3>,' unit(s)'", keyLbl, bPar(b), plyr.bondUnts(b);
+      IF slotQty > 0 THEN
+        PRINT "  [Sell "; slotQty; "]"
+      ELSE
+        PRINT
+      ENDIF
+    ENDIF
+  NEXT b
+
+  IF NOT hasSell THEN
+    PRINT
+    PRINT "Nothing to sell this turn."
+    IF currMgnTot <= 0 THEN
+      PRINT
+      PRINT "  Any key=continue  S=save+exit  Q=quit: ";
+      GET #0, kIn
+      PRINT
+      dCtx.dcType := 0
+      dCtx.dcAsset := 0
+      IF kIn = "S" OR kIn = "s" THEN
+        dCtx.dcAct := 3
+      ELSE IF kIn = "Q" OR kIn = "q" THEN
+        dCtx.dcAct := 4
+      ELSE
+        dCtx.dcAct := 1
+      ENDIF \ENDIF
+      RUN saveDraftCtx(hdrPath, dCtx, draftOK)
+      IF NOT draftOK THEN
+        PRINT "snbSellUI: saveDraftCtx failed"
+      ENDIF
+      END
+    ENDIF
+  ENDIF
+
+  PRINT
+  IF dSum.dsActCnt > 0 THEN
+    PRINT "  Enter=confirm orders  P=pass  S=save+exit  Q=quit"
+  ELSE
+    PRINT "  P=pass  S=save+exit  Q=quit"
+  ENDIF
+  GET #0, kIn
+  PRINT
+
+  IF kIn <> "" THEN
+    keyCode := ASC(kIn)
+    IF keyCode >= ASC("a") AND keyCode <= ASC("z") THEN
+      keyCode := keyCode - 32
+    ENDIF
+  ELSE
+    keyCode := 0
+  ENDIF
+
+  IF kIn = "S" OR kIn = "s" THEN
+    dCtx.dcType := 0
+    dCtx.dcAsset := 0
+    dCtx.dcAct := 3
+    RUN saveDraftCtx(hdrPath, dCtx, draftOK)
+    IF NOT draftOK THEN
+      PRINT "snbSellUI: saveDraftCtx failed"
+    ENDIF
+    END
+  ELSE IF kIn = "Q" OR kIn = "q" THEN
+    dCtx.dcType := 0
+    dCtx.dcAsset := 0
+    dCtx.dcAct := 4
+    RUN saveDraftCtx(hdrPath, dCtx, draftOK)
+    IF NOT draftOK THEN
+      PRINT "snbSellUI: saveDraftCtx failed"
+    ENDIF
+    END
+  ENDIF \ENDIF
+
+  selType := 0
+  selId   := 0
+  dispIdx := 0
+  FOR s := 1 TO 9
+    IF selType = 0 THEN
+      IF plyr.stckShrs(s) > 0 AND mkt.stckPrice(s) > 0 THEN
+        dispIdx := dispIdx + 1
+        IF keyCode = ASC("0") + dispIdx THEN
+          selType := 1
+          selId   := s
+        ENDIF
+      ENDIF
+    ENDIF
+  NEXT s
+  dispIdx := 0
+  FOR b := 1 TO 3
+    IF selType = 0 THEN
+      IF plyr.bondUnts(b) > 0 THEN
+        dispIdx := dispIdx + 1
+        IF keyCode = ASC("A") + dispIdx - 1 THEN
+          selType := 2
+          selId   := b
+        ENDIF
+      ENDIF
+    ENDIF
+  NEXT b
+
+  IF keyCode = ASC("P") THEN
+    IF dSum.dsActCnt > 0 THEN
+      PRINT "Pending orders will be discarded. Press Y to pass."
+      GET #0, cnfIn
+      PRINT
+      IF cnfIn = "Y" OR cnfIn = "y" THEN
+        dCtx.dcType := 0
+        dCtx.dcAsset := 0
+        dCtx.dcAct := 1
+        RUN saveDraftCtx(hdrPath, dCtx, draftOK)
+        IF NOT draftOK THEN
+          PRINT "snbSellUI: saveDraftCtx failed"
+        ENDIF
+        END
+      ENDIF
+    ELSE
+      dCtx.dcType := 0
+      dCtx.dcAsset := 0
+      dCtx.dcAct := 1
+      RUN saveDraftCtx(hdrPath, dCtx, draftOK)
+      IF NOT draftOK THEN
+        PRINT "snbSellUI: saveDraftCtx failed"
+      ENDIF
+      END
+    ENDIF
+  ELSE IF keyCode = 13 THEN
+    IF dSum.dsActCnt > 0 THEN
+      dCtx.dcType := 0
+      dCtx.dcAsset := 0
+      dCtx.dcAct := 2
+      RUN saveDraftCtx(hdrPath, dCtx, draftOK)
+      IF NOT draftOK THEN
+        PRINT "snbSellUI: saveDraftCtx failed"
+      ENDIF
+      END
+    ENDIF
+  ELSE
+    IF selType > 0 THEN
+      dCtx.dcType := selType
+      dCtx.dcAsset := selId
+      dCtx.dcAct := 0
+      RUN saveDraftCtx(hdrPath, dCtx, draftOK)
+      IF NOT draftOK THEN
+        PRINT "snbSellUI: saveDraftCtx failed"
+        END
+      ENDIF
+      modNam := "snbStateIO"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "snbSellUI: failed to ensure snbStateIO"
+        END
+      ENDIF
+      modNam := "snbTradeShared"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "snbSellUI: failed to ensure snbTradeShared"
+        END
+      ENDIF
+      modNam := "snbGameData"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "snbSellUI: failed to ensure snbGameData"
+        END
+      ENDIF
+      modNam := "snbPhaseCore"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "snbSellUI: failed to ensure snbPhaseCore"
+        END
+      ENDIF
+      modNam := "snbScreenUtil"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "snbSellUI: failed to ensure snbScreenUtil"
+        END
+      ENDIF
+      modNam := "snbTradeHumanUI"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "snbSellUI: failed to ensure snbTradeHumanUI"
+        END
+      ENDIF
+      modNam := "snbForkUtil"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "snbSellUI: failed to ensure snbForkUtil"
+        END
+      ENDIF
+      modNam := "snbSellDraft"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "snbSellUI: failed to ensure snbSellDraft"
+        END
+      ENDIF
+      modNam := "snbSellLot"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "snbSellUI: failed to ensure snbSellLot"
+        END
+      ENDIF
+      RUN forkPhaseLib("snbSellLot", debugLog, exitStat)
+      IF exitStat <> 0 THEN
+        PRINT "snbSellUI: snbSellLot failed exitStat="; exitStat
+        END
+      ENDIF
+      RUN loadDraftCtx(hdrPath, dCtx, draftOK)
+      IF NOT draftOK THEN
+        PRINT "snbSellUI: loadDraftCtx failed"
+        END
+      ENDIF
+      IF dCtx.dcAct = 3 OR dCtx.dcAct = 4 THEN
+        END
+      ENDIF
+    ENDIF
+  ENDIF \ENDIF
+
+ENDLOOP
+
+END
+
+900 PRINT "snbSellUI error ("; ERR; ")"
+RUN waitKey
+END
