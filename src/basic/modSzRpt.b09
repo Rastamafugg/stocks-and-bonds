@@ -123,22 +123,6 @@ ELSE
 ENDIF
 PRINT
 
-! --- Unload module ----------------------------------------
-PRINT "Unloading "; modNam; "..."
-modIdx := 1
-RUN memModGet(modNam, modIdx, prcNam) \ ! get first proc name
-LOOP
-  EXITIF prcNam = "" THEN
-  ENDEXIT
-  nameAddr := ADDR(prcNam)
-  callCode := $1D        \ ! F$UnLoad: unload by name
-  regs.a   := 0
-  regs.x   := nameAddr
-  RUN SysCall(callCode, regs)
-  modIdx := modIdx + 1
-  RUN memModGet(modNam, modIdx, prcNam) \ ! next proc name
-ENDLOOP
-PRINT "Unload complete."
 END
 
 900 \ ! Error handler
