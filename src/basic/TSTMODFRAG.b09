@@ -143,9 +143,11 @@ IF ok THEN
   PRINT "PASS: snb loaded"
   PRINT "Expected resident total now = "; sizeSnb
   PRINT "Expected free now           = "; procLimit - sizeSnb
+  RUN showProcMem("Observed F$Mem(0) after snb load")
   passed := passed + 1
 ELSE
   PRINT "FAIL: snb load failed err "; errCode
+  RUN showProcMem("Observed F$Mem(0) after snb load fail")
   failed := failed + 1
 ENDIF
 testNum := testNum + 1
@@ -166,9 +168,11 @@ IF ok THEN
   loadTotal := sizeSnb + sizeBuy
   PRINT "Expected resident total now = "; loadTotal
   PRINT "Expected free now           = "; procLimit - loadTotal
+  RUN showProcMem("Observed F$Mem(0) after snbBuy load")
   passed := passed + 1
 ELSE
   PRINT "FAIL: snbBuy load failed err "; errCode
+  RUN showProcMem("Observed F$Mem(0) after snbBuy load fail")
   failed := failed + 1
 ENDIF
 testNum := testNum + 1
@@ -189,9 +193,11 @@ IF ok THEN
   loadTotal := sizeSnb + sizeBuy + sizeDiv
   PRINT "Expected resident total now = "; loadTotal
   PRINT "Expected free now           = "; procLimit - loadTotal
+  RUN showProcMem("Observed F$Mem(0) after snbDividend load")
   passed := passed + 1
 ELSE
   PRINT "FAIL: snbDividend load failed err "; errCode
+  RUN showProcMem("Observed F$Mem(0) after snbDividend load fail")
   failed := failed + 1
 ENDIF
 testNum := testNum + 1
@@ -213,9 +219,11 @@ IF ok THEN
   PRINT "Expected resident total now = "; loadTotal
   PRINT "Expected total free now     = "; procLimit - loadTotal
   PRINT "Expected freed hole         = "; sizeBuy
+  RUN showProcMem("Observed F$Mem(0) after snbBuy unload")
   passed := passed + 1
 ELSE
   PRINT "FAIL: snbBuy unload failed err "; errCode
+  RUN showProcMem("Observed F$Mem(0) after snbBuy unload fail")
   failed := failed + 1
 ENDIF
 testNum := testNum + 1
@@ -248,6 +256,7 @@ IF ok THEN
   PRINT "FAIL: snbSellDraft loaded unexpectedly"
   PRINT "This means the observed layout did not match"
   PRINT "the expected fragmented-middle-hole scenario."
+  RUN showProcMem("Observed F$Mem(0) after snbSellDraft load")
   failed := failed + 1
   RUN unloadFragModule(modNam, ok, errCode)
 ELSE
@@ -256,6 +265,7 @@ ELSE
   PRINT "Expected math: 16343 total free, but no 9802-byte"
   PRINT "single block if only the 8771-byte middle hole is"
   PRINT "newly available."
+  RUN showProcMem("Observed F$Mem(0) after snbSellDraft load fail")
   passed := passed + 1
 ENDIF
 testNum := testNum + 1
@@ -479,4 +489,28 @@ PRINT
 END
 
 900 PRINT "waitKey error ("; ERR; ")"
+END
+
+PROCEDURE showProcMem
+(* ============================================================ *)
+(* PROCEDURE : showProcMem                                      *)
+(* PURPOSE   : Query F$Mem(0) and print the observed process    *)
+(*             memory size with a caller-supplied label.        *)
+(* ============================================================ *)
+PARAM labelTxt : STRING[48]
+DIM grantBytes : INTEGER
+DIM ok         : BOOLEAN
+DIM errCode    : INTEGER
+
+ON ERROR GOTO 900
+
+RUN requestProcMem(0, grantBytes, ok, errCode)
+IF ok THEN
+  PRINT labelTxt; " = "; grantBytes; " bytes"
+ELSE
+  PRINT labelTxt; " query failed err "; errCode
+ENDIF
+END
+
+900 PRINT "showProcMem error ("; ERR; ")"
 END
