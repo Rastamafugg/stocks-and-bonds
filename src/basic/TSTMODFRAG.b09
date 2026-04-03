@@ -1,0 +1,482 @@
+PROCEDURE TSTMODFRAG
+(* ============================================================ *)
+(* PROCEDURE : TSTMODFRAG                                       *)
+(* PURPOSE   : Exercise a fixed module-load order for a         *)
+(*             fragmentation study using these merged modules:  *)
+(*               snb         = 8256 bytes                       *)
+(*               snbBuy      = 8771 bytes                       *)
+(*               snbDividend = 8168 bytes                       *)
+(*               snbSellDraft= 9802 bytes                       *)
+(*             Exact sequence under test:                       *)
+(*               1. load snb                                    *)
+(*               2. load snbBuy                                 *)
+(*               3. load snbDividend                            *)
+(*               4. unload snbBuy                               *)
+(*               5. attempt load snbSellDraft                   *)
+(*             Expected arithmetic against a 32767-byte         *)
+(*             process-space budget:                            *)
+(*               3-load total        = 25195                    *)
+(*               free after 3 loads  = 7572                     *)
+(*               free after unload   = 16343 total              *)
+(*               middle hole size    = 8771                     *)
+(*               sellDraft needs     = 9802                     *)
+(*             Therefore total free after the unload is enough, *)
+(*             but the freed middle block is too small.         *)
+(* PRE       : SysCall machine-lang module resident.            *)
+(*             These four merged modules packed and attr e.     *)
+(* NOTE      : Use mfree and mdir -e outside this harness to    *)
+(*             inspect the actual free-block layout.            *)
+(* ============================================================ *)
+DIM modNam        : STRING[20]
+DIM grantBytes    : INTEGER
+DIM errCode       : INTEGER
+DIM procLimit     : INTEGER
+DIM sizeSnb       : INTEGER
+DIM sizeBuy       : INTEGER
+DIM sizeDiv       : INTEGER
+DIM sizeSell      : INTEGER
+DIM loadTotal     : INTEGER
+DIM freeBytes     : INTEGER
+DIM holeBytes     : INTEGER
+DIM fragmentGap   : INTEGER
+DIM passed        : INTEGER
+DIM failed        : INTEGER
+DIM testNum       : INTEGER
+DIM ok            : BOOLEAN
+DIM isRes         : BOOLEAN
+
+ON ERROR GOTO 900
+
+procLimit := 32767
+sizeSnb   := 8256
+sizeBuy   := 8771
+sizeDiv   := 8168
+sizeSell  := 9802
+passed    := 0
+failed    := 0
+testNum   := 0
+
+PRINT "=== TSTMODFRAG ==="
+PRINT
+PRINT "Target sequence:"
+PRINT "  load snb"
+PRINT "  load snbBuy"
+PRINT "  load snbDividend"
+PRINT "  unload snbBuy"
+PRINT "  load snbSellDraft"
+PRINT
+
+loadTotal := sizeSnb + sizeBuy + sizeDiv
+freeBytes := procLimit - loadTotal
+PRINT "Expected after 3 loads:"
+PRINT "  resident bytes = "; loadTotal
+PRINT "  free bytes     = "; freeBytes
+PRINT
+
+loadTotal := sizeSnb + sizeDiv
+freeBytes := procLimit - loadTotal
+holeBytes := sizeBuy
+fragmentGap := sizeSell - holeBytes
+PRINT "Expected after unloading snbBuy:"
+PRINT "  resident bytes = "; loadTotal
+PRINT "  total free     = "; freeBytes
+PRINT "  middle hole    = "; holeBytes
+PRINT "  sellDraft need = "; sizeSell
+PRINT "  over hole by   = "; fragmentGap
+PRINT
+
+testNum := testNum + 1
+PRINT "Test "; testNum; ": request process memory 32767 bytes"
+RUN requestProcMem(procLimit, grantBytes, ok, errCode)
+IF ok THEN
+  PRINT "PASS: F$Mem granted "; grantBytes; " bytes"
+  passed := passed + 1
+ELSE
+  PRINT "FAIL: F$Mem request failed err "; errCode
+  failed := failed + 1
+ENDIF
+PRINT
+RUN waitKey
+
+PRINT "-- Cleanup baseline --"
+modNam := "snbSellDraft"
+RUN unloadFragModule(modNam, ok, errCode)
+modNam := "snbDividend"
+RUN unloadFragModule(modNam, ok, errCode)
+modNam := "snbBuy"
+RUN unloadFragModule(modNam, ok, errCode)
+modNam := "snb"
+RUN unloadFragModule(modNam, ok, errCode)
+
+testNum := testNum + 1
+PRINT "Test "; testNum; ": snb not resident at start"
+modNam := "snb"
+ok := FALSE
+GOSUB 100
+
+testNum := testNum + 1
+PRINT "Test "; testNum; ": snbBuy not resident at start"
+modNam := "snbBuy"
+ok := FALSE
+GOSUB 100
+
+testNum := testNum + 1
+PRINT "Test "; testNum; ": snbDividend not resident at start"
+modNam := "snbDividend"
+ok := FALSE
+GOSUB 100
+
+testNum := testNum + 1
+PRINT "Test "; testNum; ": snbSellDraft not resident at start"
+modNam := "snbSellDraft"
+ok := FALSE
+GOSUB 100
+PRINT
+RUN waitKey
+
+PRINT "-- Block 1: Load snb --"
+testNum := testNum + 1
+PRINT "Test "; testNum; ": F$Load snb"
+modNam := "snb"
+RUN loadFragModule(modNam, ok, errCode)
+IF ok THEN
+  PRINT "PASS: snb loaded"
+  PRINT "Expected resident total now = "; sizeSnb
+  PRINT "Expected free now           = "; procLimit - sizeSnb
+  passed := passed + 1
+ELSE
+  PRINT "FAIL: snb load failed err "; errCode
+  failed := failed + 1
+ENDIF
+testNum := testNum + 1
+PRINT "Test "; testNum; ": snb resident after load"
+modNam := "snb"
+ok := TRUE
+GOSUB 100
+PRINT
+RUN waitKey
+
+PRINT "-- Block 2: Load snbBuy --"
+testNum := testNum + 1
+PRINT "Test "; testNum; ": F$Load snbBuy"
+modNam := "snbBuy"
+RUN loadFragModule(modNam, ok, errCode)
+IF ok THEN
+  PRINT "PASS: snbBuy loaded"
+  loadTotal := sizeSnb + sizeBuy
+  PRINT "Expected resident total now = "; loadTotal
+  PRINT "Expected free now           = "; procLimit - loadTotal
+  passed := passed + 1
+ELSE
+  PRINT "FAIL: snbBuy load failed err "; errCode
+  failed := failed + 1
+ENDIF
+testNum := testNum + 1
+PRINT "Test "; testNum; ": snbBuy resident after load"
+modNam := "snbBuy"
+ok := TRUE
+GOSUB 100
+PRINT
+RUN waitKey
+
+PRINT "-- Block 3: Load snbDividend --"
+testNum := testNum + 1
+PRINT "Test "; testNum; ": F$Load snbDividend"
+modNam := "snbDividend"
+RUN loadFragModule(modNam, ok, errCode)
+IF ok THEN
+  PRINT "PASS: snbDividend loaded"
+  loadTotal := sizeSnb + sizeBuy + sizeDiv
+  PRINT "Expected resident total now = "; loadTotal
+  PRINT "Expected free now           = "; procLimit - loadTotal
+  passed := passed + 1
+ELSE
+  PRINT "FAIL: snbDividend load failed err "; errCode
+  failed := failed + 1
+ENDIF
+testNum := testNum + 1
+PRINT "Test "; testNum; ": snbDividend resident after load"
+modNam := "snbDividend"
+ok := TRUE
+GOSUB 100
+PRINT
+RUN waitKey
+
+PRINT "-- Block 4: Unload snbBuy --"
+testNum := testNum + 1
+PRINT "Test "; testNum; ": F$UnLoad snbBuy"
+modNam := "snbBuy"
+RUN unloadFragModule(modNam, ok, errCode)
+IF ok THEN
+  PRINT "PASS: snbBuy unload succeeded"
+  loadTotal := sizeSnb + sizeDiv
+  PRINT "Expected resident total now = "; loadTotal
+  PRINT "Expected total free now     = "; procLimit - loadTotal
+  PRINT "Expected freed hole         = "; sizeBuy
+  passed := passed + 1
+ELSE
+  PRINT "FAIL: snbBuy unload failed err "; errCode
+  failed := failed + 1
+ENDIF
+testNum := testNum + 1
+PRINT "Test "; testNum; ": snbBuy not resident after unload"
+modNam := "snbBuy"
+ok := FALSE
+GOSUB 100
+testNum := testNum + 1
+PRINT "Test "; testNum; ": snb still resident after snbBuy unload"
+modNam := "snb"
+ok := TRUE
+GOSUB 100
+testNum := testNum + 1
+PRINT "Test "; testNum; ": snbDividend still resident after unload"
+modNam := "snbDividend"
+ok := TRUE
+GOSUB 100
+PRINT
+RUN waitKey
+
+PRINT "-- Block 5: Attempt load snbSellDraft --"
+testNum := testNum + 1
+PRINT "Test "; testNum; ": F$Load snbSellDraft should fail"
+PRINT "Expected total free after unload = 16343"
+PRINT "Expected largest freed middle block = 8771"
+PRINT "snbSellDraft requires = 9802"
+modNam := "snbSellDraft"
+RUN loadFragModule(modNam, ok, errCode)
+IF ok THEN
+  PRINT "FAIL: snbSellDraft loaded unexpectedly"
+  PRINT "This means the observed layout did not match"
+  PRINT "the expected fragmented-middle-hole scenario."
+  failed := failed + 1
+  RUN unloadFragModule(modNam, ok, errCode)
+ELSE
+  PRINT "PASS: snbSellDraft load failed as expected"
+  PRINT "Observed err code = "; errCode
+  PRINT "Expected math: 16343 total free, but no 9802-byte"
+  PRINT "single block if only the 8771-byte middle hole is"
+  PRINT "newly available."
+  passed := passed + 1
+ENDIF
+testNum := testNum + 1
+PRINT "Test "; testNum; ": snbSellDraft not resident after attempt"
+modNam := "snbSellDraft"
+ok := FALSE
+GOSUB 100
+PRINT
+RUN waitKey
+
+PRINT "-- Cleanup end state --"
+modNam := "snbDividend"
+RUN unloadFragModule(modNam, ok, errCode)
+modNam := "snbBuy"
+RUN unloadFragModule(modNam, ok, errCode)
+modNam := "snb"
+RUN unloadFragModule(modNam, ok, errCode)
+modNam := "snbSellDraft"
+RUN unloadFragModule(modNam, ok, errCode)
+
+PRINT
+PRINT "=== SUMMARY ==="
+PRINT "Passed: "; passed
+PRINT "Failed: "; failed
+END
+
+100 \ ! GOSUB: compare residency of modNam against ok.
+    RUN checkFragModule(modNam, isRes, errCode)
+    IF isRes = ok THEN
+      IF isRes THEN
+        PRINT "PASS: "; modNam; " resident (expected)"
+      ELSE
+        PRINT "PASS: "; modNam; " not resident (expected)"
+      ENDIF
+      passed := passed + 1
+    ELSE
+      IF isRes THEN
+        PRINT "FAIL: "; modNam; " resident (unexpected)"
+      ELSE
+        PRINT "FAIL: "; modNam; " not resident (unexpected)"
+      ENDIF
+      failed := failed + 1
+    ENDIF
+    RETURN
+
+900 PRINT "TSTMODFRAG error ("; ERR; ")"
+PRINT "Passed: "; passed; "  Failed: "; failed
+END
+
+PROCEDURE requestProcMem
+(* ============================================================ *)
+(* PROCEDURE : requestProcMem                                   *)
+(* PURPOSE   : Request a process memory size via F$Mem and      *)
+(*             return the granted size.                         *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM reqBytes   : INTEGER
+PARAM grantBytes : INTEGER
+PARAM ok         : BOOLEAN
+PARAM errCode    : INTEGER
+DIM regs         : Register
+DIM callCode     : BYTE
+DIM iCC          : INTEGER
+DIM hiVal        : INTEGER
+DIM loVal        : INTEGER
+
+ON ERROR GOTO 900
+
+ok         := FALSE
+errCode    := 0
+grantBytes := 0
+callCode   := $07
+hiVal      := reqBytes / 256
+loVal      := LAND(reqBytes, 255)
+regs.a     := hiVal
+regs.b     := loVal
+
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) = 0 THEN
+  hiVal      := regs.a
+  loVal      := regs.b
+  grantBytes := hiVal * 256 + loVal
+  ok         := TRUE
+ELSE
+  errCode := regs.b
+ENDIF
+END
+
+900 PRINT "requestProcMem error ("; ERR; ")"
+END
+
+PROCEDURE loadFragModule
+(* ============================================================ *)
+(* PROCEDURE : loadFragModule                                   *)
+(* PURPOSE   : Issue F$Load for the named merged module.        *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM modName : STRING[20]
+PARAM ok      : BOOLEAN
+PARAM errCode : INTEGER
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM nameAddr  : INTEGER
+DIM iCC       : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errCode  := 0
+callCode := $01
+nameAddr := ADDR(modName)
+regs.a   := 0
+regs.x   := nameAddr
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) = 0 THEN
+  ok := TRUE
+ELSE
+  errCode := regs.b
+ENDIF
+END
+
+900 PRINT "loadFragModule error ("; ERR; ")"
+END
+
+PROCEDURE unloadFragModule
+(* ============================================================ *)
+(* PROCEDURE : unloadFragModule                                 *)
+(* PURPOSE   : Issue F$UnLoad for the named merged module.      *)
+(*             A missing module is treated as a cleanup success *)
+(*             so the harness can normalize its own baseline.   *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM modName : STRING[20]
+PARAM ok      : BOOLEAN
+PARAM errCode : INTEGER
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM nameAddr  : INTEGER
+DIM iCC       : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errCode  := 0
+callCode := $1D
+nameAddr := ADDR(modName)
+regs.a   := 0
+regs.x   := nameAddr
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) = 0 THEN
+  ok := TRUE
+ELSE
+  errCode := regs.b
+  RUN checkFragModule(modName, ok, errCode)
+  IF NOT ok THEN
+    ok := TRUE
+    errCode := 0
+  ELSE
+    ok := FALSE
+  ENDIF
+ENDIF
+END
+
+900 PRINT "unloadFragModule error ("; ERR; ")"
+END
+
+PROCEDURE checkFragModule
+(* ============================================================ *)
+(* PROCEDURE : checkFragModule                                  *)
+(* PURPOSE   : Test module residency with F$Link. If the link   *)
+(*             succeeds, immediately F$UnLink to undo the probe *)
+(*             link-count increment.                            *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM modName : STRING[20]
+PARAM isRes   : BOOLEAN
+PARAM errCode : INTEGER
+DIM regs      : Register
+DIM linkCode  : BYTE
+DIM unlkCode  : BYTE
+DIM nameAddr  : INTEGER
+DIM iCC       : INTEGER
+
+ON ERROR GOTO 900
+
+isRes    := FALSE
+errCode  := 0
+nameAddr := ADDR(modName)
+linkCode := $00
+regs.a   := 0
+regs.x   := nameAddr
+RUN SysCall(linkCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) = 0 THEN
+  isRes    := TRUE
+  unlkCode := $02
+  RUN SysCall(unlkCode, regs)
+ELSE
+  errCode := regs.b
+ENDIF
+END
+
+900 PRINT "checkFragModule error ("; ERR; ")"
+END
+
+PROCEDURE waitKey
+(* ============================================================ *)
+(* PROCEDURE : waitKey                                          *)
+(* PURPOSE   : Pause between output blocks.                     *)
+(* ============================================================ *)
+DIM keyIn : STRING[1]
+
+ON ERROR GOTO 900
+
+PRINT "Press any key to continue...";
+GET #0, keyIn
+PRINT
+END
+
+900 PRINT "waitKey error ("; ERR; ")"
+END
