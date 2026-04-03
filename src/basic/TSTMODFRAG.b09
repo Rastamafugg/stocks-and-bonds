@@ -1,112 +1,100 @@
 PROCEDURE TSTMODFRAG
 (* ============================================================ *)
 (* PROCEDURE : TSTMODFRAG                                       *)
-(* PURPOSE   : Exercise a fixed module-load order for a         *)
-(*             fragmentation study using these merged modules:  *)
-(*               snb         = 8256 bytes                       *)
-(*               snbBuy      = 8771 bytes                       *)
-(*               snbDividend = 8168 bytes                       *)
-(*               snbSellDraft= 9802 bytes                       *)
-(*             Exact sequence under test:                       *)
-(*               1. load snb                                    *)
-(*               2. load snbBuy                                 *)
-(*               3. load snbDividend                            *)
-(*               4. unload snbBuy                               *)
-(*               5. attempt load snbSellDraft                   *)
-(*             Expected arithmetic against a 32767-byte         *)
-(*             process-space budget:                            *)
-(*               3-load total        = 25195                    *)
-(*               free after 3 loads  = 7572                     *)
-(*               free after unload   = 16343 total              *)
-(*               middle hole size    = 8771                     *)
-(*               sellDraft needs     = 9802                     *)
-(*             Therefore total free after the unload is enough, *)
-(*             but the freed middle block is too small.         *)
+(* PURPOSE   : Probe module placement and removal under the     *)
+(*             current live memory layout using observed-good   *)
+(*             setup loads first.                               *)
+(*                                                             *)
+(*             Revised sequence:                                *)
+(*               1. load snbDividend (8168)                     *)
+(*               2. load snb (8256)                             *)
+(*               3. unlink snbDividend                          *)
+(*               4. attempt load snbBuy (8771)                  *)
+(*               5. attempt load snbSellDraft (9802)            *)
+(*                                                             *)
+(*             Size comparisons used by this probe:             *)
+(*               freed by unlink snbDividend = 8168             *)
+(*               snbBuy needs                = 8771             *)
+(*               snbSellDraft needs          = 9802             *)
+(*               snbBuy exceeds freed block  = 603              *)
+(*               snbSellDraft exceeds it by  = 1634             *)
+(*                                                             *)
+(*             Therefore, if only the unlinked snbDividend      *)
+(*             block is available, both later loads should fail.*)
+(*             If either load succeeds, the live module map is  *)
+(*             providing a larger contiguous block than this     *)
+(*             simple model predicts.                           *)
 (* PRE       : SysCall machine-lang module resident.            *)
 (*             These four merged modules packed and attr e.     *)
-(* NOTE      : Use mfree and mdir -e outside this harness to    *)
-(*             inspect the actual free-block layout.            *)
+(* NOTE      : F$Mem(0) removed. It reported constant process   *)
+(*             data memory and was not useful for this test.    *)
+(*             Use mfree and mdir -e outside this harness for   *)
+(*             free-block inspection.                           *)
 (* ============================================================ *)
-DIM modNam        : STRING[20]
-DIM grantBytes    : INTEGER
-DIM errCode       : INTEGER
-DIM procLimit     : INTEGER
-DIM sizeSnb       : INTEGER
-DIM sizeBuy       : INTEGER
-DIM sizeDiv       : INTEGER
-DIM sizeSell      : INTEGER
-DIM loadTotal     : INTEGER
-DIM freeBytes     : INTEGER
-DIM holeBytes     : INTEGER
-DIM fragmentGap   : INTEGER
-DIM passed        : INTEGER
-DIM failed        : INTEGER
-DIM testNum       : INTEGER
-DIM ok            : BOOLEAN
-DIM isRes         : BOOLEAN
+DIM modNam       : STRING[20]
+DIM errCode      : INTEGER
+DIM sizeDiv      : INTEGER
+DIM sizeSnb      : INTEGER
+DIM sizeBuy      : INTEGER
+DIM sizeSell     : INTEGER
+DIM gapBuy       : INTEGER
+DIM gapSell      : INTEGER
+DIM passed       : INTEGER
+DIM failed       : INTEGER
+DIM testNum      : INTEGER
+DIM ok           : BOOLEAN
+DIM isRes        : BOOLEAN
+DIM hdrDividend  : INTEGER
+DIM hdrSnb       : INTEGER
+DIM hdrBuy       : INTEGER
+DIM hdrSell      : INTEGER
 
 ON ERROR GOTO 900
 
-procLimit := 32767
-sizeSnb   := 8256
-sizeBuy   := 8771
-sizeDiv   := 8168
-sizeSell  := 9802
-passed    := 0
-failed    := 0
-testNum   := 0
+sizeDiv     := 8168
+sizeSnb     := 8256
+sizeBuy     := 8771
+sizeSell    := 9802
+gapBuy      := sizeBuy - sizeDiv
+gapSell     := sizeSell - sizeDiv
+passed      := 0
+failed      := 0
+testNum     := 0
+hdrDividend := 0
+hdrSnb      := 0
+hdrBuy      := 0
+hdrSell     := 0
 
 PRINT "=== TSTMODFRAG ==="
 PRINT
-PRINT "Target sequence:"
-PRINT "  load snb"
-PRINT "  load snbBuy"
+PRINT "Revised sequence:"
 PRINT "  load snbDividend"
-PRINT "  unload snbBuy"
+PRINT "  load snb"
+PRINT "  unlink snbDividend"
+PRINT "  load snbBuy"
 PRINT "  load snbSellDraft"
 PRINT
-
-loadTotal := sizeSnb + sizeBuy + sizeDiv
-freeBytes := procLimit - loadTotal
-PRINT "Expected after 3 loads:"
-PRINT "  resident bytes = "; loadTotal
-PRINT "  free bytes     = "; freeBytes
-PRINT
-
-loadTotal := sizeSnb + sizeDiv
-freeBytes := procLimit - loadTotal
-holeBytes := sizeBuy
-fragmentGap := sizeSell - holeBytes
-PRINT "Expected after unloading snbBuy:"
-PRINT "  resident bytes = "; loadTotal
-PRINT "  total free     = "; freeBytes
-PRINT "  middle hole    = "; holeBytes
-PRINT "  sellDraft need = "; sizeSell
-PRINT "  over hole by   = "; fragmentGap
-PRINT
-
-testNum := testNum + 1
-PRINT "Test "; testNum; ": query current process memory with F$Mem(0)"
-RUN requestProcMem(0, grantBytes, ok, errCode)
-IF ok THEN
-  PRINT "PASS: F$Mem query returned "; grantBytes; " bytes"
-  passed := passed + 1
-ELSE
-  PRINT "FAIL: F$Mem query failed err "; errCode
-  failed := failed + 1
-ENDIF
+PRINT "Predicted hole after unlink snbDividend = "; sizeDiv
+PRINT "snbBuy exceeds that hole by             = "; gapBuy
+PRINT "snbSellDraft exceeds it by              = "; gapSell
 PRINT
 RUN waitKey
 
 PRINT "-- Cleanup baseline --"
 modNam := "snbSellDraft"
-RUN unloadFragModule(modNam, ok, errCode)
-modNam := "snbDividend"
-RUN unloadFragModule(modNam, ok, errCode)
+RUN dropFragModule(modNam, ok, errCode)
 modNam := "snbBuy"
-RUN unloadFragModule(modNam, ok, errCode)
+RUN dropFragModule(modNam, ok, errCode)
 modNam := "snb"
-RUN unloadFragModule(modNam, ok, errCode)
+RUN dropFragModule(modNam, ok, errCode)
+modNam := "snbDividend"
+RUN dropFragModule(modNam, ok, errCode)
+
+testNum := testNum + 1
+PRINT "Test "; testNum; ": snbDividend not resident at start"
+modNam := "snbDividend"
+ok := FALSE
+GOSUB 100
 
 testNum := testNum + 1
 PRINT "Test "; testNum; ": snb not resident at start"
@@ -121,12 +109,6 @@ ok := FALSE
 GOSUB 100
 
 testNum := testNum + 1
-PRINT "Test "; testNum; ": snbDividend not resident at start"
-modNam := "snbDividend"
-ok := FALSE
-GOSUB 100
-
-testNum := testNum + 1
 PRINT "Test "; testNum; ": snbSellDraft not resident at start"
 modNam := "snbSellDraft"
 ok := FALSE
@@ -134,72 +116,20 @@ GOSUB 100
 PRINT
 RUN waitKey
 
-PRINT "-- Block 1: Load snb --"
-testNum := testNum + 1
-PRINT "Test "; testNum; ": F$Load snb"
-modNam := "snb"
-RUN loadFragModule(modNam, ok, errCode)
-IF ok THEN
-  PRINT "PASS: snb loaded"
-  PRINT "Expected resident total now = "; sizeSnb
-  PRINT "Expected free now           = "; procLimit - sizeSnb
-  RUN showProcMem("Observed F$Mem(0) after snb load")
-  passed := passed + 1
-ELSE
-  PRINT "FAIL: snb load failed err "; errCode
-  RUN showProcMem("Observed F$Mem(0) after snb load fail")
-  failed := failed + 1
-ENDIF
-testNum := testNum + 1
-PRINT "Test "; testNum; ": snb resident after load"
-modNam := "snb"
-ok := TRUE
-GOSUB 100
-PRINT
-RUN waitKey
-
-PRINT "-- Block 2: Load snbBuy --"
-testNum := testNum + 1
-PRINT "Test "; testNum; ": F$Load snbBuy"
-modNam := "snbBuy"
-RUN loadFragModule(modNam, ok, errCode)
-IF ok THEN
-  PRINT "PASS: snbBuy loaded"
-  loadTotal := sizeSnb + sizeBuy
-  PRINT "Expected resident total now = "; loadTotal
-  PRINT "Expected free now           = "; procLimit - loadTotal
-  RUN showProcMem("Observed F$Mem(0) after snbBuy load")
-  passed := passed + 1
-ELSE
-  PRINT "FAIL: snbBuy load failed err "; errCode
-  RUN showProcMem("Observed F$Mem(0) after snbBuy load fail")
-  failed := failed + 1
-ENDIF
-testNum := testNum + 1
-PRINT "Test "; testNum; ": snbBuy resident after load"
-modNam := "snbBuy"
-ok := TRUE
-GOSUB 100
-PRINT
-RUN waitKey
-
-PRINT "-- Block 3: Load snbDividend --"
+PRINT "-- Block 1: Load snbDividend --"
 testNum := testNum + 1
 PRINT "Test "; testNum; ": F$Load snbDividend"
 modNam := "snbDividend"
-RUN loadFragModule(modNam, ok, errCode)
+RUN loadFragModule(modNam, hdrDividend, ok, errCode)
 IF ok THEN
   PRINT "PASS: snbDividend loaded"
-  loadTotal := sizeSnb + sizeBuy + sizeDiv
-  PRINT "Expected resident total now = "; loadTotal
-  PRINT "Expected free now           = "; procLimit - loadTotal
-  RUN showProcMem("Observed F$Mem(0) after snbDividend load")
+  PRINT "Observed hdrAddr = "; hdrDividend
   passed := passed + 1
 ELSE
   PRINT "FAIL: snbDividend load failed err "; errCode
-  RUN showProcMem("Observed F$Mem(0) after snbDividend load fail")
   failed := failed + 1
 ENDIF
+
 testNum := testNum + 1
 PRINT "Test "; testNum; ": snbDividend resident after load"
 modNam := "snbDividend"
@@ -208,83 +138,133 @@ GOSUB 100
 PRINT
 RUN waitKey
 
-PRINT "-- Block 4: Unload snbBuy --"
+PRINT "-- Block 2: Load snb --"
 testNum := testNum + 1
-PRINT "Test "; testNum; ": F$UnLoad snbBuy"
-modNam := "snbBuy"
-RUN unloadFragModule(modNam, ok, errCode)
+PRINT "Test "; testNum; ": F$Load snb"
+modNam := "snb"
+RUN loadFragModule(modNam, hdrSnb, ok, errCode)
 IF ok THEN
-  PRINT "PASS: snbBuy unload succeeded"
-  loadTotal := sizeSnb + sizeDiv
-  PRINT "Expected resident total now = "; loadTotal
-  PRINT "Expected total free now     = "; procLimit - loadTotal
-  PRINT "Expected freed hole         = "; sizeBuy
-  RUN showProcMem("Observed F$Mem(0) after snbBuy unload")
+  PRINT "PASS: snb loaded"
+  PRINT "Observed hdrAddr = "; hdrSnb
   passed := passed + 1
 ELSE
-  PRINT "FAIL: snbBuy unload failed err "; errCode
-  RUN showProcMem("Observed F$Mem(0) after snbBuy unload fail")
+  PRINT "FAIL: snb load failed err "; errCode
   failed := failed + 1
 ENDIF
+
 testNum := testNum + 1
-PRINT "Test "; testNum; ": snbBuy not resident after unload"
-modNam := "snbBuy"
-ok := FALSE
-GOSUB 100
-testNum := testNum + 1
-PRINT "Test "; testNum; ": snb still resident after snbBuy unload"
+PRINT "Test "; testNum; ": snb resident after load"
 modNam := "snb"
 ok := TRUE
 GOSUB 100
+PRINT
+RUN waitKey
+
+PRINT "-- Block 3: Unlink snbDividend --"
 testNum := testNum + 1
-PRINT "Test "; testNum; ": snbDividend still resident after unload"
+PRINT "Test "; testNum; ": F$UnLink snbDividend by hdrAddr"
+RUN unlinkFragModule(hdrDividend, ok, errCode)
+IF ok THEN
+  PRINT "PASS: snbDividend unlinked"
+  hdrDividend := 0
+  passed := passed + 1
+ELSE
+  PRINT "FAIL: snbDividend unlink failed err "; errCode
+  failed := failed + 1
+ENDIF
+
+testNum := testNum + 1
+PRINT "Test "; testNum; ": snbDividend not resident after unlink"
 modNam := "snbDividend"
+ok := FALSE
+GOSUB 100
+
+testNum := testNum + 1
+PRINT "Test "; testNum; ": snb still resident after snbDividend unlink"
+modNam := "snb"
 ok := TRUE
+GOSUB 100
+PRINT
+RUN waitKey
+
+PRINT "-- Block 4: Attempt load snbBuy --"
+testNum := testNum + 1
+PRINT "Test "; testNum; ": F$Load snbBuy after freeing 8168-byte block"
+PRINT "Predicted outcome: fail if only that block was freed"
+modNam := "snbBuy"
+RUN loadFragModule(modNam, hdrBuy, ok, errCode)
+IF ok THEN
+  PRINT "FAIL: snbBuy loaded unexpectedly"
+  PRINT "Observed hdrAddr = "; hdrBuy
+  PRINT "Inference: live map provided a larger contiguous"
+  PRINT "block than the 8168-byte freed module alone."
+  failed := failed + 1
+ELSE
+  PRINT "PASS: snbBuy load failed as predicted"
+  PRINT "Observed err code = "; errCode
+  passed := passed + 1
+ENDIF
+
+testNum := testNum + 1
+PRINT "Test "; testNum; ": snbBuy residency after attempt"
+modNam := "snbBuy"
+IF hdrBuy <> 0 THEN
+  ok := TRUE
+ELSE
+  ok := FALSE
+ENDIF
 GOSUB 100
 PRINT
 RUN waitKey
 
 PRINT "-- Block 5: Attempt load snbSellDraft --"
 testNum := testNum + 1
-PRINT "Test "; testNum; ": F$Load snbSellDraft should fail"
-PRINT "Expected total free after unload = 16343"
-PRINT "Expected largest freed middle block = 8771"
-PRINT "snbSellDraft requires = 9802"
+PRINT "Test "; testNum; ": F$Load snbSellDraft after same unlink"
+PRINT "Predicted outcome: fail if only that block was freed"
 modNam := "snbSellDraft"
-RUN loadFragModule(modNam, ok, errCode)
+RUN loadFragModule(modNam, hdrSell, ok, errCode)
 IF ok THEN
   PRINT "FAIL: snbSellDraft loaded unexpectedly"
-  PRINT "This means the observed layout did not match"
-  PRINT "the expected fragmented-middle-hole scenario."
-  RUN showProcMem("Observed F$Mem(0) after snbSellDraft load")
+  PRINT "Observed hdrAddr = "; hdrSell
+  PRINT "Inference: live map provided a larger contiguous"
+  PRINT "block than the simple freed-block model predicts."
   failed := failed + 1
-  RUN unloadFragModule(modNam, ok, errCode)
 ELSE
-  PRINT "PASS: snbSellDraft load failed as expected"
+  PRINT "PASS: snbSellDraft load failed as predicted"
   PRINT "Observed err code = "; errCode
-  PRINT "Expected math: 16343 total free, but no 9802-byte"
-  PRINT "single block if only the 8771-byte middle hole is"
-  PRINT "newly available."
-  RUN showProcMem("Observed F$Mem(0) after snbSellDraft load fail")
   passed := passed + 1
 ENDIF
+
 testNum := testNum + 1
-PRINT "Test "; testNum; ": snbSellDraft not resident after attempt"
+PRINT "Test "; testNum; ": snbSellDraft residency after attempt"
 modNam := "snbSellDraft"
-ok := FALSE
+IF hdrSell <> 0 THEN
+  ok := TRUE
+ELSE
+  ok := FALSE
+ENDIF
 GOSUB 100
 PRINT
 RUN waitKey
 
 PRINT "-- Cleanup end state --"
-modNam := "snbDividend"
-RUN unloadFragModule(modNam, ok, errCode)
-modNam := "snbBuy"
-RUN unloadFragModule(modNam, ok, errCode)
-modNam := "snb"
-RUN unloadFragModule(modNam, ok, errCode)
+IF hdrSell <> 0 THEN
+  RUN unlinkFragModule(hdrSell, ok, errCode)
+ENDIF
+IF hdrBuy <> 0 THEN
+  RUN unlinkFragModule(hdrBuy, ok, errCode)
+ENDIF
+IF hdrSnb <> 0 THEN
+  RUN unlinkFragModule(hdrSnb, ok, errCode)
+ENDIF
 modNam := "snbSellDraft"
-RUN unloadFragModule(modNam, ok, errCode)
+RUN dropFragModule(modNam, ok, errCode)
+modNam := "snbBuy"
+RUN dropFragModule(modNam, ok, errCode)
+modNam := "snb"
+RUN dropFragModule(modNam, ok, errCode)
+modNam := "snbDividend"
+RUN dropFragModule(modNam, ok, errCode)
 
 PRINT
 PRINT "=== SUMMARY ==="
@@ -315,56 +295,15 @@ END
 PRINT "Passed: "; passed; "  Failed: "; failed
 END
 
-PROCEDURE requestProcMem
-(* ============================================================ *)
-(* PROCEDURE : requestProcMem                                   *)
-(* PURPOSE   : Request a process memory size via F$Mem and      *)
-(*             return the granted size.                         *)
-(* ============================================================ *)
-TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
-PARAM reqBytes   : INTEGER
-PARAM grantBytes : INTEGER
-PARAM ok         : BOOLEAN
-PARAM errCode    : INTEGER
-DIM regs         : Register
-DIM callCode     : BYTE
-DIM iCC          : INTEGER
-DIM hiVal        : INTEGER
-DIM loVal        : INTEGER
-
-ON ERROR GOTO 900
-
-ok         := FALSE
-errCode    := 0
-grantBytes := 0
-callCode   := $07
-hiVal      := reqBytes / 256
-loVal      := LAND(reqBytes, 255)
-regs.a     := hiVal
-regs.b     := loVal
-
-RUN SysCall(callCode, regs)
-iCC := regs.cc
-IF LAND(iCC, 1) = 0 THEN
-  hiVal      := regs.a
-  loVal      := regs.b
-  grantBytes := hiVal * 256 + loVal
-  ok         := TRUE
-ELSE
-  errCode := regs.b
-ENDIF
-END
-
-900 PRINT "requestProcMem error ("; ERR; ")"
-END
-
 PROCEDURE loadFragModule
 (* ============================================================ *)
 (* PROCEDURE : loadFragModule                                   *)
-(* PURPOSE   : Issue F$Load for the named merged module.        *)
+(* PURPOSE   : Issue F$Load for the named merged module and     *)
+(*             return the header address from regs.u.           *)
 (* ============================================================ *)
 TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
 PARAM modName : STRING[20]
+PARAM hdrAddr : INTEGER
 PARAM ok      : BOOLEAN
 PARAM errCode : INTEGER
 DIM regs      : Register
@@ -376,6 +315,7 @@ ON ERROR GOTO 900
 
 ok       := FALSE
 errCode  := 0
+hdrAddr  := 0
 callCode := $01
 nameAddr := ADDR(modName)
 regs.a   := 0
@@ -383,6 +323,7 @@ regs.x   := nameAddr
 RUN SysCall(callCode, regs)
 iCC := regs.cc
 IF LAND(iCC, 1) = 0 THEN
+  hdrAddr := regs.u
   ok := TRUE
 ELSE
   errCode := regs.b
@@ -392,15 +333,77 @@ END
 900 PRINT "loadFragModule error ("; ERR; ")"
 END
 
-PROCEDURE unloadFragModule
+PROCEDURE unlinkFragModule
 (* ============================================================ *)
-(* PROCEDURE : unloadFragModule                                 *)
-(* PURPOSE   : Issue F$UnLoad for the named merged module.      *)
-(*             A missing module is treated as a cleanup success *)
-(*             so the harness can normalize its own baseline.   *)
+(* PROCEDURE : unlinkFragModule                                 *)
+(* PURPOSE   : Issue F$UnLink by module header address.         *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM hdrAddr : INTEGER
+PARAM ok      : BOOLEAN
+PARAM errCode : INTEGER
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+
+ON ERROR GOTO 900
+
+ok      := FALSE
+errCode := 0
+IF hdrAddr = 0 THEN
+  END
+ENDIF
+callCode := $02
+regs.u   := hdrAddr
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) = 0 THEN
+  ok := TRUE
+ELSE
+  errCode := regs.b
+ENDIF
+END
+
+900 PRINT "unlinkFragModule error ("; ERR; ")"
+END
+
+PROCEDURE dropFragModule
+(* ============================================================ *)
+(* PROCEDURE : dropFragModule                                   *)
+(* PURPOSE   : Best-effort cleanup by linking a module by name  *)
+(*             and immediately unlinking it by the returned     *)
+(*             header address. A missing module counts as a     *)
+(*             successful cleanup state.                        *)
+(* ============================================================ *)
+PARAM modName : STRING[20]
+PARAM ok      : BOOLEAN
+PARAM errCode : INTEGER
+DIM hdrAddr  : INTEGER
+
+ON ERROR GOTO 900
+
+RUN findFragHdr(modName, hdrAddr, ok, errCode)
+IF NOT ok THEN
+  ok := TRUE
+  errCode := 0
+  END
+ENDIF
+RUN unlinkFragModule(hdrAddr, ok, errCode)
+END
+
+900 PRINT "dropFragModule error ("; ERR; ")"
+END
+
+PROCEDURE findFragHdr
+(* ============================================================ *)
+(* PROCEDURE : findFragHdr                                      *)
+(* PURPOSE   : Link a module by name and return the header      *)
+(*             address. The caller must later F$UnLink using    *)
+(*             that header address.                             *)
 (* ============================================================ *)
 TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
 PARAM modName : STRING[20]
+PARAM hdrAddr : INTEGER
 PARAM ok      : BOOLEAN
 PARAM errCode : INTEGER
 DIM regs      : Register
@@ -412,27 +415,22 @@ ON ERROR GOTO 900
 
 ok       := FALSE
 errCode  := 0
-callCode := $1D
+hdrAddr  := 0
+callCode := $00
 nameAddr := ADDR(modName)
 regs.a   := 0
 regs.x   := nameAddr
 RUN SysCall(callCode, regs)
 iCC := regs.cc
 IF LAND(iCC, 1) = 0 THEN
+  hdrAddr := regs.u
   ok := TRUE
 ELSE
   errCode := regs.b
-  RUN checkFragModule(modName, ok, errCode)
-  IF NOT ok THEN
-    ok := TRUE
-    errCode := 0
-  ELSE
-    ok := FALSE
-  ENDIF
 ENDIF
 END
 
-900 PRINT "unloadFragModule error ("; ERR; ")"
+900 PRINT "findFragHdr error ("; ERR; ")"
 END
 
 PROCEDURE checkFragModule
@@ -442,32 +440,17 @@ PROCEDURE checkFragModule
 (*             succeeds, immediately F$UnLink to undo the probe *)
 (*             link-count increment.                            *)
 (* ============================================================ *)
-TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
 PARAM modName : STRING[20]
 PARAM isRes   : BOOLEAN
 PARAM errCode : INTEGER
-DIM regs      : Register
-DIM linkCode  : BYTE
-DIM unlkCode  : BYTE
-DIM nameAddr  : INTEGER
-DIM iCC       : INTEGER
+DIM hdrAddr : INTEGER
 
 ON ERROR GOTO 900
 
-isRes    := FALSE
-errCode  := 0
-nameAddr := ADDR(modName)
-linkCode := $00
-regs.a   := 0
-regs.x   := nameAddr
-RUN SysCall(linkCode, regs)
-iCC := regs.cc
-IF LAND(iCC, 1) = 0 THEN
-  isRes    := TRUE
-  unlkCode := $02
-  RUN SysCall(unlkCode, regs)
-ELSE
-  errCode := regs.b
+RUN findFragHdr(modName, hdrAddr, isRes, errCode)
+IF isRes THEN
+  RUN unlinkFragModule(hdrAddr, isRes, errCode)
+  isRes := TRUE
 ENDIF
 END
 
@@ -489,28 +472,4 @@ PRINT
 END
 
 900 PRINT "waitKey error ("; ERR; ")"
-END
-
-PROCEDURE showProcMem
-(* ============================================================ *)
-(* PROCEDURE : showProcMem                                      *)
-(* PURPOSE   : Query F$Mem(0) and print the observed process    *)
-(*             memory size with a caller-supplied label.        *)
-(* ============================================================ *)
-PARAM labelTxt : STRING[48]
-DIM grantBytes : INTEGER
-DIM ok         : BOOLEAN
-DIM errCode    : INTEGER
-
-ON ERROR GOTO 900
-
-RUN requestProcMem(0, grantBytes, ok, errCode)
-IF ok THEN
-  PRINT labelTxt; " = "; grantBytes; " bytes"
-ELSE
-  PRINT labelTxt; " query failed err "; errCode
-ENDIF
-END
-
-900 PRINT "showProcMem error ("; ERR; ")"
 END
