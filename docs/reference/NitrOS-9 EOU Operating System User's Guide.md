@@ -1627,13 +1627,11 @@ Each command description includes a syntax definition which describes how the co
 
 ### 7.2. Commands
 
-#### ATTR
+### ATTR
 
 **Name**
 
-```text
-ATTR — Change file security attributes
-```
+**ATTR** - Change file security attributes
 
 **Synopsis**
 
@@ -1680,7 +1678,7 @@ attr datalog
 **Name**
 
 ```text
-BACKUP — Make a backup copy of a disk
+BACKUP - Make a backup copy of a disk
 ```
 
 **Synopsis**
@@ -1692,13 +1690,15 @@ backup [ e ] [ s ] [ -v ] [devname [devname]]
 **Description**
 
 This command is used to physically copy all data from one device to another. A physical copy is performed sector by sector without regard to file structures. In almost all cases the devices specified mun.t have the exact same format (size, density, etc.) and must not have defective sectors. If both device name are omitted the names "/d0" and "/d1" are assumed. If the second device name is omitted, a single unit backup will be performed on the drive specified.
-- The options are:
 
-- E = Exit if any read error occurs.
-- S = Print single drive prompt message.
-- -V = Do not verify.
+The options are:
 
-#nK = more memory makes backup run faster
+| | |
+|-|-|
+| E | = Exit if any read error occurs. |
+| S | = Print single drive prompt message. |
+| -V | = Do not verify. |
+| #nK | = more memory makes backup run faster |
 
 **Examples**
 
@@ -1710,24 +1710,36 @@ backup /D2 /D3
 backup -V
 ```
 
+```text
 OS9: backup
 
-Ready to BACKUP from /D0 to /D1 ?: Y MYDISK is being scratched OK ?: Y Number of sectors copied: $04D0
-```text
+Ready to BACKUP from /D0 to /D1 ?: Y
+MYDISK is being scratched 
+OK ?: Y 
+Number of sectors copied: $04D0
 Verify pass
 Number of sectors verified: $04D0 OS9:
 ```
 
-Below is an example of a single drive backup. backup will read a portion of the source disk into memory, you remove the source disk and place the destination disk into the drive, backup writes on the destination disk, you remove the destination disk and place the source disk into the drive. This continues until the entire disk has been copied. Giving backup as much memory as possible will cause fewer disk exchanges to be required. For more information see: Section 1.2.2
+Below is an example of a single drive backup. backup will read a portion of the source disk into memory, you remove the source disk and place the destination disk into the drive, backup writes on the destination disk, you remove the destination disk and place the source disk into the drive. This continues until the entire disk has been copied. Giving backup as much memory as possible will cause fewer disk exchanges to be required.
 
+For more information see: Section 1.2.2
+
+```text
 OS9:backup /D0 #10k
 
-Ready to BACKUP from /D0 to /D0 ?: Y Ready DESTINATION, hit a key: MYDISK is being scratched OK ?: Y Ready SOURCE, hit a key: Ready DESTINATION, hit a key: Ready SOURCE, hit a key: Ready DESTINATION, hit a key:
+Ready to BACKUP from /D0 to /D0 ?: Y
+Ready DESTINATION, hit a key:
+MYDISK is being scratched OK ?: Y
+Ready SOURCE, hit a key:
+Ready DESTINATION, hit a key:
+Ready SOURCE, hit a key:
+Ready DESTINATION, hit a key:
 
 (several repetitions)
 
-Ready DESTINATION, hit a key: Number of sectors copied: $4D0
-```text
+Ready DESTINATION, hit a key:
+Number of sectors copied: $4D0
 Verify pass
 Number of sectors verified: $4D0
 ```
@@ -1736,9 +1748,7 @@ Number of sectors verified: $4D0
 
 **Name**
 
-```text
-BINEX — Convert Binary To S-Record File
-```
+**BINEX** - Convert Binary To S-Record File
 
 **Synopsis**
 
@@ -1749,14 +1759,13 @@ binex path1 path2
 **Description**
 
 S-Record files are a type of text file that contains records that represent binary data in hexadecimal character form. This Motorola-standard format is often directly accepted by commercial PROM programmers, emulators, logic analyzers and similar devices that are interfaced RS-232 interfaces. It can also be useful for transmitting files over data links that can only handle character-type data; or to convert NitrOS-9 assembler or compiler-generated programs to load on non-NitrOS-9 systems.
-```text
-Binex converts "path1", a NitrOS-9 binary format file, to a new file named "path2"
-in S-Record format. If invoked on a non-binary load module file, a warning message is printed and the user is asked if binex should proceed anyway. A "Y" response means yes; any other answer will terminate the program. S-Records have a header record to store the program name for informational purposes and each data record has an absolute memory address which is not meaningful to NitrOS-9 since it uses position-independent-code. However, the S-Record format requires them so binex will prompt the user for a program name and starting load address. For example:
-```
+
+Binex converts "path1", a NitrOS-9 binary format file, to a new file named "path2" in S-Record format. If invoked on a non-binary load module file, a warning message is printed and the user is asked if binex should proceed anyway. A "Y" response means yes; any other answer will terminate the program. S-Records have a header record to store the program name for informational purposes and each data record has an absolute memory address which is not meaningful to NitrOS-9 since it uses position-independent-code. However, the S-Record format requires them so binex will prompt the user for a program name and starting load address. For example:
 
 ```text
 binex /d0/cmds/scanner scanner.S1
-Enter starting address for file: $100 Enter name for header record: scanner
+Enter starting address for file: $100
+Enter name for header record: scanner
 ```
 
 To download the program to a device such as a PROM programmer (for example using serial port T1) type:
@@ -1769,9 +1778,7 @@ list scanner.S1 >/T1
 
 **Name**
 
-```text
-BUILD — Build a text file from standard input
-```
+**BUILD** - Build a text file from standard input
 
 **Synopsis**
 
@@ -1783,7 +1790,8 @@ build path
 
 This command is used to build short text files by copying the standard input path into the file specified by path. Build creates a file according to the pathlist parameter, then displays a "?" prompt to request an input line. Each line entered is written to the output path (file). Entering a line consisting of a carriage return only causes build to terminate.
 
-- Example:
+**Examples**
+
 ```text
 build small_file
 build /p (copies keyboard to printer)
@@ -1795,24 +1803,26 @@ The standard input path may also be redirected to a file. Below is an example:
 build <mytext /T2 (copies file "mytext" to terminal T2)
 ```
 
+```text
 OS9: build newfile
 
-- The powers of the NitrOS-9
-- operating system are truly
-- fantastic.
-- [RETURN]
+? The powers of the NitrOS-9
+? operating system are truly
+? fantastic.
+? [RETURN]
 
 OS9: list newfile
 
-The powers of the NitrOS-9 operating system are truly fantastic.
+The powers of the NitrOS-9
+operating system are truly
+fantastic.
+```
 
 ### CHD/CHX
 
 **Name**
 
-```text
-CHD/CHX — Change working data directory / Change working execution directory
-```
+**CHD/CHX** - Change working data directory / Change working execution directory
 
 **Synopsis**
 
@@ -1828,7 +1838,9 @@ chx pathlist
 
 These are shell "built in" commands used to change NitrOS-9’s working data directory or working execution directory. Many commands in NitrOS-9 work with user data such as text files, programs, etc. These commands assume that a file is located in the working data directory. Other NitrOS-9 commands will assume that a file is in the working execution directory.
 
-NOTE: These commands do not appear in the CMDS directory as they are built-in to the shell. For more information see: Section 3.8, Section 3.8.2
+**NOTE:** These commands do not appear in the CMDS directory as they are built-in to the shell.
+
+For more information see: Section 3.8, Section 3.8.2
 
 **Examples**
 
@@ -1852,9 +1864,7 @@ chx /D0/CMDS; chd /D1
 
 **Name**
 
-```text
-CMP — File Comparison Utility
-```
+**CMP** - File Comparison Utility
 
 **Synopsis**
 
@@ -1864,31 +1874,44 @@ cmp file1 file2
 
 **Description**
 
-Opens two files and performs a comparison of the binary values of the corresponding data bytes of the files. If any differences are encountered, the file offset (address) and the values of the bytes from each file are displayed in hexadecimal. The comparison ends when end-of-file is encountered on either file. A summary of the number of bytes compared and the number of differences found is then displayed.
+Opens two files and performs a comparison of the binary values of the corresponding data bytes of the files. If any differences are encountered, the file offset (address) and the values of the bytes from each file are displayed in hexadecimal.
+
+The comparison ends when end-of-file is encountered on either file. A summary of the number of bytes compared and the number of differences found is then displayed.
 
 **Examples**
 
+```text
 OS9: cmp red blue
 
-Differences
+ Differences
 
-byte #1 #2 ======== == == 00000013 00 01 00000022 B0 B1 0000002A 9B AB 0000002B 3B 36 0000002C 6D 65
+byte     #1 #2
+======== == ==
+00000013 00 01
+00000022 B0 B1
+0000002A 9B AB
+0000002B 3B 36
+0000002C 6D 65
 
-Bytes compared: 0000002D Bytes different: 00000005
+Bytes compared: 0000002D
+Bytes different: 00000005
+```
 
+```text
 OS9: cmp red red
 
-Differences None ...
+ Differences
+   None ...
 
-Bytes compared: 0000002D Bytes different: 00000000
+Bytes compared: 0000002D
+Bytes different: 00000000
+```
 
 ### COBBLER
 
 **Name**
 
-```text
-COBBLER — Make a bootstrap file
-```
+**COBBLER** - Make a bootstrap file
 
 **Synopsis**
 
@@ -1898,24 +1921,23 @@ cobbler device name
 
 **Description**
 
-```text
-Cobbler is used to create the OS9Boot file required on any disk from which NitrOS-9
-is to be bootstrapped. The boot file will consist of the same modules which were loaded into memory during the most recent boostrap. To add modules to the bootstrap file use the
-OS9Gen command. Cobbler also writes the NitrOS-9 kernel on the eighteen sectors
-of track 34, and excludes these sectors from the disk allocation map. If any files are present on these sectors cobbler will display an error message. NOTE: The boot file must fit into one contiguous block on the mass-storage device. For this reason cobbler is normally used on a freshly formatted disk. If cobbler is used on a disk and there is not a contiguous block of storage large enough to hold the boot file, the old boot file may have been destroyed and NitrOS-9 will not be able to boot from that disk until it is reformatted. For more information see: Section 1.2.2, Section 6.1
-```
+Cobbler is used to create the OS9Boot file required on any disk from which NitrOS-9 is to be bootstrapped. The boot file will consist of the same modules which were loaded into memory during the most recent boostrap. To add modules to the bootstrap file use the OS9Gen command. Cobbler also writes the NitrOS-9 kernel on the eighteen sectors of track 34, and excludes these sectors from the disk allocation map. If any files are present on these sectors cobbler will display an error message.
+
+**NOTE:** The boot file must fit into one contiguous block on the mass-storage device. For this reason cobbler is normally used on a freshly formatted disk. If cobbler is used on a disk and there is not a contiguous block of storage large enough to hold the boot file, the old boot file may have been destroyed and NitrOS-9 will not be able to boot from that disk until it is reformatted.
+
+For more information see: Section 1.2.2, Section 6.1
 
 **Examples**
 
+```text
 OS9: cobbler /D1
+```
 
 ### COPY
 
 **Name**
 
-```text
-COPY — Copy data from one path to another
-```
+**COPY** - Copy data from one path to another
 
 **Synopsis**
 
@@ -1925,13 +1947,23 @@ copy path path [ -a -p -r -s -w=<dir> -x ]
 
 **Description**
 
-This command copies data from the first file or device specified to the second. The first file or device must already exist, the second file is automatically created if the second path is a file on a mass storage device. Data may be of any type and is NOT modified in any way as it is copied. Data is transferred using large block reads and writes until end-of-file occurs on the input path. Because block transfers are used, normal output processing of data does not occur on character-oriented devices such as terminals, printers, etc. Therefore, the
-```text
-list command is preferred over copy when a file consisting of text is to be sent to a
-terminal or printer. The "-a" option will force copy to abort its operation if it receives an error during the
-copy of a file. If this option is not specified, copy will continue to attempt to copy any
-other files specified on its command line. The "-p" option prevents copy from echoing the filenames that it is copying (used in conjunction with -w). The "-r" option allows copy to rewrite the destination file if it matches the name of a source file that is being copied. If this option is not used, then the user will be prompted to overwrite a file of the same name. The "-s" option causes copy to perform a single drive copy operation. The second pathlist must be a full pathlist if "-s appears. Copy will read a portion of the source disk into memory, you remove the source disk and place the destination disk into the drive, enter a "C" whereupon copy writes on the destination disk, this process continues until the entire file is copied. The "-w=<dir>" option allows you to specify a destination directory where all the files will be copied to. Use this option when specifing multiple filenames on the command line. The "-x=<dir>" will cause the files to be copied to an execution-relative directory. Using the shell’s alternate memory size modifier to give a large memory space will increase speed and reduce the number of media exchanges required for single drive copies.
-```
+This command copies data from the first file or device specified to the second. The first file or device must already exist, the second file is automatically created if the second path is a file on a mass storage device. Data may be of any type and is NOT modified in any way as it is copied.
+
+Data is transferred using large block reads and writes until end-of-file occurs on the input path. Because block transfers are used, normal output processing of data does not occur on character-oriented devices such as terminals, printers, etc. Therefore, the list command is preferred over copy when a file consisting of text is to be sent to a terminal or printer.
+
+The "-a" option will force copy to abort its operation if it receives an error during the copy of a file. If this option is not specified, copy will continue to attempt to copy any other files specified on its command line.
+
+The "-p" option prevents copy from echoing the filenames that it is copying (used in conjunction with -w).
+
+The "-r" option allows copy to rewrite the destination file if it matches the name of a source file that is being copied. If this option is not used, then the user will be prompted to overwrite a file of the same name.
+
+The "-s" option causes copy to perform a single drive copy operation. The second pathlist must be a full pathlist if "-s appears. Copy will read a portion of the source disk into memory, you remove the source disk and place the destination disk into the drive, enter a "C" whereupon copy writes on the destination disk, this process continues until the entire file is copied.
+
+The "-w=<dir>" option allows you to specify a destination directory where all the files will be copied to. Use this option when specifing multiple filenames on the command line.
+
+The "-x=<dir>" will cause the files to be copied to an execution-relative directory.
+
+Using the shell’s alternate memory size modifier to give a large memory space will increase speed and reduce the number of media exchanges required for single drive copies.
 
 **Examples**
 
@@ -1953,16 +1985,16 @@ copy /term /p (copies console to printer)
 
 ```text
 copy /d0/cat /d0/animals/cat -s #32k
-Ready DESTINATION, hit C to continue: c Ready SOURCE, hit C to continue: c Ready DESTINATION, hit C to continue:c
+Ready DESTINATION, hit C to continue: c
+Ready SOURCE, hit C to continue: c
+Ready DESTINATION, hit C to continue:c
 ```
 
 ### CPUTYPE
 
 **Name**
 
-```text
-CPUTYPE — Identify the CPU
-```
+**CPUTYPE** - Identify the CPU
 
 **Synopsis**
 
@@ -1978,9 +2010,7 @@ Identifies the CPU as 6809 or 6309.
 
 **Name**
 
-```text
-DATE — Display system date and time
-```
+**DATE** - Display system date and time
 
 **Synopsis**
 
@@ -2002,9 +2032,11 @@ date -t
 date -t >/p (Output is redirected to printer)
 ```
 
+```text
 OS9: setime
 
-yyyy/mm/dd hh:mm:ss Time ? 2003/04/15 14:19:00
+       yyyy/mm/dd hh:mm:ss
+Time ? 2003/04/15 14:19:00
 
 OS9:date
 
@@ -2013,14 +2045,13 @@ April 15, 2003
 OS9:date -t
 
 April 15, 2003 14:20:20
+```
 
 ### DCHECK
 
 **Name**
 
-```text
-DCHECK — Check Disk File Structure
-```
+**DCHECK** - Check Disk File Structure
 
 **Synopsis**
 
@@ -2031,95 +2062,157 @@ dcheck [ -opts ] devnam
 **Description**
 
 It is possible for sectors on a disk to be marked as being allocated but in fact are not actually associated with a file or the disk’s free space. This can happen if a disk is removed from a drive while files are still open, or if a directory which still contains files is deleted (see Section 3.6). Dcheck is a diagnostic that can be used to detect this condition, as well as the general integrity of the directory/file linkages.
-```text
-Dcheck is given as a parameter the name of the disk device to be checked. After
-verifying and printing some vital file structure parameters, dcheck follows pointers down the disk’s file system tree to all directories and files on the disk. As it does so, it verifies the integrity of the file descriptor sectors, reports any discrepancies in the directory/file linkages, and builds a sector allocation map from the segment list associated with each file. If any file descriptor sectors (FDs) describe a segment with a cluster not within the file structure of the disk, a message is reported like:
-```
 
+Dcheck is given as a parameter the name of the disk device to be checked. After verifying and printing some vital file structure parameters, dcheck follows pointers down the disk’s file system tree to all directories and files on the disk. As it does so, it verifies the integrity of the file descriptor sectors, reports any discrepancies in the directory/file linkages, and builds a sector allocation map from the segment list associated with each file. If any file descriptor sectors (FDs) describe a segment with a cluster not within the file structure of the disk, a message is reported like:
+
+```text
 *** Bad FD segment ($xxxxxx-$yyyyyy) for file: pathlist
-
-This indicates that a segment starting at sector xxxxxx and ending at sector yyyyyy cannot really be on this disk. Because there is a good chance the entire FD is bad if any of it’s segment descriptors are bad, the allocation map is not updated for corrupt FDs. While building the allocation map, dcheck also makes sure that each disk cluster appears only once and only once in the file structure. If this condition is detected,
-```text
-dcheck will display a message like:
 ```
 
+This indicates that a segment starting at sector xxxxxx and ending at sector yyyyyy cannot really be on this disk. Because there is a good chance the entire FD is bad if any of it’s segment descriptors are bad, the allocation map is not updated for corrupt FDs.
+
+While building the allocation map, dcheck also makes sure that each disk cluster appears only once and only once in the file structure. If this condition is detected, dcheck will display a message like:
+
+```text
 Cluster $xxxxxx was previously allocated
+```
 
-This message indicates that cluster xxxxxx has been found at least once before in the file structure. The message may be printed more than once if a cluster appears in a segment in more than one file. The newly created allocation map is then compared to the allocation map stored on the disk, and any differences are reported in messages like:
+This message indicates that cluster xxxxxx has been found at least once before in the file structure. The message may be printed more than once if a cluster appears in a segment in more than one file. 
 
-Cluster $xxxxxx in allocation map but not in file structure Cluster $xxxxxx in file structure but not in allocation map
+The newly created allocation map is then compared to the allocation map stored on the disk, and any differences are reported in messages like:
 
-The first message indicates sector number xxxxxx (hexadecimal) was found not to be part of the file system, but was marked as allocated in the disk’s allocation map. In addition to the causes mentioned in the first paragraph, some sectors may have been excluded from the allocation map by the FORMAT program because they were defective or they may be the last few sectors of the disk, the sum of which was two small to comprise a cluster. The second message indicates that the cluster starting at sector xxxxxx is part of the file structure but is not marked as allocated in the disk’s allocation map. It is possible that this cluster may be allocated to another file later, overwriting the contents of the cluster with data from the newly allocated file. Any clusters that have been reported as "previously allocated" by dcheck as described above surely have this problem.
-- Available dcheck options are:
+```text
+Cluster $xxxxxx in allocation map but not in file structure
+Cluster $xxxxxx in file structure but not in allocation map
+```
 
--w=path pathlist to directory for work files -p print pathlists for questionable clusters -m save allocation map work files -b suppress listing of unused clusters -s display count of files and directories only -o print dcheck’s valid options
+The first message indicates sector number xxxxxx (hexadecimal) was found not to be part of the file system, but was marked as allocated in the disk’s allocation map. In addition to the causes mentioned in the first paragraph, some sectors may have been excluded from the allocation map by the FORMAT program because they were defective or they may be the last few sectors of the disk, the sum of which was two small to comprise a cluster.
+
+The second message indicates that the cluster starting at sector xxxxxx is part of the file structure but is not marked as allocated in the disk’s allocation map. It is possible that this cluster may be allocated to another file later, overwriting the contents of the cluster with data from the newly allocated file. Any clusters that have been reported as "previously allocated" by dcheck as described above surely have this problem.
+
+Available dcheck options are:
+
+| | |
+|-|-|
+| -w=path | pathlist to directory for work files |
+| -p | print pathlists for questionable clusters |
+| -m | save allocation map work files |
+| -b | suppress listing of unused clusters |
+| -s | display count of files and directories only |
+| -o | print dcheck’s valid options |
 
 The "-s" option causes dcheck to display a count of files and directories only; only FDs are checked for validity. The "-b" option suppresses listing of clusters allocated but not in file structure. The "-p" option causes dcheck to make a second pass through the file structure printing the pathlists for any clusters that dcheck finds as "already allocated" or "in file structure but not in allocation map". The "-w=" option tells dcheck where to locate it’s allocation map work file(s). The pathlist specified must be a FULL pathlist to a directory. The directory "/D0" is used is used if "-w" is not specified. It is recommended that this pathlist NOT be located on the disk being dchecked if the disk’s file structure integrity is in doubt.
-```text
-Dcheck builds its disk allocation map in a file called pathlist/DCHECKppO, where
-pathlist is as specified by the "-w=" option and pp is the process number in hexadecimal. Each bit in this bitmap file corresponds to a cluster of sectors on the disk. If the "-p" option appears on the command line, dcheck creates a second bitmap file (pathlist/DCHECKpp1) that has a bit set for each cluster dcheck finds as "previously allocated" or "in file structure but not in allocation map" while building the allocation map. Dcheck them makes another pass through the directory structure to determine the pathlists for these questionable clusters. These bitmap work files may be saved by specifying the "-m" option on the command line.
-```
 
-Restrictions For best results, dcheck should have exclusive access to the disk being checked. Otherwise dcheck may be fooled if the disk allocation map changes while it is building its bitmap file from the changing file structure. Dcheck cannot process disks with a directory depth greater than 39 levels. For more information see: Section 3.11, Section 3.6, format, 6.1 of NitrOS-9 Systems Programmer’s Manual
+Dcheck builds its disk allocation map in a file called pathlist/DCHECKppO, where pathlist is as specified by the "-w=" option and pp is the process number in hexadecimal. Each bit in this bitmap file corresponds to a cluster of sectors on the disk. If the "-p" option appears on the command line, dcheck creates a second bitmap file (pathlist/DCHECKpp1) that has a bit set for each cluster dcheck finds as "previously allocated" or "in file structure but not in allocation map" while building the allocation map. Dcheck them makes another pass through the directory structure to determine the pathlists for these questionable clusters. These bitmap work files may be saved by specifying the "-m" option on the command line.
+
+**Restrictions**
+
+For best results, dcheck should have exclusive access to the disk being checked. Otherwise dcheck may be fooled if the disk allocation map changes while it is building its bitmap file from the changing file structure. Dcheck cannot process disks with a directory depth greater than 39 levels.
+
+For more information see: Section 3.11, Section 3.6, format, 6.1 of NitrOS-9 Systems Programmer’s Manual
 
 **Examples**
 
+```text
 OS9: dcheck /d2 (workfile is on /D0)
 
 Volume - ’My system disk’ on device /d2
 
-$009A bytes in allocation map 1 sector per cluster $0004D0 total sectors on media Sector $000002 is start of root directory FD $0010 sectors used for id, allocation map and root directory Building allocation map work file... Checking allocation map file...
+$009A bytes in allocation map
+1 sector per cluster
+$0004D0 total sectors on media
+Sector $000002 is start of root directory FD
+$0010 sectors used for id, allocation map and root directory
+Building allocation map work file...
+Checking allocation map file...
 
-’My system disk’ file structure is intact 1 directory 2 files
+’My system disk’ file structure is intact
+1 directory
+2 files
+```
 
-OS9: dcheck -mpw=/d2 /d0 Volume - ’System disk’ on device /d0 $0046 bytes in allocation map 1 sector per cluster $00022A total sectors on media Sector $000002 is start of root directory FD $0010 sectors used for id, allocation map and root directory Building allocation map work file... Cluster $00040 was previously allocated *** Bad FD segment ($111111-$23A6F0) for file: /d0/test/junky.file Checking allocation map file... Cluster $000038 in file structure but not in allocation map Cluster $00003B in file structure but not in allocation map Cluster $0001B9 in allocation map but not in file structure Cluster $0001BB in allocation map but not in file structure
+```text
+OS9: dcheck -mpw=/d2 /d0
+Volume - ’System disk’ on device /d0
+$0046 bytes in allocation map
+1 sector per cluster
+$00022A total sectors on media
+Sector $000002 is start of root directory FD
+$0010 sectors used for id, allocation map and root directory
+Building allocation map work file...
+Cluster $00040 was previously allocated
+*** Bad FD segment ($111111-$23A6F0) for file: /d0/test/junky.file 
+Checking allocation map file...
+Cluster $000038 in file structure but not in allocation map
+Cluster $00003B in file structure but not in allocation map
+Cluster $0001B9 in allocation map but not in file structure
+Cluster $0001BB in allocation map but not in file structure
 
-- Pathlists for questionable clusters:
-Cluster $000038 in path: /d0/OS9boot Cluster $00003B in path: /d0/OS9boot Cluster $000040 in path: /d0/OS9boot Cluster $000040 in path: /d0/test/double.file
+Pathlists for questionable clusters:
+Cluster $000038 in path: /d0/OS9boot
+Cluster $00003B in path: /d0/OS9boot
+Cluster $000040 in path: /d0/OS9boot
+Cluster $000040 in path: /d0/test/double.file
 
-1 previously allocated clusters found 2 clusters in file structure but not in allocation map 2 clusters in allocation map but not in file structure 1 bad file descriptor sector
+1 previously allocated clusters found
+2 clusters in file structure but not in allocation map
+2 clusters in allocation map but not in file structure
+1 bad file descriptor sector
 
-’System disk’ file structure is not intact 5 directories 25 files
+’System disk’ file structure is not intact
+5 directories
+25 files
+```
 
 ### DEBUG
 
 **Name**
 
-```text
-DEBUG — Interactive Debugger
-```
+**DEBUG** - Interactive Debugger
 
 **Synopsis**
 
-### debug
+```text
+debug
+```
 
 **Description**
 
 Interactive Debugger.
 
-Command Summary
+**Command Summary**
 
-[SPACEBAR]expression Evaluate; display in hexadecimal and decimal form
-
-. Display dot address and contents
-
-.. Restore last dot address; display address and contents
-
-.expression set dot to result of expression; display address and contents
-
-=expression Set memory at dot to result of expression - Decrement dot; display address and contents [ENTER] Increment dot; display address and contents : Display all registers’ contents :register Display the specified register’s contents :register expression Set register to the result of expression E module-name Prepare for execution G Go to the program G expression Goto the program at the address specified by
-
-the result of expression L module-name Link to the module named; display address B Display all breakpoints B expression Set a breakpoint at the result of the expression K Kill all breakpoints K expression Kill the breakpoint at address specified by
-
-expression M expression1 expression2 Display memory dump in tabular form C expression1 expression2 Clear and test memory S expression1 expression2 Search memory for pattern $ command Call NitrOS-9 shell with optional command Q Quit (exit) Debug
+| | |
+|-|-|
+| [SPACEBAR]expression | Evaluate; display in hexadecimal and decimal form |
+| . | Display dot address and contents |
+| .. | Restore last dot address; display address and contents |
+| .expression | set dot to result of expression; display address and contents |
+| =expression | Set memory at dot to result of expression |
+| - | Decrement dot; display address and contents |
+| [ENTER] | Increment dot; display address and contents |
+| : | Display all registers’ contents |
+| :register | Display the specified register’s contents |
+| :register expression | Set register to the result of expression |
+| E | module-name Prepare for execution |
+| G | Go to the program |
+| G expression | Goto the program at the address specified by the result of expression |
+| L module-name | Link to the module named; display address |
+| B | Display all breakpoints |
+| B expression | Set a breakpoint at the result of the expression |
+| K | Kill all breakpoints |
+| K expression | Kill the breakpoint at address specified by expression |
+| M expression1 expression2 | Display memory dump in tabular form |
+| C expression1 expression2 | Clear and test memory |
+| S expression1 expression2 | Search memory for pattern |
+| $ command | Call NitrOS-9 shell with optional command |
+| Q | Quit (exit) Debug |
 
 ### DED
 
 **Name**
 
-```text
-DED — Disk Editor
-```
+**DED** - Disk Editor
 
 **Synopsis**
 
@@ -2129,28 +2222,23 @@ ded pathlist
 
 **Description**
 
-```text
-dEd is a screen-oriented disk editor utility. It was originally conceived as a floppy
-disk editor, so the display is organized around individual sectors. It performs most of the functions of Patch, from Computerware, but is faster, more compact, and screenoriented rather than line-oriented. Individual files or the disk itself (hard, floppy, RAM) can be examined and changed, sectors can be written to an output file, and executable modules can be located, linked to and verified. To use, type:
-```
+dEd is a screen-oriented disk editor utility. It was originally conceived as a floppy disk editor, so the display is organized around individual sectors. It performs most of the functions of Patch, from Computerware, but is faster, more compact, and screenoriented rather than line-oriented. Individual files or the disk itself (hard, floppy, RAM) can be examined and changed, sectors can be written to an output file, and executable modules can be located, linked to and verified.
+
+To use, type:
 
 ```text
 dEd pathlist
 ```
 
 where <pathlist> is of the form: filename or dirname or /path/filename or /D0@ (edits entire disk)
-```text
-dEd will read in and display the first 256 bytes in the file (disk). This is Logical Sector
-Number (LSN) zero. You move through the file sector (LSN) by sector using the up and down arrow keys. The current LSN number is displayed in Hex and Decimal in the upper left corner of the screen. If the disk itself was accessed (by appending ’@’ to it’s name when dEd was called), the LSN is the disk sector number. If an individual file is being editted, however, the LSN displayed refers to the file, not to the disk. All numbers requested by dEd must be in Hex format. All commands are accessed by simply pressing the desired key.
-```
+
+dEd will read in and display the first 256 bytes in the file (disk). This is Logical Sector Number (LSN) zero. You move through the file sector (LSN) by sector using the up and down arrow keys. The current LSN number is displayed in Hex and Decimal in the upper left corner of the screen. If the disk itself was accessed (by appending ’@’ to it’s name when dEd was called), the LSN is the disk sector number. If an individual file is being editted, however, the LSN displayed refers to the file, not to the disk. All numbers requested by dEd must be in Hex format. All commands are accessed by simply pressing the desired key.
 
 ### DEL
 
 **Name**
 
-```text
-DEL — Delete a file
-```
+**DEL** - Delete a file
 
 **Synopsis**
 
@@ -2160,7 +2248,11 @@ del [ -x ] path {path}
 
 **Description**
 
-This command is used to delete the file(s) specified by the pathlist(s). The user must have write permission for the file(s). Directory files cannot be deleted unless their type is changed to non-directory: see the attr command description. If the -x option appears, the current execution directory is assumed. For more information see: Section 3.6, Section 3.9.1
+This command is used to delete the file(s) specified by the pathlist(s). The user must have write permission for the file(s). Directory files cannot be deleted unless their type is changed to non-directory: see the attr command description.
+
+If the -x option appears, the current execution directory is assumed. 
+
+For more information see: Section 3.6, Section 3.9.1
 
 **Examples**
 
@@ -2172,23 +2264,27 @@ del test_program old_test_program
 del /D1/number_five
 ```
 
+```text
 OS9:dir /D1
 
-Directory of /D1 14:29:46 myfile newfile
+   Directory of /D1 14:29:46
+myfile          newfile
 
-OS9:del /D1/newfile OS9:dir /D1
+OS9:del /D1/newfile
+OS9:dir /D1
 
-Directory of /D1 14:30:37 myfile
+   Directory of /D1 14:30:37 
+myfile
 
-OS9:del myprog -x OS9:del -x CMDS.SUBDIR/file
+OS9:del myprog -x
+OS9:del -x CMDS.SUBDIR/file
+```
 
 ### DELDIR
 
 **Name**
 
-```text
-DELDIR — Delete All Files In a Directory System
-```
+**DELDIR** - Delete All Files In a Directory System
 
 **Synopsis**
 
@@ -2200,12 +2296,21 @@ deldir directory name
 
 This command is a convenient alternative to manually deleting directories and files they contain. It is only used when all files in the directory system are to be deleted. When deldir is run, it prints a prompt message like this:
 
-OS9: deldir OLDFILES Deleting directory file.
 ```text
+OS9: deldir OLDFILES
+Deleting directory file.
 List directory, delete directory, or quit ? (l/d/q)
 ```
 
-An "l" response will cause a dir -e command to be run so you can have an opportunity to see the files in the directory before they are deleted. A "d" response will initiate the process of deleting files. A "q" response will abort the command before action is taken. The directory to be deleted may include directory files, which may themselves include directory files, etc. In this case, deldir operates recursively (e.g., it calls itself) so all lower-level directories are deleted as well. In this case the lower-level directories are processed first. You must have correct access permission to delete all files and directories encountered. If not, deldir will abort upon encountering the first file for which you do not have write permission.
+An "l" response will cause a dir -e command to be run so you can have an opportunity to see the files in the directory before they are deleted.
+
+A "d" response will initiate the process of deleting files.
+
+A "q" response will abort the command before action is taken.
+
+The directory to be deleted may include directory files, which may themselves include directory files, etc. In this case, deldir operates recursively (e.g., it calls itself) so all lower-level directories are deleted as well. In this case the lower-level directories are processed first.
+
+You must have correct access permission to delete all files and directories encountered. If not, deldir will abort upon encountering the first file for which you do not have write permission.
 
 The deldir command automatically calls the DIR and ATTR commands, so they both must reside in the current execution directory.
 
@@ -2213,36 +2318,35 @@ The deldir command automatically calls the DIR and ATTR commands, so they both m
 
 **Name**
 
-```text
-DEVS — Show device table entries
-```
+**DEVS** - Show device table entries
 
 **Synopsis**
 
-### devs
+```text
+devs
+```
 
 **Description**
 
-```text
-Devs displays a list of the system’s device table. The device table contains an entry for
-each active device known to NitrOS-9. devs does not display information for uninitialized devices. The devs display header lists the system name, the NitrOS-9 version number, and the maximum number of devices allowed in the device table.
-```
+Devs displays a list of the system’s device table. The device table contains an entry for each active device known to NitrOS-9. devs does not display information for uninitialized devices. The devs display header lists the system name, the NitrOS-9 version number, and the maximum number of devices allowed in the device table.
 
-- Each line in the devs display contains five fields:
+Each line in the devs display contains five fields:
 
-Name Description Device Name of the device descriptor Driver Name of the device driver File Mgr Name of the file manager Data Ptr Address of the device driver’s static
+| Name | Description |
+|-|-|
+| Device | Name of the device descriptor |
+| Driver | Name of the device driver |
+| File Mgr | Name of the file manager |
+| Data Ptr | Address of the device driver’s static storage |
+| Links | Device use count |
 
-storage Links Device use count
-
-Note: Each time a user executes a chd to an RBF device, the use count of that device is incremented by one. Consequently, the Links field may be artificially high.
+**Note:** Each time a user executes a chd to an RBF device, the use count of that device is incremented by one. Consequently, the Links field may be artificially high.
 
 ### DMODE
 
 **Name**
 
-```text
-DMODE — Disk descriptor Editor
-```
+**DMODE** - Disk descriptor Editor
 
 **Synopsis**
 
@@ -2252,32 +2356,43 @@ dmode [devicename | -filename] [options]
 
 **Description**
 
-This new version allows any combination of upper or lower case options to be specified. Also, current parameters are displayed with a "$" preceding to remind the user that the values are hexadecimal. Options may be prefixed with a "$". It is simply ignored.
+This new version allows any combination of upper or lower case options to be specified.
+
+Also, current parameters are displayed with a "$" preceding to remind the user that the values are hexadecimal.
+
+Options may be prefixed with a "$". It is simply ignored.
 
 **Examples**
 
-- Typical dmode output:
+Typical dmode output:
 
+```text
 OS9: dmode /dd {enter}
 
-drv=$00 stp=$00 typ=$80 dns=$01 cyl=$0334 sid=$06 vfy=$00 sct=$0021 tos=$0021 ilv=$00 sas=$20
+ drv=$00 stp=$00 typ=$80 dns=$01 cyl=$0334 sid=$06
+ vfy=$00 sct=$0021 tos=$0021 ilv=$00 sas=$20
+```
 
-Now, let’s say we want to change the number of cylinders this descripter shows. The
-- following command lines would all be valid and accepted by the new dmode:
+Now, let’s say we want to change the number of cylinders this descripter shows. The following command lines would all be valid and accepted by the new dmode:
 
-OS9: dmode /dd CYL=276 -or- dmode /dd Cyl=$276 -or- dmode /dd cYL=276
+```text
+OS9: dmode /dd CYL=276
+-or- dmode /dd Cyl=$276
+-or- dmode /dd cYL=276
+```
 
 Lastly, you may now specify either "TOS" or "T0S" to setup the number of sectors per track in track zero. Example:
 
-OS9: dmode /dd tos=21 -or- dmode /dd t0s=21
+```text
+OS9: dmode /dd tos=21
+-or- dmode /dd t0s=21
+```
 
 ### DIR
 
 **Name**
 
-```text
-DIR — Display the names of files contained in a directory
-```
+**DIR** - Display the names of files contained in a directory
 
 **Synopsis**
 
@@ -2287,7 +2402,11 @@ dir [ -e ] [ -x ] [ path ]
 
 **Description**
 
-Displays a formatted list of files names in a directory file on. the standard output path. If no parameters are given, the current data directory is shown. If the "x" option is given, the current execution directory is shown. If a pathlist of a directory file is given, it is shown. If the "e" option is included, each file’s entire description is displayed: size, address, owner, permissions, date and time of last modification. For more information see: Section 1.1.3, Section 3.5, and Section 3.9.1
+Displays a formatted list of files names in a directory file on. the standard output path. If no parameters are given, the current data directory is shown. If the "x" option is given, the current execution directory is shown. If a pathlist of a directory file is given, it is shown.
+
+If the "e" option is included, each file’s entire description is displayed: size, address, owner, permissions, date and time of last modification.
+
+For more information see: Section 1.1.3, Section 3.5, and Section 3.9.1
 
 **Examples**
 
@@ -2319,9 +2438,7 @@ dir -e test_programs (display entire description of test_programs)
 
 **Name**
 
-```text
-DISASM — NitrOS-9 Module Disassembler
-```
+**DISASM** - NitrOS-9 Module Disassembler
 
 **Synopsis**
 
@@ -2331,12 +2448,9 @@ disasm [-m module name | filename] [options]
 
 **Description**
 
-```text
-Disasm was written to hack apart NitrOS-9 system modules,command modules, file
-managers and device drivers/descriptors either from memory or disk. Unlike most other disassemblers, disasm is a two pass disassembler, creating output using only referenced labels. This output can be redirected to a file and (after modifications if desired) then re-assembled.
-Disasm provides completely commented disassembly of Device Descriptors... very
-useful for building a customized boot file.
-```
+Disasm was written to hack apart NitrOS-9 system modules,command modules, file managers and device drivers/descriptors either from memory or disk. Unlike most other disassemblers, disasm is a two pass disassembler, creating output using only referenced labels. This output can be redirected to a file and (after modifications if desired) then re-assembled.
+
+Disasm provides completely commented disassembly of Device Descriptors... very useful for building a customized boot file.
 
 **Options**
 
@@ -2352,9 +2466,8 @@ disasm pathlist/module name
 
 will ’read’ the module from the specified path without loading.
 
-- other options:
-- o = display line number,address,object code & source code... useful for hard to
-crack modules with data embedded in the middle.
+other options:
+- o = display line number,address,object code & source code... useful for hard to crack modules with data embedded in the middle.
 - x = look for module in execution directory.
 
 ANY combination of options is allowed (upper or lower case) but they *must* immediately follow the ’-’ and there must be no spaces separating the options.
@@ -2363,9 +2476,7 @@ ANY combination of options is allowed (upper or lower case) but they *must* imme
 
 **Name**
 
-```text
-DISPLAY — Display Converted Characters
-```
+**DISPLAY** - Display Converted Characters
 
 **Synopsis**
 
@@ -2375,10 +2486,7 @@ display hex {hex}
 
 **Description**
 
-```text
-Display reads one or more hexadecimal numbers given as parameters, converts them
-to ASCII characters, and writes them to the standard output. It is commonly used to send special characters (such as cursor and screen control codes) to terminals and other I/O devices.
-```
+Display reads one or more hexadecimal numbers given as parameters, converts them to ASCII characters, and writes them to the standard output. It is commonly used to send special characters (such as cursor and screen control codes) to terminals and other I/O devices.
 
 **Examples**
 
@@ -2390,15 +2498,16 @@ display 0C 1F 02 7F
 display 15 >/p (sends "form feed" to printer)
 ```
 
-OS9: display 41 42 43 44 45 46 ABCDEF
+```text
+OS9: display 41 42 43 44 45 46
+ABCDEF
+```
 
 ### DSAVE
 
 **Name**
 
-```text
-DSAVE — Generate procedure file to copy files
-```
+**DSAVE** - Generate procedure file to copy files
 
 **Synopsis**
 
@@ -2408,20 +2517,23 @@ dsave [ opts ] [ path ]
 
 **Description**
 
-```text
-Dsave is used to backup or copy all files in one or more directories. It does not execute
-the commands; instead, it echos commands to standard output. This output can be redirected to a file and executed later as a procedure file. When dsave is executed, it writes copy commands to standard output to copy files from the current data directory to the directory specified by path. If dsave encounters a directory file, it will automatically include makdir and chd commands in the output before generating copy commands for files in the subdirectory. Since dsave is recursive in operation, the procedure file will exactly replicate all levels of the file system from the current data directory downward (such a section of the file system is called a "subtree"). If the current working directory happens to be the root directory of the disk, dsave will create a procedure file that will backup the entire disk file by file. This is useful when it is necessary to copy many files from different format disks, or from floppy disk to a hard disk.
-```
+Dsave is used to backup or copy all files in one or more directories. It does not execute the commands; instead, it echos commands to standard output. This output can be redirected to a file and executed later as a procedure file.
 
-- Available dsave options are:
+When dsave is executed, it writes copy commands to standard output to copy files from the current data directory to the directory specified by path. If dsave encounters a directory file, it will automatically include makdir and chd commands in the output before generating copy commands for files in the subdirectory. Since dsave is recursive in operation, the procedure file will exactly replicate all levels of the file system from the current data directory downward (such a section of the file system is called a "subtree").
 
--b make output disk a system disk by using source disk’s OS9Boot file,. if present.
+If the current working directory happens to be the root directory of the disk, dsave will create a procedure file that will backup the entire disk file by file. This is useful when it is necessary to copy many files from different format disks, or from floppy disk to a hard disk.
 
--b=path make output disk a system disk using path as source for the OS9Boot file.
+Available dsave options are:
 
--i indent for directory levels -l do not process directories below the current level -m do not include makdir commands in procedure file -r forces the copy command to rewrite the file at its destination if
-
-it already exists -sinteger set copy size parameter to integer K
+| | |
+|-|-|
+| -b | make output disk a system disk by using source disk’s OS9Boot file,. if present. |
+| -b=path | make output disk a system disk using path as source for the OS9Boot file. |
+| -i | indent for directory levels |
+| -l | do not process directories below the current level |
+| -m | do not include makdir commands in procedure file |
+| -r | forces the copy command to rewrite the file at its destination if it already exists |
+| -s*integer* | set copy size parameter to integer K |
 
 For more information see: Section 2.3
 
@@ -2430,25 +2542,22 @@ For more information see: Section 2.3
 Example which copies all files on "d2" to "d1":
 
 ```text
-chd /d0 (select "from" directory)
-dsave /d1 >/d0/makecopy (make procedure file "makecopy")
-/d0/makcopy (run procedure file)
+chd /d0                     (select "from" directory)
+dsave /d1 >/d0/makecopy     (make procedure file "makecopy")
+/d0/makcopy                 (run procedure file)
 ```
 
 ```text
 chd /d0/MYFILES/STUFF
 dsave -is32 /d1/BACKUP/STUFF >saver
-```
-
 /d0/MYFILES/STUFF/saver
+```
 
 ### DUMP
 
 **Name**
 
-```text
-DUMP — Formatted File Data Dump in Hexadecimal and ASCII
-```
+**DUMP** - Formatted File Data Dump in Hexadecimal and ASCII
 
 **Synopsis**
 
@@ -2458,37 +2567,45 @@ dump [ -h -m -x ] [ path ]
 
 **Description**
 
-This command produces a formatted display of the physical data contents of the path specified which may be a mass storage file or any other I/O device. If a pathlist is omitted, the standard input path is used. The output is written to standard output. This command is commonly used to examine the contents of non-text files. The data is displayed 16 bytes per line in both hexadecimal and ASCII character
-```text
-format. Data bytes that have non-displayable values are represented by periods in
-the character area. The addresses displayed on the dump are relative to the beginning of the file. Because memory modules are position-independent and stored on files exactly as they exist in memory, the addresses shown on the dump correspond to the relative load addresses of memory-module files.
-```
+This command produces a formatted display of the physical data contents of the path specified which may be a mass storage file or any other I/O device. If a pathlist is omitted, the standard input path is used. The output is written to standard output. This command is commonly used to examine the contents of non-text files.
 
--h prevent dump from printing its header every 256 bytes -m names on the command line are modules in memory -x names on the command line are files relative to the execution
+The data is displayed 16 bytes per line in both hexadecimal and ASCII character format. Data bytes that have non-displayable values are represented by periods in the character area.
 
-### directory
+The addresses displayed on the dump are relative to the beginning of the file. Because memory modules are position-independent and stored on files exactly as they exist in memory, the addresses shown on the dump correspond to the relative load addresses of memory-module files.
+
+| | |
+|-|-|
+| -h | prevent dump from printing its header every 256 bytes |
+| -m | names on the command line are modules in memory |
+| -x | names on the command line are files relative to the execution directory |
 
 **Examples**
 
 ```text
-dump (display keyboard input in hex)
-dump myfile >/p (dump myfile to printer)
-dump -m kernel (dump the kernel module in memory)
+dump                (display keyboard input in hex)
+dump myfile >/p     (dump myfile to printer)
+dump -m kernel      (dump the kernel module in memory)
 ```
 
-Sample Output Address 0 1 2 3 4 5 6 7 8 9 A B C D E F 0 2 4 6 8 A C E -------- ---- ---- ---- ---- ---- ---- ---- ---- ---------------- 00000000 87CD 0038 002A P181 2800 2E00 3103 FFE0 .M.8.*q.(...1..’ 00000010 0418 0000 0100 0101 0001 1808 180D 1B04 ................ 00000020 0117 0311 0807 1500 002A 5445 S2CD 5343 .........*TERMSC 00000030 C641 4349 C10E 529E FACIA.R.
+**Sample Output**
 
-^ ^ ^
-
-starting data bytes in hexadecimal data bytes in address format ASCII format
+```text
+Address   0 1  2 3  4 5  6 7  8 9  A B  C D  E F  0 2 4 6 8 A C E
+-------- ---- ---- ---- ---- ---- ---- ---- ---- ---------------- 
+00000000 87CD 0038 002A P181 2800 2E00 3103 FFE0 .M.8.*q.(...1..’ 
+00000010 0418 0000 0100 0101 0001 1808 180D 1B04 ................ 
+00000020 0117 0311 0807 1500 002A 5445 S2CD 5343 .........*TERMSC 
+00000030 C641 4349 C10E 529E                     FACIA.R.
+   ^                       ^                             ^
+starting       data bytes in hexadecimal          data bytes in
+address                 format                    ASCII format
+```
 
 ### ECHO
 
 **Name**
 
-```text
-ECHO — Echo text to output path
-```
+**ECHO** - Echo text to output path
 
 **Synopsis**
 
@@ -2503,7 +2620,7 @@ This command echoes its argument to the standard output path. It is typically us
 **Examples**
 
 ```text
-echo >/t2 Hello John how’s it going & (echo to t2)
+echo >/t2 Hello John how’s it going &       (echo to t2)
 ```
 
 ```text
@@ -2514,17 +2631,15 @@ echo >/term ** warning ** disk about to be scratched 1
 echo >/p Listing of Transaction File; list trans >/p
 ```
 
-OS9: echo Here is an important message! Here is an important message!
-
 ```text
-EX
+OS9: echo Here is an important message! Here is an important message!
 ```
+
+### EX
 
 **Name**
 
-```text
-EX — Execute program as overlay
-```
+**EX** - Execute program as overlay
 
 **Synopsis**
 
@@ -2534,7 +2649,15 @@ ex module name [ modifiers ] [ parameters ]
 
 **Description**
 
-This a shell built-in command that causes the process executing the shell to start execution of another program. It permits a transition from the shell to another program without creating another process, thus conserving system memory. This command is often used when the shell is called from another program to execute a specific program, after which the shell is not needed. For instance, applications which only use basic09 need not waste memory space on shell. The ex command should always be the last command on a shell input line because any command line following will never be processed. NOTE: Since this is a built-in shell command, it does not appear in the CMDS directory. For more information see: Section 4.5, Section 4.6, Section 4.9
+This a shell built-in command that causes the process executing the shell to start execution of another program. It permits a transition from the shell to another program without creating another process, thus conserving system memory.
+
+This command is often used when the shell is called from another program to execute a specific program, after which the shell is not needed. For instance, applications which only use basic09 need not waste memory space on shell.
+
+The ex command should always be the last command on a shell input line because any command line following will never be processed. 
+
+**NOTE:** Since this is a built-in shell command, it does not appear in the CMDS directory.
+
+For more information see: Section 4.5, Section 4.6, Section 4.9
 
 **Examples**
 
@@ -2550,9 +2673,7 @@ tsmon /t1&; tsmon /t2&; ex tsmon /term
 
 **Name**
 
-```text
-EXBIN — Convert S-Record To Binary File
-```
+**EXBIN** - Convert S-Record To Binary File
 
 **Synopsis**
 
@@ -2562,11 +2683,11 @@ exbin path2 path1
 
 **Description**
 
-S-Record files are a type of text file that contains records that represent binary data in hexadecimal character form. This Motorola-standard format is often directly accepted by commercial PROM programmers, emulators, logic analyzers and similar devices that are interfaced RS-232 interfaces. It can also be useful for transmitting files over data links that can only handle character-type data; or to convert NitrOS-9 assembler or compiler-generated programs to load on non-NitrOS-9 systems. "Path1" is assumed to be an S-Record format text file which exbin converts to pure binary form on a new file called "path2". The load addresses of each data record must describe continguous data in ascending order.
-```text
-Exbin does not generate or check for the proper NitrOS-9 module headers or CRC
-check value required to actually load the binary file. The IDENT or VERIFY commands can be used to check the validity of the modules if they are to be loaded or run. Example:
-```
+S-Record files are a type of text file that contains records that represent binary data in hexadecimal character form. This Motorola-standard format is often directly accepted by commercial PROM programmers, emulators, logic analyzers and similar devices that are interfaced RS-232 interfaces. It can also be useful for transmitting files over data links that can only handle character-type data; or to convert NitrOS-9 assembler or compiler-generated programs to load on non-NitrOS-9 systems.
+
+"Path1" is assumed to be an S-Record format text file which exbin converts to pure binary form on a new file called "path2". The load addresses of each data record must describe continguous data in ascending order.
+
+Exbin does not generate or check for the proper NitrOS-9 module headers or CRC check value required to actually load the binary file. The IDENT or VERIFY commands can be used to check the validity of the modules if they are to be loaded or run. Example:
 
 ```text
 exbin program.S1 cmds/program
@@ -2576,9 +2697,7 @@ exbin program.S1 cmds/program
 
 **Name**
 
-```text
-EXMODE — Examine or Change Device Initialization Mode
-```
+**EXMODE** - Examine or Change Device Initialization Mode
 
 **Synopsis**
 
@@ -2588,72 +2707,43 @@ exmode devname [arglist]
 
 **Description**
 
-```text
-exmode is an enhanced verison of the xmode utility, and is useful for changing ini-
-tialization parameters specific to CoCo 3 window descriptors and enhanced ACIA device descriptors.
-Exmode is very similar to the tmode command. Tmode only operates on open paths
-so its effect is temporary. Exmode actually updates the device descriptor so the change persists as long as the computer is running, even if paths to the device are repetitively opened and closed. If exmode is used to change parameter(s) and the
-COBBLER program is used to make a new system disk, the changed parameter will
-be permanently reflected on the new system disk.
-Exmode requires a device name to be given. If no arguments are given, the present
-values for each parameter are displayed, otherwise, the parameter(s) given in the argument list are processed. Any number of parameters can be given, and are separated by spaces or commas.
-```
+exmode is an enhanced verison of the xmode utility, and is useful for changing initialization parameters specific to CoCo 3 window descriptors and enhanced ACIA device descriptors.
 
-```text
-Exmode Parameter Names
-```
+Exmode is very similar to the tmode command. Tmode only operates on open paths so its effect is temporary. Exmode actually updates the device descriptor so the change persists as long as the computer is running, even if paths to the device are repetitively opened and closed. If exmode is used to change parameter(s) and the COBBLER program is used to make a new system disk, the changed parameter will be permanently reflected on the new system disk.
 
-upc Upper case only. Lower case characters are automatically converted to upper case.
+Exmode requires a device name to be given. If no arguments are given, the present values for each parameter are displayed, otherwise, the parameter(s) given in the argument list are processed. Any number of parameters can be given, and are separated by spaces or commas.
 
--upc Upper case and lower case characters permitted (default). bsb Erase on backspace: backspace characters echoed as a
+**Exmode Parameter Names**
 
-backspace-space-backspace sequence (default). -bsb no erase on backspace: echoes single backspace only bsl Backspace over line: lines are "deleted" by sending
-
-backspace-space-backspace sequences to erase the same line (for video terminals) (default).
-
--bsl No backspace over line: lines are "deleted" by printing a new line sequence (for hard-copy terminals). echo Input characters "echoed" back to terminal (default)
-
--echo No echo lf Auto line feed on: line feeds automatically echoed to terminal
-
-on input and output carriage returns (default). -lf Auto line feed off.
-
-pause Screen pause on: output suspended upon full screen. See "pag" parameter for definition of screen size. Output can be resumed by typing any key.
-
--pause Screen pause mode off. null=n Set null count: number of null ($00) characters transmitted after
-
-carriage returns for return delay. The number is decimal,
-- default = 0.
-
-pag=n Set video display page length to n (decimal) lines. Used for "pause" mode, see above.
-
-bsp=h Set input backspace character. Numeric value of character in hexadecimal. Default = 08.
-
-bse=h Set output backspace character. Numeric value of character in hexadecimal. Default = 08.
-
-```text
-del=h Set input delete line character. Numeric value of character in
-hexadecimal. Default = 18.
-```
-
-bell=h Set bell (alert) output character. Numeric value of character in hexadecimal. Default = 07
-
-eor=h Set end-of-record (carriage return) input character. Numeric value of character in hexadecimal. Default = 0D
-
-eof=h Set end-of-file input character. Numeric value of character in hexadecimal. Default 1B.
-
-type=h ACIA initialization value: sets parity, word size, etc. Value in hexadecimal. Default 15
-
-reprint=h Reprint line character. Numeric value of character in hexadecimal.
-
-dup=h Duplicate last input line character. Numeric value of character in hexadecimal.
-
-psc=h Pause character. Numeric value of character in hexadecimal. abort=h Abort character (normally Control+C). Numeric value of
-
-character in hexadecimal. quit=h Quit character (normally Control+E). Numeric value of
-
-character in hexadecimal. baud=d Set baud rate for software-controllable interface. Numeric code
-
-for baud rate: 0=110 1=300 2=600 3=1200 4=2400 5=4800 6=9600 7=19200
+| | |
+|-|-|
+| upc | Upper case only. Lower case characters are automatically converted to upper case. |
+| -upc | Upper case and lower case characters permitted (default). |
+| bsb | Erase on backspace: backspace characters echoed as a backspace-space-backspace sequence (default). |
+| -bsb | no erase on backspace: echoes single backspace only |
+| bsl | Backspace over line: lines are "deleted" by sending backspace-space-backspace sequences to erase the same line (for video terminals) (default). |
+| -bsl | No backspace over line: lines are "deleted" by printing a new line sequence (for hard-copy terminals). |
+| echo | Input characters "echoed" back to terminal (default) |
+| -echo | No echo |
+| lf | Auto line feed on: line feeds automatically echoed to terminal on input and output carriage returns (default). |
+| -lf | Auto line feed off. |
+| pause | Screen pause on: output suspended upon full screen. See "pag" parameter for definition of screen size. Output can be resumed by typing any key. |
+| -pause | Screen pause mode off. |
+| null=n | Set null count: number of null ($00) characters transmitted after carriage returns for return delay. The number is decimal, default = 0. |
+| pag=n | Set video display page length to n (decimal) lines. Used for "pause" mode, see above. |
+| bsp=h | Set input backspace character. Numeric value of character in hexadecimal. Default = 08. |
+| bse=h | Set output backspace character. Numeric value of character in hexadecimal. Default = 08. |
+| del=h | Set input delete line character. Numeric value of character in hexadecimal. Default = 18. |
+| bell=h | Set bell (alert) output character. Numeric value of character in hexadecimal. Default = 07 |
+| eor=h | Set end-of-record (carriage return) input character. Numeric value of character in hexadecimal. Default = 0D |
+| eof=h | Set end-of-file input character. Numeric value of character in hexadecimal. Default 1B. |
+| type=h | ACIA initialization value: sets parity, word size, etc. Value in hexadecimal. Default 15 |
+| reprint=h | Reprint line character. Numeric value of character in hexadecimal. |
+| dup=h | Duplicate last input line character. Numeric value of character in hexadecimal. |
+| psc=h | Pause character. Numeric value of character in hexadecimal.  |
+| abort=h | Abort character (normally Control+C). Numeric value of character in hexadecimal. |
+| quit=h | Quit character (normally Control+E). Numeric value of character in hexadecimal. |
+| baud=d | Set baud rate for software-controllable interface. Numeric code for baud rate: 0=110 1=300 2=600 3=1200 4=2400 5=4800 6=9600 7=19200 |
 
 **Examples**
 
@@ -2673,9 +2763,7 @@ exmode /P baud=3 -if
 
 **Name**
 
-```text
-FORMAT — Initialize disk media
-```
+**FORMAT** - Initialize disk media
 
 **Synopsis**
 
@@ -2685,31 +2773,24 @@ format devname
 
 **Description**
 
-This command is used to physically initialize, verify, and establish an initial file structure on a disk. All disks must be formatted before they can be used on an NitrOS-9 system. NOTE: If the diskette is to be used as a system disk, OS9gen or cobbler must be run to create the bootstrap after the disk has been formatted.
-- The formatting process works as follows:
+This command is used to physically initialize, verify, and establish an initial file structure on a disk. All disks must be formatted before they can be used on an NitrOS-9 system.
 
+**NOTE:** If the diskette is to be used as a system disk, OS9gen or cobbler must be run to create the bootstrap after the disk has been formatted.
+
+The formatting process works as follows:
 1. The disk surface is physically initialized and sectored.
-2. Each sector is read back and verified. If the sector fails to verify after several at-
+2. Each sector is read back and verified. If the sector fails to verify after several attempts, the offending sector is excluded from the initial free space on the disk. As the verification is performed, track numbers are displayed on the standard output device.
+3. The disk allocation map, root directory, and identification sector are written to the first few sectors of track zero. These sectors cannot be defective.
 
-tempts, the offending sector is excluded from the initial free space on the disk. As the verification is performed, track numbers are displayed on the standard output device.
+Format will prompt for a disk volume name, which can be up to 32 characters long and may include spaces or punctuation. This name can later be displayed using the FREE command.
 
-3. The disk allocation map, root directory, and identification sector are written to
-the first few sectors of track zero. These sectors cannot be defective.
-
-```text
-Format will prompt for a disk volume name, which can be up to 32 characters long
-and may include spaces or punctuation. This name can later be displayed using the
-FREE command.
 For more information see: Section 3.11
-```
 
 ### FREE
 
 **Name**
 
-```text
-FREE — Display free space remaining on mass-storage device
-```
+**FREE** - Display free space remaining on mass-storage device
 
 **Synopsis**
 
@@ -2719,29 +2800,33 @@ free devname
 
 **Description**
 
-This command displays the number of unused 256-byte sectors on a device which are available for new files or for expanding existing files. The device name given must be that of a mass-storage multifile device. Free also displays the disk’s name, creation
-```text
-date, and cluster size.
-Data sectors are allocated in groups called "clusters". The number of sectors per cluster depends on the storage capacity and physical characteristics of the specific device. This means that small amounts of free space may not be divisible into as many files. For example, if a given disk system uses 8 sectors per cluster, and a free command shows 32 sectors free, a maximum of four new files could be created even if each has only one cluster. For more information see: Section 3.11
-```
+This command displays the number of unused 256-byte sectors on a device which are available for new files or for expanding existing files. The device name given must be that of a mass-storage multifile device. Free also displays the disk’s name, creation date, and cluster size.
+
+Data sectors are allocated in groups called "clusters". The number of sectors per cluster depends on the storage capacity and physical characteristics of the specific device. This means that small amounts of free space may not be divisible into as many files. For example, if a given disk system uses 8 sectors per cluster, and a free command shows 32 sectors free, a maximum of four new files could be created even if each has only one cluster.
+
+For more information see: Section 3.11
 
 **Examples**
 
-OS9: free
 ```text
+OS9: free
 BACKUP DATA DISK created on: 80/06/12
-Capacity: 1,232 sectors (1-sector clusters) 1,020 free sectors, largest block 935 sectors
+Capacity: 1,232 sectors (1-sector clusters)
+1,020 free sectors, largest block 935 sectors
 ```
 
-OS9: free /D1 NitrOS-9 Documentation Disk created on: 81/04/13 Capacity: 1,232 sectors (1-sector clusters) 568 Free sectors, largest block 440 sectors
+```text
+OS9: free /D1
+NitrOS-9 Documentation Disk created on: 81/04/13
+Capacity: 1,232 sectors (1-sector clusters)
+568 Free sectors, largest block 440 sectors
+```
 
 ### HELP
 
 **Name**
 
-```text
-HELP — Displays the usage and syntax of NitrOS-9 commands.
-```
+**HELP** - Displays the usage and syntax of NitrOS-9 commands.
 
 **Synopsis**
 
@@ -2751,12 +2836,16 @@ help {command}
 
 **Description**
 
-Provide as argument the command for which you want syntax help. Include as many command names in one help line as you wish. The proper form and syntax appears for each valid command you include. If you do not include a command name, help will show you the list of available topics for you to choose from.
+Provide as argument the command for which you want syntax help. Include as many command names in one help line as you wish. The proper form and syntax appears for each valid command you include.
 
-- Examples:
+If you do not include a command name, help will show you the list of available topics for you to choose from.
+
+**Examples**
+
 ```text
 help ex [ENTER]
-Syntax: Ex <modname> Usage : Chain to the given module
+Syntax: Ex <modname>
+Usage : Chain to the given module
 ```
 
 ```text
@@ -2766,19 +2855,15 @@ me: no help available
 
 ```text
 help [ENTER]
+Help available on:
+    ASM     ATTR    [...]
 ```
-
-- Help available on:
-
-ASM ATTR [...]
 
 ### IDENT
 
 **Name**
 
-```text
-IDENT — Print NitrOS-9 module identification
-```
+**IDENT** - Print NitrOS-9 module identification
 
 **Synopsis**
 
@@ -2789,38 +2874,71 @@ ident [ -opts ] path [ -opts ]
 **Description**
 
 This command is used to display header information from NitrOS-9 memory modules. Ident displays the module size, CRC bytes (with verification), and for program and device driver modules, the execution offset and the permanent storage requirement bytes. ident will print and interpret the type/language and attribute/revision bytes. In addition, ident displays the byte immediately following the module name since most Microware-supplied modules set this byte to indicate the module edition.
+
+Ident will display all modules contained in a disk file. If the "-m" option appears, path is assumed to be a module in memory.
+
+If the "-v" option is specified, the module CRC is not verified.
+
+The "-x" option implies the pathlist begins in the execution directory.
+
+The "-s" option causes ident to display the following module information on a single line:
+
 ```text
-Ident will display all modules contained in a disk file. If the "-m" option appears,
-path is assumed to be a module in memory. If the "-v" option is specified, the module CRC is not verified. The "-x" option implies the pathlist begins in the execution directory. The "-s" option causes ident to display the. following module information on a single
+Edition byte (first byte after module name)
+Type/Language byte
+Module CRC
+A "." if the CRC verifies correctly, "?" if incorrect. (Ident will leave this field blank if the "-v" option appears.)
+Module name
 ```
-
-- line:
-
-Edition byte (first byte after module name) Type/Language byte Module CRC A "." if the CRC verifies correctly, "?" if incorrect. (Ident will leave this field blank if the "-v" option appears.) Module name
 
 **Examples**
 
-OS9: ident -m ident Header for: Ident <Module name> Module size: $06A5 #1701 <Module size> Module CRC: $1CE78A (Good) <Good or Bad> Hdr parity: $8B <Header parity> Exec. off: $0222 #546 <Execution offset> Data size: $0CA1 #3233 <Permanent storage requirement> Edition: $05 #5 <First byte after module name> Ty/La At/Rv: $11 $81 <Type/Language Attribute/Revision>
+```text
+OS9: ident -m ident
+Header for: Ident               <Module name>
+Module size: $06A5 #1701        <Module size>
+Module CRC: $1CE78A (Good)      <Good or Bad>
+Hdr parity: $8B                 <Header parity>
+Exec. off: $0222 #546           <Execution offset>
+Data size: $0CA1 #3233          <Permanent storage requirement>
+Edition: $05 #5                 <First byte after module name>
+Ty/La At/Rv: $11 $81            <Type/Language Attribute/Revision>
+Prog mod, 6809 obj, re-en       <Module type, Language, Attribute>
+```
 
-Prog mod, 6809 obj, re-en <Module type, Language, Attribute>
-
-OS9: ident /d0/os9boot -s 1 $C0 $A366DC . KernelP2
-
-83 $C0 $7FC336 . Init 1 $11 $39BA94 . SysGo 1 $C1 $402573 . IOMan 3 $D1 $EE937A . RBF
-
-82 $F1 $526268 . DD 82 $F1 $526268 . D0 82 $F1 $D65245 . D1 82 $F1 $E32FFE . D2 1 $D1 $F944D7 . SCF 2 $E1 $F9FE37 . VDGInt
-
-83 $F1 $765270 . Term 2 $D1 $BBC1EE . PipeMan 2 $E1 $5B2B56 . Piper
-
-80 $F1 $CC06AF . Pipe 2 $C1 $248B2C . Clock 2 $C1 $248B2C . Clock2 ^ ^ ^ ^ ^ | | | | | | | | | Module name | | | CRC check " " if -v, "." if OK, "?" if bad | | CRC value | Type/Language byte Edition byte (first byte after name)
+```text
+OS9: ident /d0/os9boot -s 
+    1 $C0 $A366DC . KernelP2
+   83 $C0 $7FC336 . Init 
+    1 $11 $39BA94 . SysGo 
+    1 $C1 $402573 . IOMan 
+    3 $D1 $EE937A . RBF
+   82 $F1 $526268 . DD 
+   82 $F1 $526268 . D0 
+   82 $F1 $D65245 . D1 
+   82 $F1 $E32FFE . D2 
+    1 $D1 $F944D7 . SCF 
+    2 $E1 $F9FE37 . VDGInt
+   83 $F1 $765270 . Term 
+    2 $D1 $BBC1EE . PipeMan 
+    2 $E1 $5B2B56 . Piper
+   80 $F1 $CC06AF . Pipe 
+    2 $C1 $248B2C . Clock 
+    2 $C1 $248B2C . Clock2 
+    ^  ^     ^    ^ ^ 
+    |  |     |    | | 
+    |  |     |    | Module name 
+    |  |     |    CRC check " " if -v, "." if OK, "?" if bad 
+    |  |     CRC value 
+    |  Type/Language byte 
+    Edition byte (first byte after name)
+```
 
 ### INIZ
 
 **Name**
 
-```text
-INIZ — Initialize a device.
-```
+**INIZ** - Initialize a device.
 
 **Synopsis**
 
@@ -2832,14 +2950,17 @@ iniz [ devicename [...] ]
 
 Links the specified device to NitrOS-9, places the device addres in a new device table entry, allocates the memory needed by the device driver, and calls the device driver initialization routine. If the device is already installed, iniz does not reinitialize it.
 
-- Options:
+**Options:**
 
-devicename is the name of the device drivere you want to initialize. Specify as many device drivers as you wish with one iniz command.
+devicename 
+- is the name of the device drivere you want to initialize. Specify as many device drivers as you wish with one iniz command.
 
-- Notes:
+**Notes:**
+
 You can use Iniz in the startup file or at the system startup to initialize devices and allocate their static storage at the top of memory (to reduce memory fragmentation).
 
-- Example:
+**Examples**
+
 ```text
 iniz p t2 [ENTER]
 ```
@@ -2850,29 +2971,25 @@ initializes the p (printer) and t2 (terminal 2) devices.
 
 **Name**
 
-```text
-IRQS — Show interrupt polling table
-```
+**IRQS** - Show interrupt polling table
 
 **Synopsis**
 
-### irqs
+```text
+irqs
+```
 
 **Description**
 
-```text
-Irqs displays a list of the system’s IRQ polling table. The IRQ polling table contains a
-list of the service routines for each interrupt handler known by the system.
+Irqs displays a list of the system’s IRQ polling table. The IRQ polling table contains a list of the service routines for each interrupt handler known by the system.
+
 The irqs display header lists the system name, the NitrOS-9 version number, the maximum number of devices allowed in the device table, and the maximum number of entries in the IRQ table.
-```
 
 ### KILL
 
 **Name**
 
-```text
-KILL — Abort a process
-```
+**KILL** - Abort a process
 
 **Synopsis**
 
@@ -2882,7 +2999,11 @@ kill procID
 
 **Description**
 
-This shell "built in" command sends an "abort" signal to the process having the process ID number specified. The process to be aborted must have the same user ID as the user that executed the command. The procs command can be used to obtain the process ID numbers. NOTE: If a process is waiting for I/O, it may not die until it completes the current I/O operation, therefore, if you kill a process and the procs command shows it still exists, it is probably waiting for receive a line of data from a terminal before it can die. Since this is a built-in shell command, it does not appear in the CMDS directory. For more information see: Section 4.5, Section 5.2, procs
+This shell "built in" command sends an "abort" signal to the process having the process ID number specified. The process to be aborted must have the same user ID as the user that executed the command. The procs command can be used to obtain the process ID numbers.
+
+**NOTE:** If a process is waiting for I/O, it may not die until it completes the current I/O operation, therefore, if you kill a process and the procs command shows it still exists, it is probably waiting for receive a line of data from a terminal before it can die. Since this is a built-in shell command, it does not appear in the CMDS directory.
+
+For more information see: Section 4.5, Section 5.2, procs
 
 **Examples**
 
@@ -2894,27 +3015,31 @@ kill 5
 kill 22
 ```
 
+```text
 OS9: procs
 
-User # Id pty state Mem Primary module ----- --- --- -------- --- --------------
+User # Id pty  state   Mem Primary module
+----- --- --- -------- --- --------------
+   20  2   0   active   2  Shell <TERM
+   20  1   0   waiting  1  Sysgo <TERM
+   20  3   0  sleeping 20  Copy <TERM
 
-20 2 0 active 2 Shell <TERM 20 1 0 waiting 1 Sysgo <TERM 20 3 0 sleeping 20 Copy <TERM
+OS9: kill 3
+OS9: procs
 
-OS9: kill 3 OS9: procs
-
-User # Id pty state Mem Primary module ----- --- --- -------- --- --------------
-
-20 2 0 active 2 Shell <TERM 20 1 0 waiting 1 Sysgo <TERM
+User # Id pty  state   Mem Primary module
+----- --- --- -------- --- --------------
+   20  2   0   active   2  Shell <TERM
+   20  1   0   waiting  1  Sysgo <TERM
 
 OS9:
+```
 
 ### LINK
 
 **Name**
 
-```text
-LINK — Link module into memory
-```
+**LINK** - Link module into memory
 
 **Synopsis**
 
@@ -2924,25 +3049,25 @@ link memory module name
 
 **Description**
 
-This command is used to "lock" a previously loaded module into memory. The link count of the module specified is incremented by one each time it is "linked". The
-```text
-unlink command is used to "unlock" the module when it is no longer needed.
+This command is used to "lock" a previously loaded module into memory. The link count of the module specified is incremented by one each time it is "linked". The unlink command is used to "unlock" the module when it is no longer needed.
+
 For more information see: Section 5.4, Section 5.4.1, Section 5.4.2, Section 5.4.3
-```
 
 **Examples**
 
+```text
 OS9: LINK edit
+```
 
+```text
 OS9: LINK myprogram
+```
 
 ### LIST
 
 **Name**
 
-```text
-LIST — List the contents of a text file
-```
+**LIST** - List the contents of a text file
 
 **Synopsis**
 
@@ -2952,12 +3077,16 @@ list path { path }
 
 **Description**
 
-This command copies text lines from the path(s) given as parameters to the standard output path. The program terminates upon reaching the end-of-file of the last input path. If more than one path is specified, the first path will be copied to standard output, the second path will be copied next, etc. This command is most commonly used to examine or print text files. For more information see: Section 2.3, Section 3.10.2
+This command copies text lines from the path(s) given as parameters to the standard output path. The program terminates upon reaching the end-of-file of the last input path. If more than one path is specified, the first path will be copied to standard output, the second path will be copied next, etc.
+
+This command is most commonly used to examine or print text files. 
+
+For more information see: Section 2.3, Section 3.10.2
 
 **Examples**
 
 ```text
-list /d0/startup >/p & (output is redirected to printer)
+list /d0/startup >/p &          (output is redirected to printer)
 ```
 
 ```text
@@ -2965,29 +3094,33 @@ list /d1/user5/document /d0/myfile /d0/Bob/text
 ```
 
 ```text
-list /term >/p (copy keyboard to printer - use
-"escape" key to terminate input)
+list /term >/p                  (copy keyboard to printer - use "escape" key to terminate input)
 ```
 
+```text
 OS9: build animals
-- cat
-- cow
-- dog
-- elephant
-- bird
+? cat
+? cow
+? dog
+? elephant
+? bird
+? fish
+? [RETURN]
 
-- fish
-- [RETURN]
-
-OS9: list animals cat cow dog elephant bird fish
+OS9: list animals
+cat
+cow
+dog
+elephant
+bird 
+fish
+```
 
 ### LOAD
 
 **Name**
 
-```text
-LOAD — Load module(s) from file into memory
-```
+**LOAD** - Load module(s) from file into memory
 
 **Synopsis**
 
@@ -2997,7 +3130,9 @@ load path
 
 **Description**
 
-The path specified is opened and one or more modules is read from it and loaded into memory. The names of the modules are added to the module directory. If a module is loaded that has the same name and type as a module already in memory, the module having the highest revision level is kept. For more information see: Section 3.10.4, Section 5.4.1, Section 5.4.2
+The path specified is opened and one or more modules is read from it and loaded into memory. The names of the modules are added to the module directory. If a module is loaded that has the same name and type as a module already in memory, the module having the highest revision level is kept.
+
+For more information see: Section 3.10.4, Section 5.4.1, Section 5.4.2
 
 **Examples**
 
@@ -3005,55 +3140,63 @@ The path specified is opened and one or more modules is read from it and loaded 
 load new_program
 ```
 
+```text
 OS9:mdir
 
-Module Directory at 13:36:47 DCB4 D0 D1 D2 D3 OS9P2 INIT OS9 IOMAN REF SCF ACIA TERM T1 T2 T3 P PIA CDS H1 Sysgo Clock Shell Tsmon Copy
-```text
+   Module Directory at 13:36:47
+DCB4        D0          D1          D2          D3
+OS9P2       INIT        OS9         IOMAN       REF
+SCF         ACIA        TERM        T1          T2
+T3          P           PIA         CDS         H1
+Sysgo       Clock       Shell       Tsmon       Copy
 Mdir
 ```
 
-OS9:load edit OS9:mdir
-
-Module Directory at 13:37:14 DCB4 D0 D1 D2 D3 OS9P2 INIT OS9 IOMAN REF SCF ACIA TERM T1 T2 T3 P PIA CDS H1 Sysgo Clock Shell Tsmon Copy
-
 ```text
-Mdir EDIT
+OS9:load edit
+OS9:mdir
+
+   Module Directory at 13:37:14
+DCB4        D0          D1          D2          D3
+OS9P2       INIT        OS9         IOMAN       REF
+SCF         ACIA        TERM        T1          T2
+T3          P           PIA         CDS         H1
+Sysgo       Clock       Shell       Tsmon       Copy
+Mdir        EDIT
 ```
 
 ### LOGIN
 
 **Name**
 
-```text
-LOGIN — Timesharing System Log-In
-```
+**LOGIN** - Timesharing System Log-In
 
 **Synopsis**
 
-### login
+```text
+login
+```
 
 **Description**
 
-```text
-Login is used in timesharing systems to provide log-in security. It is automatically
-called by the timesharing monitor tsmon, or can be used after initial log-in to change a terminal’s user.
-Login requests a user name and password, which is checked against a validation file.
-If the information is correct, the user’s system priority, user ID, and working directories are set up according to information stored in the file, and the initial program specified in the password file is executed (usually shell). If the user cannot supply a correct user name and password after three attempts, the process is aborted. The validation file is called PASSWORD and must be present in the directory /d0/SYS. The file contains one or more variable-length text records, one for each user name. Each record has the following fields, which are delimited by commas:
-```
+Login is used in timesharing systems to provide log-in security. It is automatically called by the timesharing monitor tsmon, or can be used after initial log-in to change a terminal’s user.
 
-1. User name (up to 32 characters, may include spaces). If this field is empty, any
-name will match.
-2. Password (up to 32 characters, may include spaces) If this field is omitted, no pass-
-word is required by the specific use.
-3. User index (ID) number (from 0 to 65535, 0 is superuser). This number is used
-by the file security system and as the system-wide user ID to identify all processes initiated by the user. The system manager should assign a unique ID to each potential user. (See Section 3.9)
+Login requests a user name and password, which is checked against a validation file. If the information is correct, the user’s system priority, user ID, and working directories are set up according to information stored in the file, and the initial program specified in the password file is executed (usually shell). If the user cannot supply a correct user name and password after three attempts, the process is aborted. The validation file is called PASSWORD and must be present in the directory /d0/SYS. The file contains one or more variable-length text records, one for each user name. Each record has the following fields, which are delimited by commas:
+
+1. User name (up to 32 characters, may include spaces). If this field is empty, any name will match.
+2. Password (up to 32 characters, may include spaces) If this field is omitted, no password is required by the specific use.
+3. User index (ID) number (from 0 to 65535, 0 is superuser). This number is used by the file security system and as the system-wide user ID to identify all processes initiated by the user. The system manager should assign a unique ID to each potential user. (See Section 3.9)
 4. Initial process (CPU time) priority: 1 - 255 (see Section 5.2)
 5. Pathlist of initial execution directory (usually /d0/CMDS)
 6. Pathlist of initial data directory (specific user’s directory)
-7. Name of initial program to execute (usually shell). NOTE: This is not a shell com-
-mand line. Here’s a sample validation file:
+7. Name of initial program to execute (usually shell). NOTE: This is not a shell command line. Here’s a sample validation file:
 
-superuser,secret,0,255,.,.,shell steve,open sesame,3,128,.,/d1/STEVE,shell sally,qwerty,10,100,/d0/BUSINESS,/d1/LETTERS,wordprocessor bob„4,128,.,/d1/BOB,Basic09
+```text
+superuser,secret,0,255,.,.,shell
+steve,open sesame,3,128,.,/d1/STEVE,shell
+sally,qwerty,10,100,/d0/BUSINESS,/d1/LETTERS,wordprocessor
+bob„4,128,.,/d1/BOB,Basic09
+```
 
 To use the login command, enter:
 
@@ -3061,35 +3204,43 @@ To use the login command, enter:
 login
 ```
 
-This will cause prompts for the user’s name and (optionally) password to be displayed, and if answered correctly, the user is logged into the system. Login initializes the user number, working execution directory, working data directory, and executes the initial program specified by the password file. The date, time and process number (which is not the same as the user ID, see Section 5.3) are also displayed. Note: if the shell from which login was called will not be needed again, it may be discarded by using the ex command to start the login command. For example:
+This will cause prompts for the user’s name and (optionally) password to be displayed, and if answered correctly, the user is logged into the system. Login initializes the user number, working execution directory, working data directory, and executes the initial program specified by the password file. The date, time and process number (which is not the same as the user ID, see Section 5.3) are also displayed.
+
+**Note:** if the shell from which login was called will not be needed again, it may be discarded by using the ex command to start the login command. For example:
 
 ```text
 ex login
 ```
 
-Logging Off the System To log off the system, the initial program specified in the password file must be terminated. For most programs (including shell) this may be done by typing an end of file character (escape) as the first character on a line.
+**Logging Off the System**
 
-Displaying a “Message-of-the-Day” If desired, a file named motd appearing in the SYS directory will cause login to display it’s contents on the user’s terminal after successful login. This file is not required for login to operate. For more information see: tsmon, Section 4.9, Section 3.9, Section 5.3
+To log off the system, the initial program specified in the password file must be terminated. For most programs (including shell) this may be done by typing an end of file character (escape) as the first character on a line.
+
+**Displaying a "Message-of-the-Day"**
+
+If desired, a file named motd appearing in the SYS directory will cause login to display it’s contents on the user’s terminal after successful login. This file is not required for login to operate. For more information see: tsmon, Section 4.9, Section 3.9, Section 5.3
 
 **Examples**
 
+```text
 OS9: login
 
-NitrOS-9/6309 Timesharing System Level 2 V03.02.01
+NitrOS-9/6309 Timesharing System
+Level 2 V03.02.01
+    2003/12/04 13:02:22
 
-2003/12/04 13:02:22
+User name?: superuser
+Password: secret
 
-User name?: superuser Password: secret
-
-Process #07 logged on 2003/12/04 13:03:00 Welcome!
+Process #07 logged on   2003/12/04 13:03:00
+Welcome!
+```
 
 ### MAKDIR
 
 **Name**
 
-```text
-MAKDIR — Create directory file
-```
+**MAKDIR** - Create directory file
 
 **Synopsis**
 
@@ -3099,7 +3250,13 @@ makdir path
 
 **Description**
 
-Creates a new directory file acdording to the pathlist given. The pathlist must refer to a parent directory for which the user has write permission. The new directory is initialized and initially does not contain files except for the . and .. pointers to its parent directory and itself, respectively (see Section 3.8.3). All access permissions are enabled (except sharable). It is customary (but not mandatory) to capitalize directory names. For more information see: Section 3.4, Section 3.5, Section 3.6, Section 3.8.3, Section 3.10.5
+Creates a new directory file acdording to the pathlist given. The pathlist must refer to a parent directory for which the user has write permission.
+
+The new directory is initialized and initially does not contain files except for the . and .. pointers to its parent directory and itself, respectively (see Section 3.8.3). All access permissions are enabled (except sharable).
+
+It is customary (but not mandatory) to capitalize directory names. 
+
+For more information see: Section 3.4, Section 3.5, Section 3.6, Section 3.8.3, Section 3.10.5
 
 **Examples**
 
@@ -3119,9 +3276,7 @@ makdir ../SAVEFILES
 
 **Name**
 
-```text
-MDIR — Display Module Directory
-```
+**MDIR** - Display Module Directory
 
 **Synopsis**
 
@@ -3133,22 +3288,36 @@ mdir [ -e ]
 
 Displays the present module names in the system module directory, i.e., all modules currently resident in memory. For example:
 
+```text
 OS9: mdir
 
-Module Directory at 14:44:35 D0 Pipe OS9 OS9P2 Init Boot DDisk D1 KBVDIO TERM IOMan RBF SCF SysGo Clock Shell PRINTER P PipeMan Piper
-```text
+ Module Directory at 14:44:35
+D0      Pipe    OS9     OS9P2
+Init    Boot    DDisk   D1 
+KBVDIO  TERM    IOMan   RBF
+SCF     SysGo   Clock   Shell
+PRINTER P       PipeMan Piper
 Mdir
 ```
 
 If the "e" option is given, a full listing of the physical address, size, type, revision level, reentant attribute, user count, and name of each module is displayed. All numbers shown are in hexadecimal.
 
+```text
 OS9: mdir -e
 
-Module Directory at 10:55:04
+ Module Directory at 10:55:04
 
-ADDR SIZE TY RV AT UC NAME ---- ---- -- -- -- -- -------C305 2F F1 1 R D0 F059 7EB C1 1 R OS9 F852 4F4 C1 1 R OS9P2 FD46 2E CO 1 R INIT C363 798 E1 1 R 2 KBVDIO CAFB 38 F1 1 R 2 TERM
+ADDR SIZE TY RV AT UC   NAME
+---- ---- -- -- -- -- -------
+C305   2F F1  1 R     D0
+F059  7EB C1  1 R     OS9
+F852  4F4 C1  1 R     OS9P2
+FD46   2E CO  1 R     INIT
+C363  798 E1  1 R   2 KBVDIO
+CAFB   38 F1  1 R   2 TERM
+```
 
-Caution Many of the modules listed by mdir are NitrOS-9 system modules and not executable as programs: always check the module type code before running a module if you are not familiar with it!
+**Caution** Many of the modules listed by mdir are NitrOS-9 system modules and not executable as programs: always check the module type code before running a module if you are not familiar with it!
 
 For more information see: Section 5.4.1
 
@@ -3156,9 +3325,7 @@ For more information see: Section 5.4.1
 
 **Name**
 
-```text
-MERGE — Copy and Combine Files to Standard Output
-```
+**MERGE** - Copy and Combine Files to Standard Output
 
 **Synopsis**
 
@@ -3172,43 +3339,51 @@ This command copies multiple input files specified by the pathlists given as par
 
 **Examples**
 
+```text
 OS9: merge file1 file2 file3 file4 >combined.file
+```
 
+```text
 OS9: merge compile.list asm.list >/printer
+```
 
 ### MFREE
 
 **Name**
 
-```text
-MFREE — Display Free System RAM
-```
+**MFREE** - Display Free System RAM
 
 **Synopsis**
 
-### mfree
+```text
+mfree
+```
 
 **Description**
 
-Displays a list of which areas of memory are not presently in use and available for assignment. The address and size of each free memory block are displayed. The size is given as the number of 256-byte pages. This information is useful to detect and correct memory fragmentation (see Section 5.4.3). For more information see: Section 5.4, Section 5.4.3
+Displays a list of which areas of memory are not presently in use and available for assignment. The address and size of each free memory block are displayed. The size is given as the number of 256-byte pages. This information is useful to detect and correct memory fragmentation (see Section 5.4.3).
+
+For more information see: Section 5.4, Section 5.4.3
 
 **Examples**
 
+```text
 OS9: mfree
 
-Address pages --------- ----- 700- 7FF 1 B00-AEFF 164
-
-B100-B1FF 1
+ Address  pages
+--------- ----- 
+ 700- 7FF    1
+ B00-AEFF  164
+B100-B1FF    1
 
 Total pages free = 166
+```
 
 ### OS9GEN
 
 **Name**
 
-```text
-OS9GEN — Build and Link a Bootstrap File
-```
+**OS9GEN** - Build and Link a Bootstrap File
 
 **Synopsis**
 
@@ -3218,67 +3393,82 @@ os9gen device name
 
 **Description**
 
-```text
-OS9Gen is used to create and link the OS9Boot file required on any disk from which
-OS-9 is to be bootstrapped. OS9Gen is used to add modules to an existing boot or to create an entirely new boot file. If an exact copy of the existing OS9Boot file is desired, the cobbler command should be used instead.
-```
+OS9Gen is used to create and link the OS9Boot file required on any disk from which OS-9 is to be bootstrapped. OS9Gen is used to add modules to an existing boot or to create an entirely new boot file. If an exact copy of the existing OS9Boot file is desired, the cobbler command should be used instead.
 
-The name of the device on which the OS9Boot file is to be installed is passed to
-```text
-OS9Gen as a command line parameter. OS9Gen then creates a working file called
-TempBoot on the device specified. Next it reads file names (pathlists) from its standard input, one pathlist per line. Every file named is opened and copied to TempBoot. This is repeated until end-of-file or a blank line is reached on OS9Gen’s standard input. All boot files must contain the OS-9 component modules listed in section Section 6.1. After all input files have been copied to TempBoot, the old OS9Boot file, if present, is deleted. TempBoot is then renamed to OS9Boot, and its starting address and size is linked in the disk’s Identification Sector (LSN 0) for use by the OS-9 bootstrap firmware. WARNING: Any OS9Boot file must be stored in physically contiguous sectors. Therefore, OS9Gen is normally used on a freshly formatted disk. If the OS9Boot file is fragmented, OS9Gen will print a warning message indicated the disk cannot be used to bootstrap OS-9. The list of file names given to OS9Gen can be entered from a keyboard, or OS9Gen’s standard input may be redirected to a text file containing a list of file names (pathlists) . If names are entered manually, no prompts are given, and the end-of-file key (usually ESCAPE) or a blank line is entered after the line containing the last pathlist. For more information see: Chapter 6, Section 6.1, Section 6.6
-```
+The name of the device on which the OS9Boot file is to be installed is passed to OS9Gen as a command line parameter. OS9Gen then creates a working file called TempBoot on the device specified. Next it reads file names (pathlists) from its standard input, one pathlist per line. Every file named is opened and copied to TempBoot. This is repeated until end-of-file or a blank line is reached on OS9Gen’s standard input. All boot files must contain the OS-9 component modules listed in section Section 6.1.
+
+After all input files have been copied to TempBoot, the old OS9Boot file, if present, is deleted. TempBoot is then renamed to OS9Boot, and its starting address and size is linked in the disk’s Identification Sector (LSN 0) for use by the OS-9 bootstrap firmware. 
+
+**WARNING:** Any OS9Boot file must be stored in physically contiguous sectors. Therefore, OS9Gen is normally used on a freshly formatted disk. If the OS9Boot file is fragmented, OS9Gen will print a warning message indicated the disk cannot be used to bootstrap OS-9.
+
+The list of file names given to OS9Gen can be entered from a keyboard, or OS9Gen’s standard input may be redirected to a text file containing a list of file names (pathlists) . If names are entered manually, no prompts are given, and the end-of-file key (usually ESCAPE) or a blank line is entered after the line containing the last pathlist.
+
+For more information see: Chapter 6, Section 6.1, Section 6.6
 
 **Examples**
 
 To manually install a boot file on device "d1" which is an exact copy of the OS9Boot file on device "d0":
 
-OS9: os9gen /d1 (run OS9Gen) /d0/os9boot (enter file to be installed) [ESCAPE] (enter end-of-file)
+```text
+OS9: os9gen /d1         (run OS9Gen)
+/d0/os9boot             (enter file to be installed)
+[ESCAPE]                (enter end-of-file)
+```
 
 To manually install a boot file on device "d1" which is a copy of the OS9Boot file on device "d0" with the addition of modules stored in the files /d0/tape.driver and /d2/video.driver:
 
-OS9: os9gen /d1 (run OS9Gen) /d0/os9boot (enter main boot file name) /d0/tape.driver (enter name of first file to be added) /d2/video.driver (enter name of second file to be added) [ESCAPE] (enter end-of-file)
+```text
+OS9: os9gen /d1         (run OS9Gen)
+/d0/os9boot             (enter main boot file name)
+/d0/tape.driver         (enter name of first file to be added)
+/d2/video.driver        (enter name of second file to be added) 
+[ESCAPE]                (enter end-of-file)
+```
 
 As above, but automatically by redirecting OS9Gen standard input:
 
+```text
 OS9: build /d0/bootlist (use build to create file bootlist)
-- /d0/os9boot (enter first file name)
-- /d0/tape.driver (enter second file name)
-- /d2/video.driver (enter third file name)
-- [RETURN] (terminate build)
+? /d0/os9boot           (enter first file name)
+? /d0/tape.driver       (enter second file name)
+? /d2/video.driver      (enter third file name)
+? [RETURN]              (terminate build)
 OS9: os9gen /d1 </d0/bootlist (run OS9gen with redirected input)
+```
 
 ### PRINTERR
 
 **Name**
 
-```text
-PRINTERR — Print Full Text Error Messages
-```
+**PRINTERR** - Print Full Text Error Messages
 
 **Synopsis**
 
-### printerr
+```text
+printerr
+```
 
 **Description**
 
-This command replaces the basic OS-9 error printing routine (F$Perr service request) which only prints error code numbers, with a routine the reads and displays textual error messages from the file /d0/SYS/errmsg. Printerr’s effect is system-wide. A standard error message file is supplied with OS-9. This file can be edited or replaced by the system manager. The file is a normal text file with variable length line. Each error message line begins with the error number code (in ASCII characters), a delimiter, and the error message text. The error messages need not be in any particular order. Delimiters are spaces or any character numerically lower then $20. Any line having a delimiter as its first character is considered a continuation of the previous line(s) which permits multi-line error messages.
+This command replaces the basic OS-9 error printing routine (F$Perr service request) which only prints error code numbers, with a routine the reads and displays textual error messages from the file /d0/SYS/errmsg. Printerr’s effect is system-wide.
 
-Warning Once the printerr command has been used, it can not be undone. Once installed, the printerr module should not be unlinked. Printerr uses the current user’s stack for an I/O buffer, so users are encouraged to reserve reasonably large stacks.
+A standard error message file is supplied with OS-9. This file can be edited or replaced by the system manager. The file is a normal text file with variable length line. Each error message line begins with the error number code (in ASCII characters), a delimiter, and the error message text. The error messages need not be in any particular order. Delimiters are spaces or any character numerically lower then $20. Any line having a delimiter as its first character is considered a continuation of the previous line(s) which permits multi-line error messages.
+
+**Warning** Once the printerr command has been used, it can not be undone. Once installed, the printerr module should not be unlinked. Printerr uses the current user’s stack for an I/O buffer, so users are encouraged to reserve reasonably large stacks.
 
 For more information see: Section 4.7, Section 6.2.
 
 **Examples**
 
+```text
 OS9: printerr
+```
 
 ### PROCS
 
 **Name**
 
-```text
-PROCS — Display Processes
-```
+**PROCS** - Display Processes
 
 **Synopsis**
 
@@ -3290,26 +3480,29 @@ procs [ -e ]
 
 Displays a list of processes running on the system. Normally only processes having the user’s ID are listed, but if the "-e" option is given, processes of all users are listed. The display is a "snapshot" taken at the instant the command is executed: processes can switch states rapidly, usually many times per second.
 
-```text
-PROCS shows the user and process ID numbers, priority, state (process status), mem-
-ory size (in 256 byte pages), primary program module, and standard input path. For more information see: Section 5.1, Section 5.2, Section 5.3
-```
+PROCS shows the user and process ID numbers, priority, state (process status), memory size (in 256 byte pages), primary program module, and standard input path.
+
+For more information see: Section 5.1, Section 5.2, Section 5.3
 
 **Examples**
 
-- Level One Example:
+Level One Example:
 
-User# Id pty state Mem Primary module ---- --- --- -------- --- --------------
-
-0 2 0 active 2 Shell 0 1 0 waiting 1 SysGo 1 3 1 waiting 2 Tsmon 1 4 1 waiting 4 Shell 1 5 1 active 64 Basic09
+```text
+User# Id pty  state   Mem Primary module
+---- --- --- -------- --- --------------
+   0   2   0  active    2 Shell
+   0   1   0  waiting   1 SysGo
+   1   3   1  waiting   2 Tsmon
+   1   4   1  waiting   4 Shell
+   1   5   1  active   64 Basic09
+```
 
 ### PWD/PXD
 
 **Name**
 
-```text
-PWD/PXD — Print Working Directory / Print Execution Directory
-```
+**PWD/PXD** - Print Working Directory / Print Execution Directory
 
 **Synopsis**
 
@@ -3317,28 +3510,38 @@ PWD/PXD — Print Working Directory / Print Execution Directory
 pwd
 ```
 
-### pxd
+```text
+pxd
+```
 
 **Description**
 
-```text
-Pwd displays a pathlist that shows the path from the root directory to the user’s
-current data directory. It can be used by programs to discover the actual physical location of files, or by humans who get lost in the file system. Pxd is identical except that is shows the pathlist of the user’s current execution directory.
-```
+Pwd displays a pathlist that shows the path from the root directory to the user’s current data directory. It can be used by programs to discover the actual physical location of files, or by humans who get lost in the file system. Pxd is identical except that is shows the pathlist of the user’s current execution directory.
 
 **Examples**
 
-OS9: chd /D1/STEVE/TEXTFILES/MANUALS OS9: pwd /D1/STEVE/TEXTFILES/MANUALS OS9: chd .. OS9: pwd /D1/STEVE/TEXTFILES OS9: chd .. OS9: pwd /D1/STEVE
+```text
+OS9: chd /D1/STEVE/TEXTFILES/MANUALS
+OS9: pwd
+/D1/STEVE/TEXTFILES/MANUALS
+OS9: chd .. 
+OS9: pwd
+/D1/STEVE/TEXTFILES 
+OS9: chd .. 
+OS9: pwd
+/D1/STEVE
+```
 
-OS9: pxd /D0/CMDS
+```text
+OS9: pxd
+/D0/CMDS
+```
 
 ### RENAME
 
 **Name**
 
-```text
-RENAME — Change file name
-```
+**RENAME** - Change file name
 
 **Synopsis**
 
@@ -3360,21 +3563,24 @@ rename blue purple
 rename /D3/user9/test temp
 ```
 
+```text
 OS9: dir
 
-Directory of . 16:22:53 myfile animals
+   Directory of . 16:22:53
+myfile          animals
 
-OS9:rename animals cars OS9:dir
+OS9:rename animals cars
+OS9:dir
 
-Directory of . 16:23:22 myfile cars
+   Directory of . 16:23:22
+myfile          cars
+```
 
 ### RUNB
 
 **Name**
 
-```text
-RUNB — BASIC09 run time package
-```
+**RUNB** - BASIC09 run time package
 
 **Synopsis**
 
@@ -3384,15 +3590,15 @@ runb i-code module
 
 **Description**
 
-BASIC09 run time package Once one or more BASIC09 procedures are debugged to the programmer’s satisfaction, they can be "packed" or converted permanently to the bytecode form. Packed BASIC09 procedures are in fact OS-9 modules, and the OS-9 shell recognizes them as I-code and passes them off to the virtual machine emulator RunB for execution. RunB avoids a great deal of the overhead of the typical interpreted BASICs of the day -- not to mention that one can do integer calculations where appropriate rather than doing everything in floating point -- so that BASIC09 programs run very quickly in comparison with interpreted BASICs.
+BASIC09 run time package Once one or more BASIC09 procedures are debugged to the programmer’s satisfaction, they can be "packed" or converted permanently to the bytecode form.
+
+Packed BASIC09 procedures are in fact OS-9 modules, and the OS-9 shell recognizes them as I-code and passes them off to the virtual machine emulator RunB for execution. RunB avoids a great deal of the overhead of the typical interpreted BASICs of the day -- not to mention that one can do integer calculations where appropriate rather than doing everything in floating point -- so that BASIC09 programs run very quickly in comparison with interpreted BASICs.
 
 ### SAVE
 
 **Name**
 
-```text
-SAVE — Save memory module(s) on a file
-```
+**SAVE** - Save memory module(s) on a file
 
 **Synopsis**
 
@@ -3402,7 +3608,9 @@ save path modname {modname}
 
 **Description**
 
-Creates a new file and writes a copy of the memory module(s) specified on to the file. The module name(s) must exist in the module directory when saved. The new file is given access permissions for all modes except public write. Note: save’s default directory is the current data directory. Executable modules should generally be saved in the default execution directory.
+Creates a new file and writes a copy of the memory module(s) specified on to the file. The module name(s) must exist in the module directory when saved. The new file is given access permissions for all modes except public write.
+
+**Note:** save’s default directory is the current data directory. Executable modules should generally be saved in the default execution directory.
 
 **Examples**
 
@@ -3418,9 +3626,7 @@ save /d1/mathpack add sub mul div
 
 **Name**
 
-```text
-SETIME — Activate and set system clock
-```
+**SETIME** - Activate and set system clock
 
 **Synopsis**
 
@@ -3430,31 +3636,31 @@ setime [y,m,d,h,m,s]
 
 **Description**
 
-This command sets the system date and time, then activates the real time clock. The
-```text
-date and time can be entered as parameters, or if no parameters are given, setime will
-issue a prompt. Numbers are one or two decimal digits using space, colon, semicolon or slash delimiters. OS-9 system time uses the 24 hour clock, i.e., 1520 is 3:20 PM.
-```
+This command sets the system date and time, then activates the real time clock. The date and time can be entered as parameters, or if no parameters are given, setime will issue a prompt. Numbers are one or two decimal digits using space, colon, semicolon or slash delimiters. OS-9 system time uses the 24 hour clock, i.e., 1520 is 3:20 PM.
 
-Important: This command must be executed before OS-9 can perform multitasking operations. If the system does not have a real time clock this command should still be used to set the date for the file system.
+**Important:** This command must be executed before OS-9 can perform multitasking operations. If the system does not have a real time clock this command should still be used to set the date for the file system.
 
-Systems With Battery Backed up Clocks: Setime should still be run to start timeslicing, but only the year need be given, the date and time will be read from the clock.
+**Systems With Battery Backed up Clocks:** Setime should still be run to start timeslicing, but only the year need be given, the date and time will be read from the clock.
 
 **Examples**
 
-OS9: setime 82,12,22,1545 (Set to: Dec. 12, 1981, 3:45 PM)
+```text
+OS9: setime 82,12,22,1545   (Set to: Dec. 12, 1981, 3:45 PM)
+```
 
-OS9: setime 821222 154500 (Same as above)
+```text
+OS9: setime 821222 154500   (Same as above)
+```
 
-OS9: setime 82 (For system with battery-backup clock)
+```text
+OS9: setime 82              (For system with battery-backup clock)
+```
 
 ### SETPR
 
 **Name**
 
-```text
-SETPR — Set Process Priority
-```
+**SETPR** - Set Process Priority
 
 **Synopsis**
 
@@ -3464,10 +3670,9 @@ setpr procID number
 
 **Description**
 
-This command changes the CPU priority of a process. It may only be used with a process having the user’s ID. The process number is a decimal number in the range of 1 (lowest) to 255. The procs command can be used to obtain process ID numbers and present priority. NOTE: This command does not appear in the CMDS directory as it is built-in to the
-```text
-shell.
-```
+This command changes the CPU priority of a process. It may only be used with a process having the user’s ID. The process number is a decimal number in the range of 1 (lowest) to 255. The procs command can be used to obtain process ID numbers and present priority.
+
+**NOTE:** This command does not appear in the CMDS directory as it is built-in to the shell.
 
 For more information see: Section 5.1, procs
 
@@ -3477,25 +3682,30 @@ For more information see: Section 5.1, procs
 setpr 8 250 (change process #8 priority to 250)
 ```
 
+```text
 OS9: procs
 
-User # Id pty state Mem Primary module ----- --- --- -------- --- --------------
+User # Id pty  state   Mem Primary module
+----- --- --- -------- --- --------------
+    0   3   0 waiting    2 Shell <TERM
+    0   2   0 waiting    2 Shell <TERM
+    0   1   0 waiting    1 Sysgo <TERM
 
-0 3 0 waiting 2 Shell <TERM 0 2 0 waiting 2 Shell <TERM 0 1 0 waiting 1 Sysgo <TERM
+OS9: setpr 3 128
+OS9: procs
 
-OS9: setpr 3 128 OS9: procs
-
-User # Id pty state Mem Primary module ----- --- --- -------- --- --------------
-
-0 3 128 active 2 Shell <TERM 0 2 0 waiting 2 Shell <TERM 0 1 0 waiting 1 Sysgo <TERM
+User # Id pty  state   Mem Primary module
+----- --- --- -------- --- --------------
+    0   3 128 active     2 Shell <TERM
+    0   2   0 waiting    2 Shell <TERM
+    0   1   0 waiting    1 Sysgo <TERM
+```
 
 ### SHELL
 
 **Name**
 
-```text
-SHELL — OS-9 Command Interpreter
-```
+**SHELL** - OS-9 Command Interpreter
 
 **Synopsis**
 
@@ -3505,41 +3715,67 @@ shell arglist
 
 **Description**
 
-The shell is OS-9’s command interpreter program. It reads data from its standard input path (the keyboard or a file), and interprets the data as a sequence of commands. - The basic function of the shell is to initiate and control execution of other OS-9 programs. The shell reads and interprets one text line at a time from the standard input path. After interpretation of each line it reads another until an end-of-file condition occurs, at which time it terminates itself. A special case is when the shell is called from another program, in which case it will take the parameter area (rest of the command line) as its first line of input. If this command line consists of "built in" commands only, more lines will be read and processed; otherwise control will return to the calling program after the single command line is processed. The rest of this description is a technical specification of the shell syntax. Use of the
-```text
-shell is described fully in Chapters 2 and 4 of this manual.
-```
+The shell is OS-9’s command interpreter program. It reads data from its standard input path (the keyboard or a file), and interprets the data as a sequence of commands. - The basic function of the shell is to initiate and control execution of other OS-9 programs.
+
+The shell reads and interprets one text line at a time from the standard input path. After interpretation of each line it reads another until an end-of-file condition occurs, at which time it terminates itself. A special case is when the shell is called from another program, in which case it will take the parameter area (rest of the command line) as its first line of input. If this command line consists of "built in" commands only, more lines will be read and processed; otherwise control will return to the calling program after the single command line is processed.
+
+The rest of this description is a technical specification of the shell syntax. Use of the shell is described fully in Chapters 2 and 4 of this manual.
+
+**Shell Input Line Formal Syntax**
 
 ```text
-Shell Input Line Formal Syntax
-pgm line := pgm {pgm} pgm := [params] [ name [modif] [pgm params] [modif] ] [sep]
+pgm line := pgm {pgm}
+pgm := [params] [ name [modif] [pgm params] [modif] ] [sep]
 ```
 
-Program Specifications
+**Program Specifications**
 
-name := module name := pathlist := ( pgm list )
+```text
+name := module name 
+            := pathlist 
+            := ( pgm list )
+```
 
 **Parameters**
 
-params:= param { delim param } delim := space or comma characters param := ex name [modif] chain to program specified
+```text
+params:= param { delim param }
+delim := space or comma characters
+param := ex name [modif] chain to program specified
+          := chd pathlist       change working directory
+          := kill procID        send abort signal to process
+          := setprprocID pty    change process priority
+          := chx pathlist       change execution directory
+          := w                  wait for any process to die
+          := p                  turn "OS9:" prompting on
+          := -p                 turn prompting off
+          := t                  echo input lines to std output
+          := -t                 don’t echo input lines
+          := -x                 dont abort on error
+          := x                  abort on error
+          := * text             comment line: not processed
+sep   := ;              sequential execution separator
+          := &                  concurrent execution separator
+          := !                  pipeline separator
+          := cr         end-of-line (sequential execution separator)
+```
 
-:= chd pathlist change working directory := kill procID send abort signal to process := setprprocID pty change process priority := chx pathlist change execution directory := w wait for any process to die := p turn "OS9:" prompting on := -p turn prompting off := t echo input lines to std output := -t don’t echo input lines := -x dont abort on error := x abort on error := * text comment line: not processed
+**Modifiers**
 
-sep := ; sequential execution separator := & concurrent execution separator := ! pipeline separator := cr end-of-line (sequential execution separator)
-
-Modifiers
-
-modif := mod { delim mod } mod := < pathlist redirect standard input
-
-:= > pathlist redirect standard output := >> pathlist redirect standard error output := # integer set process memory size in pages := # integer K set program memory size in 1K increments
+```text
+modif := mod { delim mod }
+mod   := < pathlist         redirect standard input
+        := > pathlist       redirect standard output
+        := >> pathlist      redirect standard error output
+        := # integer        set process memory size in pages
+        := # integer K      set program memory size in 1K increments
+```
 
 ### SLEEP
 
 **Name**
 
-```text
-SLEEP — Suspend process for period of time
-```
+**SLEEP** - Suspend process for period of time
 
 **Synopsis**
 
@@ -3549,19 +3785,21 @@ sleep tickcount
 
 **Description**
 
-This command puts the user’s process to "sleep" for a number of clock ticks. It is generally used to generate time delays or to "break up" CPU-intensive jobs. The duration of a tick is 16.66 milliseconds. A tick count of 1 causes the process to "give up" its current time slide. A tick count of zero causes the process to sleep indefinitely (usually awakened by a signal)
+This command puts the user’s process to "sleep" for a number of clock ticks. It is generally used to generate time delays or to "break up" CPU-intensive jobs. The duration of a tick is 16.66 milliseconds. A tick count of 1 causes the process to "give up" its current time slide.
+
+A tick count of zero causes the process to sleep indefinitely (usually awakened by a signal)
 
 **Examples**
 
+```text
 OS9: sleep 25
+```
 
 ### TEE
 
 **Name**
 
-```text
-TEE — Copy standard input to multiple output paths
-```
+**TEE** - Copy standard input to multiple output paths
 
 **Synopsis**
 
@@ -3571,16 +3809,19 @@ tee {path}
 
 **Description**
 
-This command is a filter (see Section 4.3.3) that copies all text lines from its standard input path to the standard output path and any number of additional output paths whose pathlists are given as parameters. The example below uses a pipeline and tee to simultaneously send the output listing of the dir command to the terminal, printer, and a disk file:
+This command is a filter (see Section 4.3.3) that copies all text lines from its standard input path to the standard output path and any number of additional output paths whose pathlists are given as parameters.
+
+The example below uses a pipeline and tee to simultaneously send the output listing of the dir command to the terminal, printer, and a disk file:
 
 ```text
 dir e ! tee /printer /d0/dir.listing
 ```
 
-The following example sends the output of an assembler listing to a disk file and the
-- printer:
+The following example sends the output of an assembler listing to a disk file and the printer:
 
+```text
 asm pgm.src l ! tee pgm.list >/printer
+```
 
 The example below "broadcasts" a message to four terminals:
 
@@ -3592,9 +3833,7 @@ echo WARNING System down in 10 minutes ! tee /t1 /t2 /t3 /t4
 
 **Name**
 
-```text
-TMODE — Change terminal operating mode
-```
+**TMODE** - Change terminal operating mode
 
 **Synopsis**
 
@@ -3604,59 +3843,43 @@ tmode [ .pathnum ] [ arglist ]
 
 **Description**
 
-This command is used to display or change the operating parameters of the user’s terminal. If no arguments are given, the present values for each parameter are displayed, otherwise, the parameter(s) given in the argument list are processed. Any number of parameters can be. given, and are separated by spaces or commas. A period and a number can be used to optionally specify the path number to be affected. If none is given, the standard input path is affected. NOTE: If this command is used in a shell procedure file, the option ".path num" must be used to specify one of the standard output paths (0, 1 or 2) to change the terminal’s operating characteristics. The change will remain in effect until the path is closed. To effect a permanent change to a device characteristic, the device descriptor must be changed. This command can work only if a path to the file/device has already been opened. You may alter the device descriptor to set a device’s initial operating parameter (see the System Programmer’s Manual).
+This command is used to display or change the operating parameters of the user’s terminal.
 
-upc Upper case only. Lower case characters are automatically converted to upper case.
+If no arguments are given, the present values for each parameter are displayed, otherwise, the parameter(s) given in the argument list are processed. Any number of parameters can be. given, and are separated by spaces or commas. A period and a number can be used to optionally specify the path number to be affected. If none is given, the standard input path is affected.
 
--upc Upper case and lower case characters permitted (default). bsb Erase on backspace: backspace characters echoed as a
+**NOTE:** If this command is used in a shell procedure file, the option ".path num" must be used to specify one of the standard output paths (0, 1 or 2) to change the terminal’s operating characteristics. The change will remain in effect until the path is closed. To effect a permanent change to a device characteristic, the device descriptor must be changed.
 
-backspace-space-backspace sequence (default). -bsb no erase on backspace: echoes single backspace only bsl Backspace over line: lines are "deleted" by sending
+This command can work only if a path to the file/device has already been opened. You may alter the device descriptor to set a device’s initial operating parameter (see the System Programmer’s Manual).
 
-backspace-space-backspace sequences to erase the same line (for video terminals) (default).
-
--bsl No backspace over line: lines are "deleted" by printing a new line sequence (for hard-copy terminals). echo Input characters "echoed" back to terminal (default)
-
--echo No echo lf Auto line feed on: line feeds automatically echoed to terminal
-
-on input and output carriage returns (default). -lf Auto line feed off. pause Screen pause on: output suspended upon full screen. See "pag"
-
-parameter for definition of screen size. Output can be resumed by typing any key.
-
--pause Screen pause mode off. null=n Set null count: number of null ($00) characters transmitted after
-
-carriage returns for return delay. The number is decimal,
-- default = 0.
-
-pag=n Set video display page length to n (decimal) lines. Used for "pause" mode, see above.
-
-bsp=h Set input backspace character. Numeric value of character in hexadecimal. Default = 08.
-
-bse=h Set output backspace character. Numeric value of character in hexadecimal. Default = 08.
-
-```text
-del=h Set input delete line character. Numeric value of character in
-hexadecimal. Default = 18.
-```
-
-bell=h Set bell (alert) output character. Numeric value of character in hexadecimal. Default = 07
-
-eor=h Set end-of-record (carriage return) input character. Numeric value of character in hexadecimal. Default = 0D
-
-eof=h Set end-of-file input character. Numeric value of character in hexadecimal. Default 1B.
-
-type=h ACIA initialization value: sets parity, word size, etc. Value in hexadecimal. Default 15
-
-reprint=h Reprint line character. Numeric value of character in hexadecimal.
-
-dup=h Duplicate last input line character. Numeric value of character in hexadecimal.
-
-psc=h Pause character. Numeric value of character in hexadecimal. abort=h Abort character (normally Control+C). Numeric value of
-
-character in hexadecimal. quit=h Quit character (normally Control+E). Numeric value of
-
-character in hexadecimal. baud=d Set baud rate for software-controllable interface. Numeric code
-
-for baud rate: 0=110 1=300 2=600 3=1200 4=2400 5=4800 6=9600 7=19200
+| | |
+|-|-|
+| upc | Upper case only. Lower case characters are automatically converted to upper case. |
+| -upc | Upper case and lower case characters permitted (default). |
+| bsb | Erase on backspace: backspace characters echoed as a backspace-space-backspace sequence (default). |
+| -bsb | no erase on backspace: echoes single backspace only |
+| bsl | Backspace over line: lines are "deleted" by sending backspace-space-backspace sequences to erase the same line (for video terminals) (default). |
+| -bsl | No backspace over line: lines are "deleted" by printing a new line sequence (for hard-copy terminals). |
+| echo | Input characters "echoed" back to terminal (default) |
+| -echo | No echo |
+| lf | Auto line feed on: line feeds automatically echoed to terminal on input and output carriage returns (default). |
+| -lf | Auto line feed off. |
+| pause | Screen pause on: output suspended upon full screen. See "pag" parameter for definition of screen size. Output can be resumed by typing any key. |
+| -pause | Screen pause mode off. |
+| null=n | Set null count: number of null ($00) characters transmitted after carriage returns for return delay. The number is decimal, default = 0. |
+| pag=n | Set video display page length to n (decimal) lines. Used for "pause" mode, see above. |
+| bsp=h | Set input backspace character. Numeric value of character in hexadecimal. Default = 08. |
+| bse=h | Set output backspace character. Numeric value of character in hexadecimal. Default = 08. |
+| del=h | Set input delete line character. Numeric value of character in hexadecimal. Default = 18. |
+| bell=h | Set bell (alert) output character. Numeric value of character in hexadecimal. Default = 07 |
+| eor=h | Set end-of-record (carriage return) input character. Numeric value of character in hexadecimal. Default = 0D |
+| eof=h | Set end-of-file input character. Numeric value of character in hexadecimal. Default 1B. |
+| type=h | ACIA initialization value: sets parity, word size, etc. Value in hexadecimal. Default 15 |
+| reprint=h | Reprint line character. Numeric value of character in hexadecimal. |
+| dup=h | Duplicate last input line character. Numeric value of character in hexadecimal. |
+| psc=h | Pause character. Numeric value of character in hexadecimal.  |
+| abort=h | Abort character (normally Control+C). Numeric value of character in hexadecimal. |
+| quit=h | Quit character (normally Control+E). Numeric value of character in hexadecimal. |
+| baud=d | Set baud rate for software-controllable interface. Numeric code for baud rate: 0=110 1=300 2=600 3=1200 4=2400 5=4800 6=9600 7=19200 |
 
 **Examples**
 
@@ -3668,8 +3891,9 @@ tmode -upc lf null=4 bselF pause
 tmode pag=24 pause bsl -echo bsp=8 bsl=C
 ```
 
-NOTE: If you use tmode in a procedure file, it will be necessary to specify one of the standard output paths (.1 or .2) since the shell’s standard input path will have been redirected to the disk file (Tmode can be used on an SCFMAN-type devices only).
-- Example:
+**NOTE:** If you use tmode in a procedure file, it will be necessary to specify one of the standard output paths (.1 or .2) since the shell’s standard input path will have been redirected to the disk file (Tmode can be used on an SCFMAN-type devices only).
+
+**Examples**
 
 ```text
 tmode .1 pag=24 (set lines/page on standard output)
@@ -3679,9 +3903,7 @@ tmode .1 pag=24 (set lines/page on standard output)
 
 **Name**
 
-```text
-TSMON — Timesharing monitor
-```
+**TSMON** - Timesharing monitor
 
 **Synopsis**
 
@@ -3691,21 +3913,28 @@ tsmon [pathlist]
 
 **Description**
 
-This command is used to supervise idle terminals and initiate the login sequence in timesharing applications. If a pathlist is given, standard I/O paths are opened for the device. When a carriage return is typed, tsmon will automatically call the login command. If the login fails because the user could not supply a valid user name or password, it will return to tsmon. Note: The login command and its password file must be present for tsmon to work correctly (see the login command description).
+This command is used to supervise idle terminals and initiate the login sequence in timesharing applications. If a pathlist is given, standard I/O paths are opened for the device. When a carriage return is typed, tsmon will automatically call the login command. If the login fails because the user could not supply a valid user name or password, it will return to tsmon.
 
-Logging Off the System Most programs will terminate when an end of file character (escape) is entered as the first character on a command line. This will log you off of the system and return control to tsmon. For more information see: Section 4.9, login
+**Note:** The login command and its password file must be present for tsmon to work correctly (see the login command description).
+
+**Logging Off the System**
+
+Most programs will terminate when an end of file character (escape) is entered as the first character on a command line. This will log you off of the system and return control to tsmon.
+
+For more information see: Section 4.9, login
 
 **Examples**
 
-OS9:tsmon /t1& &005
+```text
+OS9:tsmon /t1&
+&005
+```
 
 ### TUNEPORT
 
 **Name**
 
-```text
-TUNEPORT — Tune the printer port on the Color Computer
-```
+**TUNEPORT** - Tune the printer port on the Color Computer
 
 **Synopsis**
 
@@ -3716,13 +3945,16 @@ tuneport [ -s=value ]
 **Description**
 
 This command lets you test and set delay loop values for the current baud rate and select the best value for your printer (/p) or terminal (/t1).
+
 **Examples**
 
 ```text
 TUNEPORT /P [ENTER]
 ```
 
-Provides a text operation for your printer. After a short delay, TUNEPORT displays the current baud rate and sends data to the printer to test if it is working properly. The program then displays the current delay value and asks for a new value. Enter a decimal delay value and press [ENTER]. Again, test data is sent to the printer as a test. Continue this process until you find the best value. When you are satisfied, press [ENTER] instead of entering a value at the prompt. A closing message displays your new value. Use the same process to set a new delay loop value for /t1 terminal
+Provides a text operation for your printer. After a short delay, TUNEPORT displays the current baud rate and sends data to the printer to test if it is working properly. The program then displays the current delay value and asks for a new value. Enter a decimal delay value and press [ENTER]. Again, test data is sent to the printer as a test. Continue this process until you find the best value. When you are satisfied, press [ENTER] instead of entering a value at the prompt. A closing message displays your new value.
+
+Use the same process to set a new delay loop value for /t1 terminal
 
 ```text
 tuneport /p -s=225 [ENTER]
@@ -3734,9 +3966,7 @@ Sets the delay loop value for your printer at 225. Use such a command on future 
 
 **Name**
 
-```text
-UNLINK — Unlink memory module
-```
+**UNLINK** - Unlink memory module
 
 **Synopsis**
 
@@ -3746,7 +3976,13 @@ unlink modname {modname}
 
 **Description**
 
-Tells OS-9 that the memory module(s) named are no longer needed by the user. The module(s) may or may not be destroyed and their memory reassigned, depending on if in use by other processes or user, whether resident in ROM or RAM, etc. It is good practice to unload modules whenever possible to make most efficient use of available memory resources. Warning: never unlink a module you did not load or link to. For more information see: Section 5.4, Section 5.4.1, Section 5.4.2
+Tells OS-9 that the memory module(s) named are no longer needed by the user. The module(s) may or may not be destroyed and their memory reassigned, depending on if in use by other processes or user, whether resident in ROM or RAM, etc.
+
+It is good practice to unload modules whenever possible to make most efficient use of available memory resources.
+
+Warning: never unlink a module you did not load or link to.
+
+For more information see: Section 5.4, Section 5.4.1, Section 5.4.2
 
 **Examples**
 
@@ -3754,27 +3990,32 @@ Tells OS-9 that the memory module(s) named are no longer needed by the user. The
 unlink pgml pgm5 pgm99
 ```
 
+```text
 OS9: mdir
 
-Module Directory at 11:26:22 DCB4 D0 D1 D2 D3 OS9P2 INIT OS9 IOMAN RBF SCF ACIA TERM T1 T2 T3 P PIA Sysgo Clock
-```text
-Shell Tsmon Edit
-```
+   Module Directory at 11:26:22
+DCB4        D0      D1      D2      D3
+OS9P2       INIT    OS9     IOMAN   RBF
+SCF         ACIA    TERM    T1      T2
+T3          P       PIA     Sysgo   Clock
+Shell       Tsmon   Edit
 
-OS9: unlink edit OS9: mdir
+OS9: unlink edit
+OS9: mdir
 
-Module Directory at 11:26:22 DCB4 D0 D1 D2 D3 OS9P2 INIT OS9 IOMAN RBF SCF ACIA TERM T1 T2 T3 P PIA Sysgo Clock
-```text
-Shell Tsmon
+   Module Directory at 11:26:22
+DCB4        D0      D1      D2      D3
+OS9P2       INIT    OS9     IOMAN   RBF
+SCF         ACIA    TERM    T1      T2
+T3          P       PIA     Sysgo   Clock
+Shell       Tsmon
 ```
 
 ### VERIFY
 
 **Name**
 
-```text
-VERIFY — Verify or update module header and CRC
-```
+**VERIFY** - Verify or update module header and CRC
 
 **Synopsis**
 
@@ -3784,34 +4025,39 @@ verify [ -u ]
 
 **Description**
 
-This command is used to verify that module header parity and CRC value of one or more modules on a file (standard input) are correct. Module(s) are read from standard input, and messages will be sent to the standard error path. If the -u (update) option is specified, the module(s) will be copied to the standard output path with the module’s header parity and CRC values replaced with the computed values. A message will be displayed to indicate whether or not the module’s values matched those computed by verify. If the option is NOT specified, the module will not be copied to standard output.
-```text
-Verify will only display a message to indicate whether or not the module’s header
-parity and CRC matched those which were computed.
-```
+This command is used to verify that module header parity and CRC value of one or more modules on a file (standard input) are correct. Module(s) are read from standard input, and messages will be sent to the standard error path.
+
+If the -u (update) option is specified, the module(s) will be copied to the standard output path with the module’s header parity and CRC values replaced with the computed values. A message will be displayed to indicate whether or not the module’s values matched those computed by verify.
+
+If the option is NOT specified, the module will not be copied to standard output. Verify will only display a message to indicate whether or not the module’s header parity and CRC matched those which were computed.
 
 **Examples**
 
+```text
 OS9: verify <EDIT >NEWEDIT
 
-Module’s header parity is correct. Calculated CRC matches module’s.
+Module’s header parity is correct.
+Calculated CRC matches module’s.
 
 OS9: verify <myprograml >myprogram2
 
-Module’s header parity is correct. CRC does not match.
+Module’s header parity is correct.
+CRC does not match.
 
 OS9: verify <myprogram2
 
-Module’s header parity is correct. Calculated CRC matches module’s.
+Module’s header parity is correct.
+Calculated CRC matches module’s.
 
 OS9: verify -u <module >temp
+```
 
 ### XMODE
 
 **Name**
 
 ```text
-XMODE — Examine or Change Device Initialization Mode
+XMODE - Examine or Change Device Initialization Mode
 ```
 
 **Synopsis**
@@ -3823,68 +4069,40 @@ xmode devname [arglist]
 **Description**
 
 This command is used to display or change the initialization parameters of any SCFtype device such as the video display, printer, RS232 port, etc. A common use is to change baud rates, control key definitions, etc.
-```text
-Xmode is very similar to the tmode command. Tmode only operates on open paths
-so its effect is temporary. Xmode actually updates the device descriptor so the change persists as long as the computer is running, even if paths to the device are repetitively opened and closed. If xmode is used to change parameter(s) and the cobbler program is used to make a new system disk, the changed parameter will be permanently reflected on the new system disk.
-Xmode requires a device name to be given. If no arguments are given, the present
-values for each parameter are displayed, otherwise, the parameter(s) given in the argument list are processed. Any number of parameters can be given, and are separated by spaces or commas.
-```
 
-```text
-XMODE Parameter Names
-```
+Xmode is very similar to the tmode command. Tmode only operates on open paths so its effect is temporary. Xmode actually updates the device descriptor so the change persists as long as the computer is running, even if paths to the device are repetitively opened and closed. If xmode is used to change parameter(s) and the cobbler program is used to make a new system disk, the changed parameter will be permanently reflected on the new system disk.
 
-upc Upper case only. Lower case characters are automatically converted to upper case.
+Xmode requires a device name to be given. If no arguments are given, the present values for each parameter are displayed, otherwise, the parameter(s) given in the argument list are processed. Any number of parameters can be given, and are separated by spaces or commas.
 
--upc Upper case and lower case characters permitted (default). bsb Erase on backspace: backspace characters echoed as a
+**XMODE Parameter Names**
 
-backspace-space-backspace sequence (default). -bsb no erase on backspace: echoes single backspace only bsl Backspace over line: lines are "deleted" by sending
-
-backspace-space-backspace sequences to erase the same line (for video terminals) (default).
-
--bsl No backspace over line: lines are "deleted" by printing a new line sequence (for hard-copy terminals). echo Input characters "echoed" back to terminal (default)
-
--echo No echo lf Auto line feed on: line feeds automatically echoed to terminal
-
-on input and output carriage returns (default). -lf Auto line feed off.
-
-pause Screen pause on: output suspended upon full screen. See "pag" parameter for definition of screen size. Output can be resumed by typing any key.
-
--pause Screen pause mode off. null=n Set null count: number of null ($00) characters transmitted after
-
-carriage returns for return delay. The number is decimal,
-- default = 0.
-
-pag=n Set video display page length to n (decimal) lines. Used for "pause" mode, see above.
-
-bsp=h Set input backspace character. Numeric value of character in hexadecimal. Default = 08.
-
-bse=h Set output backspace character. Numeric value of character in hexadecimal. Default = 08.
-
-```text
-del=h Set input delete line character. Numeric value of character in
-hexadecimal. Default = 18.
-```
-
-bell=h Set bell (alert) output character. Numeric value of character in hexadecimal. Default = 07
-
-eor=h Set end-of-record (carriage return) input character. Numeric value of character in hexadecimal. Default = 0D
-
-eof=h Set end-of-file input character. Numeric value of character in hexadecimal. Default 1B.
-
-type=h ACIA initialization value: sets parity, word size, etc. Value in hexadecimal. Default 15
-
-reprint=h Reprint line character. Numeric value of character in hexadecimal.
-
-dup=h Duplicate last input line character. Numeric value of character in hexadecimal.
-
-psc=h Pause character. Numeric value of character in hexadecimal. abort=h Abort character (normally Control+C). Numeric value of
-
-character in hexadecimal. quit=h Quit character (normally Control+E). Numeric value of
-
-character in hexadecimal. baud=d Set baud rate for software-controllable interface. Numeric code
-
-for baud rate: 0=110 1=300 2=600 3=1200 4=2400 5=4800 6=9600 7=19200
+| | |
+|-|-|
+| upc | Upper case only. Lower case characters are automatically converted to upper case. |
+| -upc | Upper case and lower case characters permitted (default). |
+| bsb | Erase on backspace: backspace characters echoed as a backspace-space-backspace sequence (default). |
+| -bsb | no erase on backspace: echoes single backspace only |
+| bsl | Backspace over line: lines are "deleted" by sending backspace-space-backspace sequences to erase the same line (for video terminals) (default). |
+| -bsl | No backspace over line: lines are "deleted" by printing a new line sequence (for hard-copy terminals). echo Input characters "echoed" back to terminal (default) |
+| -echo | No echo |
+| lf | Auto line feed on: line feeds automatically echoed to terminal on input and output carriage returns (default). |
+| -lf | Auto line feed off. |
+| pause | Screen pause on: output suspended upon full screen. See "pag" parameter for definition of screen size. Output can be resumed by typing any key. |
+| -pause | Screen pause mode off. |
+| null=n | Set null count: number of null ($00) characters transmitted after carriage returns for return delay. The number is decimal, default = 0. |
+| pag=n | Set video display page length to n (decimal) lines. Used for "pause" mode, see above. |
+| bsp=h | Set input backspace character. Numeric value of character in hexadecimal. Default = 08. |
+| bse=h | Set output backspace character. Numeric value of character in hexadecimal. Default = 08. |
+| del=h | Set input delete line character. Numeric value of character in hexadecimal. Default = 18. |
+| bell=h | Set bell (alert) output character. Numeric value of character in hexadecimal. Default = 07 |
+| eor=h | Set end-of-record (carriage return) input character. Numeric value of character in hexadecimal. Default = 0D |
+| eof=h | Set end-of-file input character. Numeric value of character in hexadecimal. Default 1B. |
+| type=h | ACIA initialization value: sets parity, word size, etc. Value in hexadecimal. Default 15 |
+| reprint=h | Reprint line character. Numeric value of character in hexadecimal. |
+| dup=h | Duplicate last input line character. Numeric value of character in hexadecimal. |
+| psc=h | Pause character. Numeric value of character in hexadecimal.  |
+| abort=h | Abort character (normally Control+C). Numeric value of character in hexadecimal. quit=h Quit character (normally Control+E). Numeric value of character in hexadecimal. |
+| baud=d | Set baud rate for software-controllable interface. Numeric code for baud rate: 0=110 1=300 2=600 3=1200 4=2400 5=4800 6=9600 7=19200 |
 
 **Examples**
 
@@ -3904,224 +4122,294 @@ xmode /P baud=3 -if
 
 The error codes are shown in both hexadecimal (first column) and decimal (second column). Error codes other than those listed are generated by programming languages or user programs.
 
-HEX DEC $C8 200 PATH TABLE FULL - The file cannot be opened because the
-
-system path table is currently full. $C9 201 ILLEGAL PATH NUMBER - Number too large or for
-
-non-existant path. $CA 202 INTERRUPT POLLING TABLE FULL $CB 203 ILLEGAL MODE - attempt to perform I/O function of
-
-which the device or file is incapable. $CC 204 DEVICE TABLE FULL - Can’t add another device $CD 205 ILLEGAL MODULE HEADER - module not loaded because
-
-its sync code, header parity, or CRC is incorrect. $CE 206 MODULE DIRECTORY FULL - Can’t add another module $CF 207 MEMORY FULL - Level One: not enough contiquous RAM
-
-```text
-free. Level Two: process address space full
-$D0 208 ILLEGAL SERVICE REQUEST - System call had an illegal
-```
-
-code number. $D1 209 MODULE BUSY - non-sharable module is in use by another
-
-process. $D2 210 BOUNDARY ERROR - Memory allocation or deallocation
-
-request not on a page boundary. $D3 211 END OF FILE - End of file encountered on read. $D4 212 RETURNING NON-ALLOCATED MEMORY - attempted to
-
-deallocate memory not previously assigned. $D5 213 NON-EXISTING SEGMENT - device has damaged file
-
-structure. $D6 214 NO PERMISSION - file attributes do not permit access
-
-requested. $D7 215 BAD PATH NAME - syntax error in pathlist (illegal
-
-character, etc.). $D8 216 PATH NAME NOT FOUND - can’t find pathlist specified. $D9 217 SEGMENT LIST FULL - file is too fragmented to be
-
-expanded further. $DA 218 FILE ALREADY EXISTS - file name already appears in
-
-current directory. $DB 219 ILLEGAL BLOCK ADDRESS - device’s file structure has
-
-been damaged. $DC 220 ILLEGAL BLOCK SIZE - device’s file structure has been
-
-damaged. $DD 221 MODULE NOT FOUND - request for link to module not
-
-found in directory. $DE 222 SECTOR OUT OF RANGE - device file structure damaged
-
-or incorrectly formatted.
-
-HEX DEC $DF 223 SUICIDE ATTEMPT - request to return memory where your
-
-stack is located. $E0 224 ILLEGAL PROCESS NUMBER - no such process exists. $E2 226 NO CHILDREN - can’t wait because process has no
-
-children. $E3 227 ILLEGAL SWI CODE - must be 1 to 3. $E4 228 PROCESS ABORTED - process aborted by signal code 2. $E5 229 PROCESS TABLE FULL - can’t fork now. $E6 230 ILLEGAL PARAMETER AREA - high and low bounds
-
-passed in fork call are incorrect. $E7 231 KNOWN MODULE - for internal use only. $E8 232 INCORRECT MODULE CRC - module has bad CRC value. $E9 233 SIGNAL ERROR - receiving process has previous
-
-unprocessed signal pending. $EA 234 NON-EXISTENT MODULE - unable to locate module. $EB 235 BAD NAME - illegal name syntax $EC 236 BAD HEADER - module header parity incorrect $ED 237 RAM FULL - no free system RAM available at this time $EE 238 UNKNOWN PROCESS ID - incorrect process ID number $EF 239 NO TASK NUMBER AVAILABLE - all task numbers in use
+| HEX | DEC | Description |
+|-|-|-|
+| $C8 | 200 | PATH TABLE FULL - The file cannot be opened because the system path table is currently full. |
+| $C9 | 201 | ILLEGAL PATH NUMBER - Number too large or for non-existant path. |
+| $CA | 202 | INTERRUPT POLLING TABLE FULL |
+| $CB | 203 | ILLEGAL MODE - attempt to perform I/O function of which the device or file is incapable. |
+| $CC | 204 | DEVICE TABLE FULL - Can’t add another device |
+| $CD | 205 | ILLEGAL MODULE HEADER - module not loaded because its sync code, header parity, or CRC is incorrect. |
+| $CE | 206 | MODULE DIRECTORY FULL - Can’t add another module |
+| $CF | 207 | MEMORY FULL - Level One: not enough contiquous RAM free. Level Two: process address space full |
+| $D0 | 208 | ILLEGAL SERVICE REQUEST - System call had an illegal code number. |
+| $D1 | 209 | MODULE BUSY - non-sharable module is in use by another process. |
+| $D2 | 210 | BOUNDARY ERROR - Memory allocation or deallocation request not on a page boundary. |
+| $D3 | 211 | END OF FILE - End of file encountered on read. |
+| $D4 | 212 | RETURNING NON-ALLOCATED MEMORY - attempted to deallocate memory not previously assigned. |
+| $D5 | 213 | NON-EXISTING SEGMENT - device has damaged file structure. |
+| $D6 | 214 | NO PERMISSION - file attributes do not permit access requested. |
+| $D7 | 215 | BAD PATH NAME - syntax error in pathlist (illegal character, etc.). |
+| $D8 | 216 | PATH NAME NOT FOUND - can’t find pathlist specified. |
+| $D9 | 217 | SEGMENT LIST FULL - file is too fragmented to be expanded further. |
+| $DA | 218 | FILE ALREADY EXISTS - file name already appears in current directory. |
+| $DB | 219 | ILLEGAL BLOCK ADDRESS - device’s file structure has been damaged. |
+| $DC | 220 | ILLEGAL BLOCK SIZE - device’s file structure has been damaged. |
+| $DD | 221 | MODULE NOT FOUND - request for link to module not found in directory. |
+| $DE | 222 | SECTOR OUT OF RANGE - device file structure damaged or incorrectly formatted. |
+| $DF | 223 | SUICIDE ATTEMPT - request to return memory where your stack is located. |
+| $E0 | 224 | ILLEGAL PROCESS NUMBER - no such process exists. |
+| $E2 | 226 | NO CHILDREN - can’t wait because process has no children. |
+| $E3 | 227 | ILLEGAL SWI CODE - must be 1 to 3. |
+| $E4 | 228 | PROCESS ABORTED - process aborted by signal code 2. |
+| $E5 | 229 | PROCESS TABLE FULL - can’t fork now. |
+| $E6 | 230 | ILLEGAL PARAMETER AREA - high and low bounds passed in fork call are incorrect. |
+| $E7 | 231 | KNOWN MODULE - for internal use only. |
+| $E8 | 232 | INCORRECT MODULE CRC - module has bad CRC value. |
+| $E9 | 233 | SIGNAL ERROR - receiving process has previous unprocessed signal pending. |
+| $EA | 234 | NON-EXISTENT MODULE - unable to locate module. |
+| $EB | 235 | BAD NAME - illegal name syntax |
+| $EC | 236 | BAD HEADER - module header parity incorrect |
+| $ED | 237 | RAM FULL - no free system RAM available at this time |
+| $EE | 238 | UNKNOWN PROCESS ID - incorrect process ID number |
+| $EF | 239 | NO TASK NUMBER AVAILABLE - all task numbers in use |
 
 ### A.1. Device Driver Errors
 
 The following error codes are generated by I/O device drivers, and are somewhat hardware dependent. Consult manufacturer’s hardware manual for more details.
 
-$F0 240 UNIT ERROR - device unit does not exist. $F1 241 SECTOR ERROR - sector number is out of range. $F2 242 WRITE PROTECT - device is write protected. $F3 243 CRC ERROR - CRC error on read or write verify. $F4 244 READ ERROR - Data transfer error during disk read
-
-operation, or SCF (terminal) input buffer overrun. $F5 245 WRITE ERROR - hardware error during disk write
-
-operation. $F6 246 NOT READY - device has "not ready" status. $F7 247 SEEK ERROR - physical seek to non-existant sector. $F8 248 MEDIA FULL - insufficient free space on media. $F9 249 WRONG TYPE - attempt to read incompatible media (i.e.
-
-attempt to read double-side disk on single-side drive) $FA 250 DEVICE BUSY - non-sharable device is in use $FB 251 DISK ID CHANGE - Media was changed with files open $FC 252 RECORD IS LOCKED-OUT - Another process is accessing
-
-the requested record. $FD 253 NON-SHARABLE FILE BUSY - Another process is accessing
-
-the requested file.
+| HEX | DEC | Description |
+|-|-|-|
+| $F0 | 240 | UNIT ERROR - device unit does not exist. |
+| $F1 | 241 | SECTOR ERROR - sector number is out of range. |
+| $F2 | 242 | WRITE PROTECT - device is write protected. |
+| $F3 | 243 | CRC ERROR - CRC error on read or write verify. |
+| $F4 | 244 | READ ERROR - Data transfer error during disk read operation, or SCF (terminal) input buffer overrun. |
+| $F5 | 245 | WRITE ERROR - hardware error during disk write operation. |
+| $F6 | 246 | NOT READY - device has "not ready" status. |
+| $F7 | 247 | SEEK ERROR - physical seek to non-existant sector. |
+| $F8 | 248 | MEDIA FULL - insufficient free space on media. |
+| $F9 | 249 | WRONG TYPE - attempt to read incompatible media (i.e. attempt to read double-side disk on single-side drive) |
+| $FA | 250 | DEVICE BUSY - non-sharable device is in use |
+| $FB | 251 | DISK ID CHANGE - Media was changed with files open |
+| $FC | 252 | RECORD IS LOCKED-OUT - Another process is accessing the requested record. |
+| $FD | 253 | NON-SHARABLE FILE BUSY - Another process is accessing the requested file. |
 
 ## Appendix B. VDG Display System Functions
 
 ### B.1. The Video Display Generator
 
-NitrOS-9 allows the VDG display to be used in alphanumeric, semigraphic, and graphics modes. There are many built-in functions to control the display, which are activated by used of various ASCII control character. Thus, these functions are available for use by software written in any language using standard output statements (such as "PRINT" in BASIC). The Color Computer’s Basic09 language has a Graphics Interface Module that can automatically generate these codes using Basic09 RUN statements. The display system has two display modes: Alphanumeric ("Alpha") mode and Graphics mode. The Alphanumeric mode also includes "semigraphic" box-graphics. The Color Computer’s display system uses a separate - memory area for each
-```text
-display mode so operations on the Alpha display do not affect the Graphics display,
-and visa-versa. Either display can be selected under software control. 8-bit characters sent to the display system are interpreted according to their numerical value, as shown in the chart below.
-```
+NitrOS-9 allows the VDG display to be used in alphanumeric, semigraphic, and graphics modes. There are many built-in functions to control the display, which are activated by used of various ASCII control character. Thus, these functions are available for use by software written in any language using standard output statements (such as "PRINT" in BASIC). The Color Computer’s Basic09 language has a Graphics Interface Module that can automatically generate these codes using Basic09 RUN statements.
 
-Character Range (Hex) Mode/Used For 00 - 0E Alpha Mode - cursor and screen control 0F - 1B Graphics Mode - drawing and screen control 1C - 20 Not used 20 - SF Alpha Mode - upper case characters 60 - 7F Alpha Mode - lower case characters 80 - FF Alpha Mode - Semigraphic patterns
+The display system has two display modes: Alphanumeric ("Alpha") mode and Graphics mode. The Alphanumeric mode also includes "semigraphic" box-graphics. The Color Computer’s display system uses a separate - memory area for each display mode so operations on the Alpha display do not affect the Graphics display, and visa-versa. Either display can be selected under software control.
+
+8-bit characters sent to the display system are interpreted according to their numerical value, as shown in the chart below.
+
+| Character Range (Hex) | Mode/Used For |
+|-|-|
+| 00 - 0E | Alpha Mode - cursor and screen control |
+| 0F - 1B | Graphics Mode - drawing and screen control |
+| 1C - 20 | Not used |
+| 20 - SF | Alpha Mode - upper case characters |
+| 60 - 7F | Alpha Mode - lower case characters |
+| 80 - FF | Alpha Mode - Semigraphic patterns |
 
 The graphics and alphanumeric functions are handled by the OS-9 device driver module called "CCIO".
 
 ### B.2. Alpha Mode Display
 
-This is the "standard" operational mode. It is used to display alphanumeric characters and semigraphic box graphics, and simulates the operation of a typical computer terminal with functions for scrolling, cursor positioning, clear screen, line delete, etc. Each 8-bit character is assumed to be an ASCII character and is displayed if its high order bit (sign bit) is cleared. Lower case letters are displayed in reverse video. If the high order bit of the character is set it is assumed to be a "Semigraphic 6" graphics box. See the Color Computer manual for an explanation of semigraphics functions.
+This is the "standard" operational mode. It is used to display alphanumeric characters and semigraphic box graphics, and simulates the operation of a typical computer terminal with functions for scrolling, cursor positioning, clear screen, line delete, etc.
 
-Table B-1. Alpha Mode Command Codes
+Each 8-bit character is assumed to be an ASCII character and is displayed if its high order bit (sign bit) is cleared. Lower case letters are displayed in reverse video. If the high order bit of the character is set it is assumed to be a "Semigraphic 6" graphics box. See the Color Computer manual for an explanation of semigraphics functions.
 
-Control Name/Function Code 01 HOME - return cursor to upper left hand corner of screen 02 CURSOR XY - move cursor to character X of line Y. The binary
+**Table B-1. Alpha Mode Command Codes**
 
-value minus 32 of the two characters following the control character are used as the X and Y coordinates. For example, to position the cursor at character 5 of line 10, you must give X=37 and Y42
-
-03 ERASE LINE - erases all characters on the cursor’s line.
-
-Control Name/Function Code 06 CURSOR RIGHT - move cursor right one character position 08 CURSOR LEFT - move cursor left one character position 09 CURSOR UP - move cursor up one line 10 CURSOR DOWN (linefeed) move cursor down one line 12 CLEAR SCREEN - erase entire screen and home cursor 13 RETURN - return cursor to leftmost character of line 14 DISPLAY ALPHA - switch screen from graphic mode to alpha
-
-numeric mode
+| Control Code | Name/Function |
+|-|-|
+| 01 | HOME - return cursor to upper left hand corner of screen |
+| 02 | CURSOR XY - move cursor to character X of line Y. The binary value minus 32 of the two characters following the control character are used as the X and Y coordinates. For example, to position the cursor at character 5 of line 10, you must give X=37 and Y42 |
+| 03 | ERASE LINE - erases all characters on the cursor’s line. |
+| 06 | CURSOR RIGHT - move cursor right one character position |
+| 08 | CURSOR LEFT - move cursor left one character position |
+| 09 | CURSOR UP - move cursor up one line |
+| 10 | CURSOR DOWN (linefeed) move cursor down one line |
+| 12 | CLEAR SCREEN - erase entire screen and home cursor |
+| 13 | RETURN - return cursor to leftmost character of line |
+| 14 | DISPLAY ALPHA - switch screen from graphic mode to alpha numeric mode |
 
 ### B.3. Graphics Mode Display
 
-This mode is used to display high-resolution 2- or 4-color graphics, and it includes commands to: set color; plot and erase individual points; draw and erase lines; position the graphics cursor; and draw circles. The DISPLAY GRAPHICS command must be executed before any other graphics mode command is used. It causes the graphics screen to be displayed and sets a current display format and color. The Li.u.t time the DISPLAY GRAPHICS command is given, a 6144 byte display memory is allocated by OS-9, so there must be at least this much continuous free memory available (the OS-9 "MFREE" command can be used to check free memory). This memory is retained until the END GRAPHICS command is given, even if the program that initiated Graphics mode finishes, so it important that the END GRAPHICS command be used to give up the display memory when Graphics mode is no longer needed. Graphics mode supports two basic formats: Two-Color which has 256 horizontal by 192 vertical points (G6R mode); and Four Color which has 128 horizontal by 192 vertical points (G6C mode). Two color sets are available in either mode. Regardless of the resolution of the format selected, all Graphics mode commands use a 256 by 192 point coordinate system. The X and Y coordinates are always positive numbers which assume that point 0,0 is the lower lefthand corner of the screen. An invisible Graphics Cursor is used by many command to reduce the amount of output required to generate graphics. This cursor can be explicitly set to any point using the SET GRAPHICS CURSOR command. Also, all other commands that include X,Y coordinates (such as SET POINT) move the graphics cursor to the specified position.
+This mode is used to display high-resolution 2- or 4-color graphics, and it includes commands to: set color; plot and erase individual points; draw and erase lines; position the graphics cursor; and draw circles.
 
-Table B-2. Graphics Mode Selection Codes
+The DISPLAY GRAPHICS command must be executed before any other graphics mode command is used. It causes the graphics screen to be displayed and sets a current display format and color. The Li.u.t time the DISPLAY GRAPHICS command is given, a 6144 byte display memory is allocated by OS-9, so there must be at least this much continuous free memory available (the OS-9 "MFREE" command can be used to check free memory). This memory is retained until the END GRAPHICS command is given, even if the program that initiated Graphics mode finishes, so it important that the END GRAPHICS command be used to give up the display memory when Graphics mode is no longer needed.
 
-Code Format 00 256 x 192 two-color graphics 01 128 x 192 four-color graphics
+Graphics mode supports two basic formats: Two-Color which has 256 horizontal by 192 vertical points (G6R mode); and Four Color which has 128 horizontal by 192 vertical points (G6C mode). Two color sets are available in either mode. Regardless of the resolution of the format selected, all Graphics mode commands use a 256 by 192 point coordinate system. The X and Y coordinates are always positive numbers which assume that point 0,0 is the lower lefthand corner of the screen.
 
-Table B-3. Color Set and Current Foreground Color Selection Codes
+An invisible Graphics Cursor is used by many command to reduce the amount of output required to generate graphics. This cursor can be explicitly set to any point using the SET GRAPHICS CURSOR command. Also, all other commands that include X,Y coordinates (such as SET POINT) move the graphics cursor to the specified position.
 
-Two Color Format Four Color Format Char Background Foreground Background Foreground
+**Table B-2. Graphics Mode Selection Codes**
 
-Color 00 Black Black Green Green Set 1
+| Code | Format |
+|-|-|
+| 00 | 256 x 192 two-color graphics |
+| 01 | 128 x 192 four-color graphics |
 
-01 Black Green Green Yellow
+**Table B-3. Color Set and Current Foreground Color Selection Codes**
 
-Two Color Format Four Color Format Char Background Foreground Background Foreground
+**TCF**=Two Color Format
 
-02 Green Blue 03 Green Red
+**FCF**=Four Color Format
 
-Color 04 Black Black Buff Buff Set 2
+| Colour Set | TCF Char | TCF Background | TCF Foreground | FCF Background | FCF Foreground |
+|-|-|-|-|-|-|
+| Color Set 1 | 00 | Black | Black | Green | Green |
+| Color Set 1 | 01 | Black | Green | Green | Yellow |
+| Color Set 1 | 02 | | | Green | Blue |
+| Color Set 1 | 03 | | | Green | Red |
+| Color Set 2 | 04 | Black | Black | Buff | Buff |
+| Color Set 2 | 05 | Black | Buff | Buff | Cyan |
+| Color Set 2 | 06 | | | Buff | Magenta |
+| Color Set 2 | 07 | | | Buff | Orange |
+| Color Set 3* | 08 | | | Black | Black |
+| Color Set 3* | 09 | | | Black | Dark Green |
+| Color Set 3* | 10 | | | Black | Med. Green |
+| Color Set 3* | 11 | | | Black | Light Green |
+| Color Set 4* | 12 | | | Black | Black |
+| Color Set 4* | 13 | | | Black | Green |
+| Color Set 4* | 14 | | | Black | Red |
+| Color Set 4* | 15 | | | Black | Buff |
 
-05 Black Buff Buff Cyan 06 Buff Magenta 07 Buff Orange
+* Color sets 3 and 4 not available on PAL video system (European) models. These color sets work only with NTSC (U.S., Canada, Japan) models.
 
-Color 08 Black Black Set 3*
+**Table B-4. Graphics Mode Control Commands**
 
-09 Black Dark Green 10 Black Med. Green 11 Black Light Green
-
-Color 12 Black Black Set 4*
-
-13 Black Green 14 Black Red 15 Black Buff
-
-- Color sets 3 and 4 not available on PAL video system (European) models. These
-color sets work only with NTSC (U.S., Canada, Japan) models.
-
-Table B-4. Graphics Mode Control Commands
-
-Control Name/Function Code 15 DISPLAY GRAPHICS - switches screen to graphics mode. This
-
-command must be given before any other graphics commands are used. The first time this command is given, a 6K byte
-```text
-display buffer is assigned. If 6K of contiguous memory is not
-available an error is returned. This command is followed by two characters which specify the graphics mode and current color/color set, respectively.
-```
-
-16 PRESET SCREEN - presets entire screen to color code passed in next character.
-
-17 SET COLOR - selects foreground color (and color set) passed in next character, but does not change graphics mode.
-
-18 QUIT GRAPHICS - disables graphics mode and returns the 6K byte graphics memory area to OS-9 for other use, and switches to alpha mode.
-
-19 ERASE GRAPHICS - erases all points to background color and homes graphics cursor to the desired position.
-
-20 HOME GRAPHICS CURSOR - moves graphics cursor to coordinates 0,0 (lower left hand corner).
-
-21 SET GRAPHICS CURSOR - moves graphics cursor to given coordinates X,Y. The binary value of the two characters that immediately follow are used as the X and Y values, respectively.
-
-Control Name/Function Code 22 DRAW LINE - draws a line of the current foreground color
-
-from the current graphics cursor position to the given X,Y coordinates. The binary value of the two characters that immediately follow are used as the X and Y values, respectively. The graphics cursor is moved to the end point of the line.
-
-23 ERASE LINE - same as DRAW LINE except the line is "drawn" in the current background color, thus erasing the line.
-
-24 SET POINT - sets the pixel-at point X,Y to the current foreground color. The binary value of the two characters that immediately follow are used as the x and Y values, respectively. The graphics cursor is moved to the point Set.
-
-25 ERASE POINT - same as DRAW POINT except the point is "drawn" in the current background color, thus erasing the point.
-
-26 DRAW CIRCLE - draws a circle of the current foreground color with its center at the current graphics cursor position using a radius R which is obtained using the binary value of the next character. The graphics cursor position is not affected by this command.
+| Control Code | Name/Function |
+|-|-|
+| 15 | DISPLAY GRAPHICS - switches screen to graphics mode. This command must be given before any other graphics commands are used. The first time this command is given, a 6K byte display buffer is assigned. If 6K of contiguous memory is not available an error is returned. This command is followed by two characters which specify the graphics mode and current color/color set, respectively. |
+| 16 | PRESET SCREEN - presets entire screen to color code passed in next character. |
+| 17 | SET COLOR - selects foreground color (and color set) passed in next character, but does not change graphics mode. |
+| 18 | QUIT GRAPHICS - disables graphics mode and returns the 6K byte graphics memory area to OS-9 for other use, and switches to alpha mode. |
+| 19 | ERASE GRAPHICS - erases all points to background color and homes graphics cursor to the desired position. |
+| 20 | HOME GRAPHICS CURSOR - moves graphics cursor to coordinates 0,0 (lower left hand corner). |
+| 21 | SET GRAPHICS CURSOR - moves graphics cursor to given coordinates X,Y. The binary value of the two characters that immediately follow are used as the X and Y values, respectively. |
+| 22 | DRAW LINE - draws a line of the current foreground color from the current graphics cursor position to the given X,Y coordinates. The binary value of the two characters that immediately follow are used as the X and Y values, respectively. The graphics cursor is moved to the end point of the line. |
+| 23 | ERASE LINE - same as DRAW LINE except the line is "drawn" in the current background color, thus erasing the line. |
+| 24 | SET POINT - sets the pixel-at point X,Y to the current foreground color. The binary value of the two characters that immediately follow are used as the x and Y values, respectively. The graphics cursor is moved to the point Set. |
+| 25 | ERASE POINT - same as DRAW POINT except the point is "drawn" in the current background color, thus erasing the point. |
+| 26 | DRAW CIRCLE - draws a circle of the current foreground color with its center at the current graphics cursor position using a radius R which is obtained using the binary value of the next character. The graphics cursor position is not affected by this command. |
 
 ### B.4. Get Status Commands
 
-The Color Computer I/O driver includes OS-9 Get Status commands that return the
+The Color Computer I/O driver includes OS-9 Get Status commands that return the display status and joystick values, respectively. These are accessable via the Basic09 Graphics Interface Module, or by the assembly language system calls listed below:
+
+**GET DISPLAY STATUS:**
+
+Calling Format
 ```text
-display status and joystick values, respectively. These are accessable via the Basic09
-Graphics Interface Module, or by the assembly language system calls listed below:
+lda #1          (path number)
+ldb #SS.DStat   (Getstat code $12)
+os9 I$GSTT      call OS-9
 ```
+Passed
+- nothing
 
-- GET DISPLAY STATUS:
-
-Calling Format lda #1 (path number) ldb #SS.DStat (Getstat code $12) os9 I$GSTT call OS-9
-
-Passed nothing Returns X = address of graphics display memory
-
+Returns
+- X = address of graphics display memory
 - Y = graphics cursor address x=MSB y =LSB
 - A = color code of pixel at cursor address
 
-- GET JOYSTICK VALUES:
+**GET JOYSTICK VALUES:**
 
-Calling Format lda #1 (path number) ldb #SS.Joy (Getstat code $13) os9 I$GSTT call OS-9
+Calling Format
 
-Passed X = 0 for right joystick; 1 for left joystick Returns X = selected joystick x value (0-63)
+```text
+lda #1          (path number)
+ldb #SS.Joy     (Getstat code $13)
+os9 I$GSTT      call OS-9
+```
 
+Passed
+- X = 0 for right joystick; 1 for left joystick
+
+Returns
+- X = selected joystick x value (0-63)
 - Y = selected joystick y value (0-63)
 - A = $FF if fire button on; $00 if off
 
-Table B-5. Display Control Codes Condensed Summary
+**Table B-5. Display Control Codes Condensed Summary**
 
-1st Byte 2nd Byte 3rd Byte Function 00 Null
-
-1st Byte 2nd Byte 3rd Byte Function 01 Home Alpha Cursor 02 Column+32 Row+32 Position Alpha Cursor 03 Erase Line 06 Cursor Right 08 Cursor Left 09 Cursor Up 10 Cursor Down 12 Clear Screen 13 Carriage Return 14 Select Alpha Mode 15 Mode Color Code Select Graphics Mode 16 Color Code Preset Screen 17 Color Code Select Color 18 Quit
-
-Graphics Mode
-
-19 Erase Screen 20 Home
-
-Graphics Cursor
-
-21 X Coord Y Coord Move Graphics Cursor 22 X Coord Y Coord Draw Line to X/Y 23 X Coord Y Coord Erase Line to X/Y 24 X Coord Y Coord Set Point at X/Y 25 X Coord Y Coord Clear Point at X/Y 26 Radius Draw Circle
+| 1st Byte | 2nd Byte | 3rd Byte | Function |
+|-|-|-|-|
+| 00 | | | Null |
+| 01 | | | Home Alpha Cursor |
+| 02 | Column+32 | Row+32 | Position Alpha Cursor |
+| 03 | | | Erase Line |
+| 06 | | | Cursor Right |
+| 08 | | | Cursor Left |
+| 09 | | | Cursor Up |
+| 10 | | | Cursor Down |
+| 12 | | | Clear Screen |
+| 13 | | | Carriage Return |
+| 14 | | | Select Alpha Mode |
+| 15 | Mode | Color Code | Select Graphics Mode |
+| 16 | Color Code | | Preset Screen |
+| 17 | Color Code | | Select Color |
+| 18 | | Quit Graphics Mode | |
+| 19 | | Erase Screen | |
+| 20 | | Home Graphics Cursor | |
+| 21 | X Coord | Y Coord | Move Graphics Cursor |
+| 22 | X Coord | Y Coord | Draw Line to X/Y |
+| 23 | X Coord | Y Coord | Erase Line to X/Y |
+| 24 | X Coord | Y Coord | Set Point at X/Y |
+| 25 | X Coord | Y Coord | Clear Point at X/Y |
+| 26 | Radius | | Draw Circle |
 
 ## Appendix C. Key Definitions With Hexadecimal Values
 
-NORM SHFT CTRL NORM SHFT CTRL NORM SHFT CTRL ---- ---- ------ ---- ---- ------ ---- ---- ------ 0 30 0 30 -- @ 40 ’ 60 NUL 00 P 50 p 70 DLE 10 1 31 1 21 | 7C A 41 a 61 SOH 01 Q 51 q 71 DC1 11 2 32 " 22 00 B 42 b 62 STX 02 R 52 r 72 DC2 12 3 33 # 23 - 7E C 43 c 63 ETX O3 S 53 s 73 DC3 13 4 34 $ 24 00 0 44 d 64 EOT 04 T 54 t 74 DC4 14 5 35 % 25 00 E 45 e 65 END O5 U 55 u 75 NAK 15 6 36 & 26 00 F 46 f 66 ACK 06 V 56 V 76 SYN 16 7 37 ’ 27 5E G 47 g 67 BEL O7 W 57 w 77 ETB 17 8 38 ( 28 [ 5B H 48 h 68 BSP 08 X 58 x 78 CAN 18 9 39 ) 29 ] 5D I 49 i 69 HT O9 Y 59 y 79 EM 19 : 3A * 2A 00 J 4A j 6A LF CA Z 5A z 7A SUM 1A ; 3B + 2B 00 K 4B k 6B VT OB , 2C < 3C { 7B L 4C l 6C FF 0C - 2D = 3D - 5F M 4D m 6D CR 00 . 2E > 3E } 7D N 4E n 6E CO CE / 2F ? 3F \ 5C O 4F o 6F CI OF
+| NORM | HEX | SHFT | HEX | CTRL | HEX |
+|-|-|-|-|-:|-:|
+| 0 | 30 | 0 | 30 | | -- |
+| 1 | 31 | 1 | 21 | \| | 7C |
+| 2 | 32 | " | 22 | | 00 |
+| 3 | 33 | # | 23 | - | 7E |
+| 4 | 34 | $ | 24 | | 00 |
+| 5 | 35 | % | 25 | | 00 |
+| 6 | 36 | & | 26 | | 00 |
+| 7 | 37 | ’ | 27 |  | 5E |
+| 8 | 38 | ( | 28 | [ | 5B |
+| 9 | 39 | ) | 29 | ] | 5D |
+| : | 3A | * | 2A | | 00 |
+| ; | 3B | + | 2B | | 00 |
+| , | 2C | < | 3C | { | 7B |
+| - | 2D | = | 3D | - | 5F |
+| . | 2E | > | 3E | } | 7D |
+| / | 2F | ? | 3F | \ | 5C |
+| @ | 40 | ’ | 60 | NUL | 00 |
+| A | 41 | a | 61 | SOH | 01 |
+| B | 42 | b | 62 | STX | 02 |
+| C | 43 | c | 63 | ETX | O3 |
+| D | 44 | d | 64 | EOT | 04 |
+| E | 45 | e | 65 | END | O5 |
+| F | 46 | f | 66 | ACK | 06 |
+| G | 47 | g | 67 | BEL | O7 |
+| H | 48 | h | 68 | BSP | 08 |
+| I | 49 | i | 69 | HT | O9 |
+| J | 4A | j | 6A | LF | CA |
+| K | 4B | k | 6B | VT | OB |
+| L | 4C | l | 6C | FF | 0C |
+| M | 4D | m | 6D | CR | 00 |
+| N | 4E | n | 6E | CO | CE |
+| O | 4F | o | 6F | CI | OF |
+| P | 50 | p | 70 | DLE | 10 |
+| Q | 51 | q | 71 | DC1 | 11 |
+| R | 52 | r | 72 | DC2 | 12 |
+| S | 53 | s | 73 | DC3 | 13 |
+| T | 54 | t | 74 | DC4 | 14 |
+| U | 55 | u | 75 | NAK | 15 |
+| V | 56 | v | 76 | SYN | 16 |
+| W | 57 | w | 77 | ETB | 17 |
+| X | 58 | x | 78 | CAN | 18 |
+| Y | 59 | y | 79 | EM | 19 |
+| Z | 5A | z | 7A | SUM | 1A |
 
-```text
-FUNCTION KEYS
-```
+**Function Keys**
 
-```text
-NORM SHFT CTRL
----- ---- ----
-```
-
-BREAK 05 03 1B ENTER 0D 0D 0D SPACE 20 20 20 <- 08 18 10 -> 09 19 11 v 0A 1A 12 ^ 0C 1C 13
-
+| Function Key | NORM | SHFT | CTRL |
+|-|-|-|-|
+| BREAK | 05 | 03 | 1B |
+| ENTER | 0D | 0D | 0D |
+| SPACE | 20 | 20 | 20 |
+| LEFT ARROW | 08 | 18 | 10 |
+| RIGHT ARROW | 09 | 19 | 11 |
+| DOWN ARROW | 0A | 1A | 12 |
+| UP ARROW | 0C | 1C | 13 |
