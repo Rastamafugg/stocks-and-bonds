@@ -1,16 +1,14 @@
-PROCEDURE snbSellDraftState
+PROCEDURE snbSellDraftHdrState
 (* ============================================================ *)
-(* PROCEDURE : snbSellDraftState                                *)
-(* PURPOSE   : README entry for sell draft state helpers.       *)
+(* PROCEDURE : snbSellDraftHdrState                             *)
+(* PURPOSE   : README entry for sell draft header/state         *)
+(*             helpers.                                         *)
 (* ============================================================ *)
-PRINT "snbSellDraftState"
+PRINT "snbSellDraftHdrState"
 PRINT "  initDraftSum"
 PRINT "  loadDraftHdr"
 PRINT "  saveDraftHdr"
-PRINT "  loadDraftSum"
 PRINT "  saveDraftSum"
-PRINT "  loadDraftCtx"
-PRINT "  saveDraftCtx"
 END
 
 PROCEDURE initDraftSum
@@ -119,53 +117,6 @@ END
     ok := FALSE
 END
 
-PROCEDURE loadDraftSum
-TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
-TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
-PARAM hdrPath : STRING[20]
-PARAM sum     : DraftSum
-PARAM ok      : BOOLEAN
-DIM hdrStub   : DraftHdr
-DIM path      : BYTE
-DIM pathOpen  : BOOLEAN
-DIM seekPos   : INTEGER
-DIM chkExp    : INTEGER
-DIM s         : INTEGER
-DIM b         : INTEGER
-
-ON ERROR GOTO 900
-pathOpen := FALSE
-ok := FALSE
-seekPos := SIZE(hdrStub)
-OPEN #path, hdrPath:READ
-pathOpen := TRUE
-SEEK #path, seekPos
-GET #path, sum
-chkExp := sum.dsPhase + sum.dsPlyr + sum.dsHas
-chkExp := chkExp + sum.dsActCnt + sum.dsCashDl
-chkExp := chkExp + sum.dsMgnDl + sum.dsRepay
-FOR s := 1 TO 9
-  chkExp := chkExp + sum.dsStkQty(s) + sum.dsStkMgn(s)
-NEXT s
-FOR b := 1 TO 3
-  chkExp := chkExp + sum.dsBndQty(b)
-NEXT b
-chkExp := LAND(chkExp, 255)
-IF chkExp <> sum.dsChk THEN
-  PRINT "loadDraftSum: corrupt summary"
-  END
-ENDIF
-CLOSE #path
-pathOpen := FALSE
-ok := TRUE
-END
-900 IF pathOpen THEN
-      CLOSE #path
-    ENDIF
-    PRINT "loadDraftSum error ("; ERR; ")"
-    ok := FALSE
-END
-
 PROCEDURE saveDraftSum
 TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
 TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
@@ -206,74 +157,5 @@ END
       CLOSE #path
     ENDIF
     PRINT "saveDraftSum error ("; ERR; ")"
-    ok := FALSE
-END
-
-PROCEDURE loadDraftCtx
-TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
-TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
-TYPE DraftCtx = dcType,dcAsset,dcAct,dcChk:BYTE
-PARAM hdrPath : STRING[20]
-PARAM ctx     : DraftCtx
-PARAM ok      : BOOLEAN
-DIM hdrStub   : DraftHdr
-DIM sumStub   : DraftSum
-DIM path      : BYTE
-DIM pathOpen  : BOOLEAN
-DIM seekPos   : INTEGER
-
-ON ERROR GOTO 900
-pathOpen := FALSE
-ok := FALSE
-seekPos := SIZE(hdrStub) + SIZE(sumStub)
-OPEN #path, hdrPath:READ
-pathOpen := TRUE
-SEEK #path, seekPos
-GET #path, ctx
-IF LAND(ctx.dcType + ctx.dcAsset + ctx.dcAct, 255) <> ctx.dcChk THEN
-  PRINT "loadDraftCtx: corrupt context"
-  END
-ENDIF
-CLOSE #path
-pathOpen := FALSE
-ok := TRUE
-END
-900 IF pathOpen THEN
-      CLOSE #path
-    ENDIF
-    PRINT "loadDraftCtx error ("; ERR; ")"
-    ok := FALSE
-END
-
-PROCEDURE saveDraftCtx
-TYPE DraftHdr = dhMagic,dhFmtVer,dhPhase,dhPlyr,dhStatus,dhRecCnt,dhNextSeq,dhChk:BYTE;dhYear,dhMaxYr:INTEGER
-TYPE DraftSum = dsPhase,dsPlyr,dsHas,dsActCnt,dsChk:BYTE;dsCashDl,dsMgnDl,dsRepay:INTEGER;dsStkQty(9):INTEGER;dsStkMgn(9):INTEGER;dsBndQty(3):INTEGER
-TYPE DraftCtx = dcType,dcAsset,dcAct,dcChk:BYTE
-PARAM hdrPath : STRING[20]
-PARAM ctx     : DraftCtx
-PARAM ok      : BOOLEAN
-DIM hdrStub   : DraftHdr
-DIM sumStub   : DraftSum
-DIM path      : BYTE
-DIM pathOpen  : BOOLEAN
-DIM seekPos   : INTEGER
-
-ON ERROR GOTO 900
-pathOpen := FALSE
-ok := FALSE
-seekPos := SIZE(hdrStub) + SIZE(sumStub)
-ctx.dcChk := LAND(ctx.dcType + ctx.dcAsset + ctx.dcAct, 255)
-OPEN #path, hdrPath:UPDATE
-pathOpen := TRUE
-SEEK #path, seekPos
-PUT #path, ctx
-CLOSE #path
-pathOpen := FALSE
-ok := TRUE
-END
-900 IF pathOpen THEN
-      CLOSE #path
-    ENDIF
-    PRINT "saveDraftCtx error ("; ERR; ")"
     ok := FALSE
 END

@@ -10,7 +10,7 @@ PROCEDURE snbSellUI
 (* SIDE EFX  : Reads SNBSTATE and updates SNBDRFTH / SNBDRFTD.  *)
 (* NOTE      : snbStateIO, snbTradeShared, snbGameData,         *)
 (*             snbPhaseCore, snbScreenUtil, snbTradeHumanUI,    *)
-(*             snbForkUtil, snbSellDraftState, and snbSellUI    *)
+(*             snbForkUtil, snbSellDraftUIState, and snbSellUI  *)
 (*             must be loaded. snbSellLot plus its draft        *)
 (*             helpers are ensured before fork.                 *)
 (* ============================================================ *)
@@ -68,10 +68,10 @@ ON ERROR GOTO 900
 debugLog := FALSE
 hdrPath := "SNBDRFTH"
 RUN initBondPar(bPar)
-modNam := "snbSellDraftState"
+modNam := "snbSellDraftUIState"
 RUN ensureModuleLib(modNam, FALSE, debugLog, ok)
 IF NOT ok THEN
-  PRINT "snbSellUI: failed to load snbSellDraftState"
+  PRINT "snbSellUI: failed to load snbSellDraftUIState"
   END
 ENDIF
 
@@ -381,10 +381,16 @@ LOOP
         PRINT "snbSellUI: failed to ensure snbForkUtil"
         END
       ENDIF
-      modNam := "snbSellDraftState"
+      modNam := "snbSellDraftUIState"
       RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
       IF NOT ok THEN
-        PRINT "snbSellUI: failed to ensure snbSellDraftState"
+        PRINT "snbSellUI: failed to ensure snbSellDraftUIState"
+        END
+      ENDIF
+      modNam := "snbSellDraftHdrState"
+      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+      IF NOT ok THEN
+        PRINT "snbSellUI: failed to ensure snbSellDraftHdrState"
         END
       ENDIF
       modNam := "snbSellDraftEdit"

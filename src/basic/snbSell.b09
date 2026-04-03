@@ -144,10 +144,10 @@ LOOP
         PRINT "snbSell: failed to ensure snbSellDraftInit"
         END
       ENDIF
-      modNam := "snbSellDraftState"
+      modNam := "snbSellDraftUIState"
       RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
       IF NOT ok THEN
-        PRINT "snbSell: failed to ensure snbSellDraftState"
+        PRINT "snbSell: failed to ensure snbSellDraftUIState"
         END
       ENDIF
       modNam := "snbSellExec"
