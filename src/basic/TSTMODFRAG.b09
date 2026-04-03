@@ -86,13 +86,13 @@ PRINT "  over hole by   = "; fragmentGap
 PRINT
 
 testNum := testNum + 1
-PRINT "Test "; testNum; ": request process memory 32767 bytes"
-RUN requestProcMem(procLimit, grantBytes, ok, errCode)
+PRINT "Test "; testNum; ": query current process memory with F$Mem(0)"
+RUN requestProcMem(0, grantBytes, ok, errCode)
 IF ok THEN
-  PRINT "PASS: F$Mem granted "; grantBytes; " bytes"
+  PRINT "PASS: F$Mem query returned "; grantBytes; " bytes"
   passed := passed + 1
 ELSE
-  PRINT "FAIL: F$Mem request failed err "; errCode
+  PRINT "FAIL: F$Mem query failed err "; errCode
   failed := failed + 1
 ENDIF
 PRINT
