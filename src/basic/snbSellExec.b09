@@ -13,8 +13,8 @@ PROCEDURE snbSellExec
 (*             snbPhaseCore, snbScreenUtil, snbTradeHumanUI,    *)
 (*             snbForkUtil, and snbSellExec must be loaded.     *)
 (*             snbSellDraftInit, snbSellDraftUIState,           *)
-(*             snbSellUI, and snbSellDraftApply are ensured     *)
-(*             as needed.                                       *)
+(*             snbSellUI, snbSellLot, and snbSellDraftApply are *)
+(*             ensured as needed.                               *)
 (* ============================================================ *)
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
@@ -113,6 +113,24 @@ modNam := "snbSellDraftUIState"
 RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
 IF NOT ok THEN
   PRINT "snbSellExec: failed to ensure snbSellDraftUIState"
+  END
+ENDIF
+modNam := "snbSellDraftHdrState"
+RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+IF NOT ok THEN
+  PRINT "snbSellExec: failed to ensure snbSellDraftHdrState"
+  END
+ENDIF
+modNam := "snbSellDraftEdit"
+RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+IF NOT ok THEN
+  PRINT "snbSellExec: failed to ensure snbSellDraftEdit"
+  END
+ENDIF
+modNam := "snbSellLot"
+RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
+IF NOT ok THEN
+  PRINT "snbSellExec: failed to ensure snbSellLot"
   END
 ENDIF
 modNam := "snbSellUI"

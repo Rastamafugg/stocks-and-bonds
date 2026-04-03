@@ -11,8 +11,8 @@ PROCEDURE snbSellUI
 (* NOTE      : snbStateIO, snbTradeShared, snbGameData,         *)
 (*             snbPhaseCore, snbScreenUtil, snbTradeHumanUI,    *)
 (*             snbForkUtil, snbSellDraftUIState, and snbSellUI  *)
-(*             must be loaded. snbSellLot plus its draft        *)
-(*             helpers are ensured before fork.                 *)
+(*             must be loaded. snbSellExec pre-ensures          *)
+(*             snbSellLot plus its draft helpers before fork.   *)
 (* ============================================================ *)
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
@@ -337,72 +337,6 @@ LOOP
       RUN saveDraftCtx(hdrPath, dCtx, draftOK)
       IF NOT draftOK THEN
         PRINT "snbSellUI: saveDraftCtx failed"
-        END
-      ENDIF
-      modNam := "snbStateIO"
-      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
-      IF NOT ok THEN
-        PRINT "snbSellUI: failed to ensure snbStateIO"
-        END
-      ENDIF
-      modNam := "snbTradeShared"
-      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
-      IF NOT ok THEN
-        PRINT "snbSellUI: failed to ensure snbTradeShared"
-        END
-      ENDIF
-      modNam := "snbGameData"
-      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
-      IF NOT ok THEN
-        PRINT "snbSellUI: failed to ensure snbGameData"
-        END
-      ENDIF
-      modNam := "snbPhaseCore"
-      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
-      IF NOT ok THEN
-        PRINT "snbSellUI: failed to ensure snbPhaseCore"
-        END
-      ENDIF
-      modNam := "snbScreenUtil"
-      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
-      IF NOT ok THEN
-        PRINT "snbSellUI: failed to ensure snbScreenUtil"
-        END
-      ENDIF
-      modNam := "snbTradeHumanUI"
-      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
-      IF NOT ok THEN
-        PRINT "snbSellUI: failed to ensure snbTradeHumanUI"
-        END
-      ENDIF
-      modNam := "snbForkUtil"
-      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
-      IF NOT ok THEN
-        PRINT "snbSellUI: failed to ensure snbForkUtil"
-        END
-      ENDIF
-      modNam := "snbSellDraftUIState"
-      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
-      IF NOT ok THEN
-        PRINT "snbSellUI: failed to ensure snbSellDraftUIState"
-        END
-      ENDIF
-      modNam := "snbSellDraftHdrState"
-      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
-      IF NOT ok THEN
-        PRINT "snbSellUI: failed to ensure snbSellDraftHdrState"
-        END
-      ENDIF
-      modNam := "snbSellDraftEdit"
-      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
-      IF NOT ok THEN
-        PRINT "snbSellUI: failed to ensure snbSellDraftEdit"
-        END
-      ENDIF
-      modNam := "snbSellLot"
-      RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
-      IF NOT ok THEN
-        PRINT "snbSellUI: failed to ensure snbSellLot"
         END
       ENDIF
       RUN forkPhaseLib("snbSellLot", debugLog, exitStat)
