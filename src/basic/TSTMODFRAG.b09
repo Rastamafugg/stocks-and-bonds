@@ -247,6 +247,56 @@ GOSUB 100
 PRINT
 RUN waitKey
 
+PRINT "-- Block 6: Remove adjacent module and retry --"
+testNum := testNum + 1
+PRINT "Test "; testNum; ": F$UnLink snb by hdrAddr"
+RUN unlinkFragModule(hdrSnb, ok, errCode)
+IF ok THEN
+  PRINT "PASS: snb unlinked"
+  hdrSnb := 0
+  passed := passed + 1
+ELSE
+  PRINT "FAIL: snb unlink failed err "; errCode
+  failed := failed + 1
+ENDIF
+
+testNum := testNum + 1
+PRINT "Test "; testNum; ": snb not resident after unlink"
+modNam := "snb"
+ok := FALSE
+GOSUB 100
+PRINT
+RUN waitKey
+
+testNum := testNum + 1
+PRINT "Test "; testNum; ": retry F$Load snbSellDraft after adjacent unlink"
+PRINT "Predicted outcome: load should now succeed if the freed"
+PRINT "snbDividend and snb regions coalesced into one larger block"
+modNam := "snbSellDraft"
+RUN loadFragModule(modNam, hdrSell, ok, errCode)
+IF ok THEN
+  PRINT "PASS: snbSellDraft loaded after adjacent unlink"
+  PRINT "Observed hdrAddr = "; hdrSell
+  passed := passed + 1
+ELSE
+  PRINT "FAIL: snbSellDraft still failed err "; errCode
+  PRINT "This means the adjacent unlink did not produce a"
+  PRINT "large enough contiguous block under the live map."
+  failed := failed + 1
+ENDIF
+
+testNum := testNum + 1
+PRINT "Test "; testNum; ": snbSellDraft resident after retry"
+modNam := "snbSellDraft"
+IF hdrSell <> 0 THEN
+  ok := TRUE
+ELSE
+  ok := FALSE
+ENDIF
+GOSUB 100
+PRINT
+RUN waitKey
+
 PRINT "-- Cleanup end state --"
 IF hdrSell <> 0 THEN
   RUN unlinkFragModule(hdrSell, ok, errCode)
@@ -270,6 +320,13 @@ PRINT
 PRINT "=== SUMMARY ==="
 PRINT "Passed: "; passed
 PRINT "Failed: "; failed
+PRINT
+PRINT "-- Final shell diagnostics --"
+PRINT "Running mfree for free-block report"
+SHELL "mfree"
+PRINT
+PRINT "Running mdir -e for module directory report"
+SHELL "mdir -e"
 END
 
 100 \ ! GOSUB: compare residency of modNam against ok.
