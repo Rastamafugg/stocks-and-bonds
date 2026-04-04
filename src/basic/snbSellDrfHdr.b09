@@ -1,10 +1,10 @@
-PROCEDURE snbSellDraftHdrState
+PROCEDURE snbSellDrfHdr
 (* ============================================================ *)
-(* PROCEDURE : snbSellDraftHdrState                             *)
+(* PROCEDURE : snbSellDrfHdr                             *)
 (* PURPOSE   : README entry for sell draft header/state         *)
 (*             helpers.                                         *)
 (* ============================================================ *)
-PRINT "snbSellDraftHdrState"
+PRINT "snbSellDrfHdr"
 PRINT "  initDraftSum"
 PRINT "  loadDraftHdr"
 PRINT "  saveDraftHdr"
@@ -159,3 +159,4 @@ END
     PRINT "saveDraftSum error ("; ERR; ")"
     ok := FALSE
 END
+

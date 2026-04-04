@@ -232,7 +232,7 @@ Notes:
 | `snbSellUI.b09` | `snbSellUI` | Human sell-turn UI child |
 | `snbSellDraftInit.b09` | `snbSellDraftInit` | Sell draft bootstrap and cleanup helpers |
 | `snbSellDraftUIState.b09` | `snbSellDraftUIState` | Sell draft summary and context helpers for UI flows |
-| `snbSellDraftHdrState.b09` | `snbSellDraftHdrState` | Sell draft header and summary-write helpers |
+| `snbSellDrfHdr.b09` | `snbSellDrfHdr` | Sell draft header and summary-write helpers |
 | `snbSellDraftEdit.b09` | `snbSellDraftEdit` | Sell draft order edit helpers |
 | `snbSellDraftApply.b09` | `snbSellDraftApply` | Sell draft replay/apply helpers |
 | `snbSellAI.b09` | `snbSellAI` | AI sell-phase child |
@@ -259,7 +259,7 @@ Several helpers now live inside the child module that uses them:
 - `snbSellUI.b09`: sell-turn editor loop
 - `snbSellDraftInit.b09`: draft bootstrap and cleanup
 - `snbSellDraftUIState.b09`: draft summary and context I/O for UI flows
-- `snbSellDraftHdrState.b09`: draft header and summary-write helpers
+- `snbSellDrfHdr.b09`: draft header and summary-write helpers
 - `snbSellDraftEdit.b09`: order mutation and summary rebuild helpers
 - `snbSellDraftApply.b09`: confirmed draft replay into the live player record
 - `snbSellAI.b09`: `aiSell`, `scrAISellTurn`
@@ -307,3 +307,4 @@ The coordinator currently calls `forkPhase(...)` with only these child names:
 - `snbEndGame`
 
 Any design note that lists other forked child entry names is historical.
+

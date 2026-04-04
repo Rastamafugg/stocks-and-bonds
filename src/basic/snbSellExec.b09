@@ -115,10 +115,10 @@ IF NOT ok THEN
   PRINT "snbSellExec: failed to ensure snbSellDraftUIState"
   END
 ENDIF
-modNam := "snbSellDraftHdrState"
+modNam := "snbSellDrfHdr"
 RUN ensureModuleLib(modNam, TRUE, debugLog, ok)
 IF NOT ok THEN
-  PRINT "snbSellExec: failed to ensure snbSellDraftHdrState"
+  PRINT "snbSellExec: failed to ensure snbSellDrfHdr"
   END
 ENDIF
 modNam := "snbSellDraftEdit"
@@ -185,3 +185,4 @@ END
 900 PRINT "snbSellExec error ("; ERR; ")"
 RUN waitKey
 END
+

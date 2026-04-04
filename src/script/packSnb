@@ -1,6 +1,11 @@
 del -x moduleLogger
+del -x snbSellDraftHdrState
+del -x snbSellDrfHdr
 basic09 #40k
 load /d1/moduleLogger.b09
+pack*
+kill*
+load /d1/snbSellDrfHdr.b09
 pack*
 kill*
 bye

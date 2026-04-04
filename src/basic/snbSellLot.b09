@@ -9,7 +9,7 @@ PROCEDURE snbSellLot
 (* PARAMS    : None                                             *)
 (* NOTE      : snbStateIO, snbTradeShared, snbGameData,         *)
 (*             snbPhaseCore, snbScreenUtil, snbTradeHumanUI,    *)
-(*             snbSellDraftUIState, snbSellDraftHdrState,       *)
+(*             snbSellDraftUIState, snbSellDrfHdr,       *)
 (*             snbSellDraftEdit, and                            *)
 (*             snbSellLot must be loaded.                       *)
 (* ============================================================ *)
@@ -57,10 +57,10 @@ IF NOT ok THEN
   PRINT "snbSellLot: failed to load snbSellDraftUIState"
   END
 ENDIF
-modNam := "snbSellDraftHdrState"
+modNam := "snbSellDrfHdr"
 RUN ensureModuleLib(modNam, FALSE, debugLog, ok)
 IF NOT ok THEN
-  PRINT "snbSellLot: failed to load snbSellDraftHdrState"
+  PRINT "snbSellLot: failed to load snbSellDrfHdr"
   END
 ENDIF
 modNam := "snbSellDraftEdit"
@@ -205,3 +205,4 @@ END
 
 900 PRINT "snbSellLot error ("; ERR; ")"
 END
+

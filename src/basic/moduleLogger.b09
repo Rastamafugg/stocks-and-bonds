@@ -46,7 +46,7 @@ modList(16) := "snbSellAI"
 modList(17) := "snbSellAIUtil"
 modList(18) := "snbSellDraftApply"
 modList(19) := "snbSellDraftEdit"
-modList(20) := "snbSellDraftHdrState"
+modList(20) := "snbSellDrfHdr"
 modList(21) := "snbSellDraftInit"
 modList(22) := "snbSellDraftUIState"
 modList(23) := "snbSellExec"
@@ -98,8 +98,8 @@ PROCEDURE showMfree
 (* ================================================== *)
 (* PROCEDURE: showMfree                               *)
 (* PURPOSE:   Run mfree before a module load attempt  *)
-(*            and pause so the user can review the    *)
-(*            output before it scrolls away.          *)
+(*            and leave the command output on the     *)
+(*            console without pausing execution.      *)
 (* PARAMS:    modNam - module about to be processed   *)
 (* ================================================== *)
 PARAM modNam : STRING[20]
@@ -108,7 +108,6 @@ ON ERROR GOTO 900
 
 PRINT "-- mfree before "; modNam; " --"
 SHELL "mfree"
-RUN moduleLoggerPause
 END
 
 900 PRINT "showMfree error ("; ERR; ")"
@@ -177,6 +176,12 @@ IF LAND(iCC, 1) <> 0 THEN
   iCC     := regs.cc
   IF LAND(iCC, 1) <> 0 THEN
     errCode := regs.b
+    IF errCode = 214 THEN
+      PRINT "logPackedModule: skip "; packedMod; " err 214"
+      PRINT #pathNo, packedMod; ",<not-packed>,214"
+      ok := TRUE
+      END
+    ENDIF
     PRINT "logPackedModule: load failed "; packedMod; " err "; errCode
     END
   ENDIF
@@ -253,9 +258,9 @@ END
 PROCEDURE showMdir
 (* ================================================== *)
 (* PROCEDURE: showMdir                                *)
-(* PURPOSE:   Run mdir after unlink and pause so the  *)
-(*            user can review the module directory    *)
-(*            before it scrolls away.                 *)
+(* PURPOSE:   Run mdir after unlink and leave the     *)
+(*            command output on the console without   *)
+(*            pausing execution.                      *)
 (* PARAMS:    modNam - module label for console log   *)
 (* ================================================== *)
 PARAM modNam : STRING[20]
@@ -264,7 +269,6 @@ ON ERROR GOTO 900
 
 PRINT "-- mdir after "; modNam; " --"
 SHELL "mdir"
-RUN moduleLoggerPause
 END
 
 900 PRINT "showMdir error ("; ERR; ")"
@@ -371,3 +375,4 @@ END
 
 900 PRINT "moduleLoggerPause error ("; ERR; ")"
 END
+
