@@ -217,7 +217,7 @@ LOOP
                         ! Line exceeds 79 chars; RUN statement cannot be split.
                         RUN snbSellHumanStub(iCYr, iMgnRule, phasePlyr, iPlyrCnt, plyr, phaseAct, savePhVal, savePlyrVal)
                       ENDIF
-                    ENDIF \ENDIF
+                    ENDIF
                   ELSE IF iSavPh = 2 THEN
                     modCnt := 1
                     IF plyr.plyrType = 2 THEN
@@ -238,7 +238,7 @@ LOOP
                         ! Line exceeds 79 chars; RUN statement cannot be split.
                         RUN snbBuy(iCYr, iMaxYr, iMgnRule, phasePlyr, iPlyrCnt, plyr, mkt, phaseAct, savePhVal, savePlyrVal)
                       ENDIF
-                    ENDIF \ENDIF
+                    ENDIF
                   ELSE
                     modCnt := 1
                     modList(1) := "snbMarginPay"
