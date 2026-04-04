@@ -11,6 +11,7 @@ while [ -L "$SOURCE" ]; do
 done
 SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
 SOURCE_DIR="$SCRIPT_DIR/src/basic"
+SCRIPT_SOURCE_DIR="$SCRIPT_DIR/src/script"
 DISK_DIR="$SCRIPT_DIR/disks"
 IMAGE_PATH="$DISK_DIR/$IMAGE_NAME"
 
@@ -21,6 +22,11 @@ fi
 
 if [ ! -d "$SOURCE_DIR" ]; then
   echo "ERROR: Source directory not found: $SOURCE_DIR"
+  exit 1
+fi
+
+if [ ! -d "$SCRIPT_SOURCE_DIR" ]; then
+  echo "ERROR: Script directory not found: $SCRIPT_SOURCE_DIR"
   exit 1
 fi
 
@@ -43,6 +49,18 @@ find "$SOURCE_DIR" -type f -name "*.b09" ! -name "global.b09" | sort | while rea
   relative_path="${file#$SOURCE_DIR/}"
   echo "  Copying $relative_path"
   os9 copy -l -r "$file" "$IMAGE_PATH,$relative_path"
+done
+
+echo "Copying NitrOS-9 procedure files from $SCRIPT_SOURCE_DIR to $IMAGE_PATH"
+find "$SCRIPT_SOURCE_DIR" -type f | sort | while read -r file; do
+  relative_path="${file#$SCRIPT_SOURCE_DIR/}"
+  relative_dir="$(dirname "$relative_path")"
+  if [ "$relative_dir" != "." ]; then
+    os9 makdir "$IMAGE_PATH,$relative_dir" >/dev/null 2>&1 || true
+  fi
+  echo "  Copying $relative_path"
+  os9 copy -l -r "$file" "$IMAGE_PATH,$relative_path"
+  os9 attr "$IMAGE_PATH,$relative_path" -e -pe
 done
 
 echo "Build complete: $IMAGE_PATH"
