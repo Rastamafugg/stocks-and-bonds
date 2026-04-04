@@ -1,5 +1,22 @@
 del -x moduleLogger
 del -x snb
+del -x snbSetup
+del -x snbDividend
+del -x snbMarket
+del -x snbSellAI
+del -x snbBuy
+del -x snbBuyAI
+del -x snbMarginPay
+del -x snbYear10Clear
+del -x snbEndGame
+del -x snbPhaseCore
+del -x snbScreenUtil
+del -x snbStateIO
+del -x snbGameData
+del -x snbTradeShared
+del -x snbTradeAI
+del -x snbBuyExec
+del -x snbSellAIUtil
 basic09 #40k
 load /d1/moduleLogger.b09
 pack*
@@ -7,7 +24,116 @@ kill*
 load /d1/snb.b09
 pack*
 kill*
+load /d1/snbSetup.b09
+load /d1/snbCoreIO.b09
+load /d1/snbCoreNameFmt.b09
+load /d1/snbScreenBase.b09
+load /d1/snbDeckUtil.b09
+load /d1/snbMenuUtil.b09
+pack*
+kill*
+load /d1/snbDividend.b09
+load /d1/snbStateHdrPlyr.b09
+load /d1/snbStateNav.b09
+load /d1/snbCoreNameFmt.b09
+load /d1/snbCoreInput.b09
+load /d1/snbScreenBase.b09
+load /d1/snbScreenMoney.b09
+load /d1/snbGameStocks.b09
+load /d1/snbGameBonds.b09
+load /d1/snbTradeMath.b09
+load /d1/snbTradeQtyUI.b09
+load /d1/snbBankruptUI.b09
+load /d1/snbForceLiqUI.b09
+load /d1/snbAILiquidate.b09
+pack*
+kill*
+load /d1/snbMarket.b09
+load /d1/snbStateNav.b09
+load /d1/snbScreenBase.b09
+load /d1/snbDeckUtil.b09
+pack*
+kill*
 load /d1/snbSellHumanStub.b09
+load /d1/snbStateHdrPlyr.b09
+load /d1/snbCoreNameFmt.b09
+load /d1/snbScreenBase.b09
+load /d1/snbMenuUtil.b09
+pack*
+kill*
+load /d1/snbSellAI.b09
+load /d1/snbCoreIO.b09
+load /d1/snbCoreMenuFlow.b09
+load /d1/snbCoreNameFmt.b09
+load /d1/snbScreenBase.b09
+load /d1/snbScreenMoney.b09
+load /d1/snbStateNav.b09
+load /d1/snbGameStocks.b09
+load /d1/snbGameBonds.b09
+load /d1/snbTradeMath.b09
+load /d1/snbTradeRepay.b09
+load /d1/snbAIProfile.b09
+load /d1/snbAILiquidate.b09
+load /d1/snbSellApply.b09
+load /d1/snbBankruptUI.b09
+pack*
+kill*
+load /d1/snbBuy.b09
+load /d1/snbStateHdrPlyr.b09
+load /d1/snbCoreNameFmt.b09
+load /d1/snbCoreMenuFlow.b09
+load /d1/snbCoreInput.b09
+load /d1/snbScreenBase.b09
+load /d1/snbScreenMoney.b09
+load /d1/snbGameBonds.b09
+load /d1/snbTradeMath.b09
+load /d1/snbTradeQtyUI.b09
+load /d1/snbBuyApply.b09
+pack*
+kill*
+load /d1/snbBuyAI.b09
+load /d1/snbCoreIO.b09
+load /d1/snbCoreMenuFlow.b09
+load /d1/snbCoreNameFmt.b09
+load /d1/snbScreenBase.b09
+load /d1/snbScreenMoney.b09
+load /d1/snbStateNav.b09
+load /d1/snbGameStocks.b09
+load /d1/snbGameBonds.b09
+load /d1/snbTradeMath.b09
+load /d1/snbAIProfile.b09
+pack*
+kill*
+load /d1/snbMarginPay.b09
+load /d1/snbCoreIO.b09
+load /d1/snbCoreInput.b09
+load /d1/snbScreenBase.b09
+load /d1/snbScreenMoney.b09
+load /d1/snbGameStocks.b09
+load /d1/snbTradeMath.b09
+load /d1/snbTradeRepay.b09
+pack*
+kill*
+load /d1/snbYear10Clear.b09
+load /d1/snbCoreIO.b09
+load /d1/snbCoreInput.b09
+load /d1/snbScreenBase.b09
+load /d1/snbScreenMoney.b09
+load /d1/snbGameStocks.b09
+load /d1/snbGameBonds.b09
+load /d1/snbTradeMath.b09
+load /d1/snbTradeRepay.b09
+load /d1/snbTradeQtyUI.b09
+load /d1/snbBankruptUI.b09
+pack*
+kill*
+load /d1/snbEndGame.b09
+load /d1/snbCoreIO.b09
+load /d1/snbCoreMenuFlow.b09
+load /d1/snbCoreNameFmt.b09
+load /d1/snbScreenBase.b09
+load /d1/snbScreenMoney.b09
+load /d1/snbMenuUtil.b09
 pack*
 kill*
 bye

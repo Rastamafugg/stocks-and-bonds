@@ -73,12 +73,8 @@ LOOP
     ! setup writes a fresh SNBSTATE for a new game or
     ! loads SNBGAME into SNBSTATE for resume flow.
     RUN chkStale(wasStale)
-    modCnt := 5
-    modList(1) := "snbPhaseCore"
-    modList(2) := "snbScreenUtil"
-    modList(3) := "snbDeckUtil"
-    modList(4) := "snbMenuUtil"
-    modList(5) := "snbSetup"
+    modCnt := 1
+    modList(1) := "snbSetup"
     RUN loadModuleList(modList, hdrList, modCnt, ok)
     IF NOT ok THEN
       END
@@ -133,15 +129,8 @@ LOOP
       ! savedPhase 0, 4, and 6 all route back into the
       ! dividend module's resume points.
       IF iSavPh = 0 OR iSavPh = 4 OR iSavPh = 6 THEN
-        modCnt := 8
-        modList(1) := "snbStateIO"
-        modList(2) := "snbTradeShared"
-        modList(3) := "snbGameData"
-        modList(4) := "snbScreenUtil"
-        modList(5) := "snbTradeHumanUI"
-        modList(6) := "snbSellForceUI"
-        modList(7) := "snbSellAIUtil"
-        modList(8) := "snbDividend"
+        modCnt := 1
+        modList(1) := "snbDividend"
         RUN loadModuleList(modList, hdrList, modCnt, ok)
         IF NOT ok THEN
           gameOver := TRUE
@@ -158,10 +147,8 @@ LOOP
       IF NOT gameOver THEN
         ! savedPhase 7 is market resume after save+exit.
         IF iSavPh = 0 OR iSavPh = 7 THEN
-          modCnt := 3
-          modList(1) := "snbStateIO"
-          modList(2) := "snbDeckUtil"
-          modList(3) := "snbMarket"
+          modCnt := 1
+          modList(1) := "snbMarket"
           RUN loadModuleList(modList, hdrList, modCnt, ok)
           IF NOT ok THEN
             gameOver := TRUE
@@ -185,15 +172,8 @@ LOOP
             PRINT "SNB: failed to read sell turn player type"
             gameOver := TRUE
           ELSE IF turnPType = 2 THEN
-            modCnt := 8
-            modList(1) := "snbPhaseCore"
-            modList(2) := "snbScreenUtil"
-            modList(3) := "snbTradeShared"
-            modList(4) := "snbGameData"
-            modList(5) := "snbTradeAI"
-            modList(6) := "snbSellAIUtil"
-            modList(7) := "snbTradeMgn"
-            modList(8) := "snbSellAI"
+            modCnt := 1
+            modList(1) := "snbSellAI"
             RUN loadModuleList(modList, hdrList, modCnt, ok)
             IF NOT ok THEN
               gameOver := TRUE
@@ -206,11 +186,8 @@ LOOP
               GOSUB 100
             ENDIF
           ELSE
-            modCnt := 4
-            modList(1) := "snbStateIO"
-            modList(2) := "snbScreenUtil"
-            modList(3) := "snbMenuUtil"
-            modList(4) := "snbSellHumanStub"
+            modCnt := 1
+            modList(1) := "snbSellHumanStub"
             RUN loadModuleList(modList, hdrList, modCnt, ok)
             IF NOT ok THEN
               gameOver := TRUE
@@ -229,16 +206,8 @@ LOOP
       IF NOT gameOver THEN
         ! savedPhase 3 is year-10 clearance before buy.
         IF iSavPh = 3 THEN
-          modCnt := 9
-          modList(1) := "snbPhaseCore"
-          modList(2) := "snbScreenUtil"
-          modList(3) := "snbTradeShared"
-          modList(4) := "snbGameData"
-          modList(5) := "snbTradeHumanUI"
-          modList(6) := "snbSellMargin"
-          modList(7) := "snbTradeAI"
-          modList(8) := "snbSellForceUI"
-          modList(9) := "snbYear10Clear"
+          modCnt := 1
+          modList(1) := "snbYear10Clear"
           RUN loadModuleList(modList, hdrList, modCnt, ok)
           IF NOT ok THEN
             gameOver := TRUE
@@ -261,13 +230,8 @@ LOOP
             PRINT "SNB: failed to read buy turn player type"
             gameOver := TRUE
           ELSE IF turnPType = 2 THEN
-            modCnt := 6
-            modList(1) := "snbPhaseCore"
-            modList(2) := "snbScreenUtil"
-            modList(3) := "snbTradeShared"
-            modList(4) := "snbGameData"
-            modList(5) := "snbTradeAI"
-            modList(6) := "snbBuyAI"
+            modCnt := 1
+            modList(1) := "snbBuyAI"
             RUN loadModuleList(modList, hdrList, modCnt, ok)
             IF NOT ok THEN
               gameOver := TRUE
@@ -280,14 +244,8 @@ LOOP
               GOSUB 100
             ENDIF
           ELSE
-            modCnt := 7
-            modList(1) := "snbStateIO"
-            modList(2) := "snbTradeShared"
-            modList(3) := "snbPhaseCore"
-            modList(4) := "snbScreenUtil"
-            modList(5) := "snbTradeHumanUI"
-            modList(6) := "snbGameData"
-            modList(7) := "snbBuy"
+            modCnt := 1
+            modList(1) := "snbBuy"
             RUN loadModuleList(modList, hdrList, modCnt, ok)
             IF NOT ok THEN
               gameOver := TRUE
@@ -306,14 +264,8 @@ LOOP
       IF NOT gameOver THEN
         ! savedPhase 5 is post-buy margin repayment.
         IF iSavPh = 5 THEN
-          modCnt := 7
-          modList(1) := "snbPhaseCore"
-          modList(2) := "snbScreenUtil"
-          modList(3) := "snbTradeShared"
-          modList(4) := "snbTradeAI"
-          modList(5) := "snbGameData"
-          modList(6) := "snbTradeMgn"
-          modList(7) := "snbMarginPay"
+          modCnt := 1
+          modList(1) := "snbMarginPay"
           RUN loadModuleList(modList, hdrList, modCnt, ok)
           IF NOT ok THEN
             gameOver := TRUE
@@ -367,10 +319,8 @@ LOOP
     IF doClsgMkt THEN
       ! Closing market pass uses the final-year state
       ! already written by the buy/margin path.
-      modCnt := 3
-      modList(1) := "snbStateIO"
-      modList(2) := "snbDeckUtil"
-      modList(3) := "snbMarket"
+      modCnt := 1
+      modList(1) := "snbMarket"
       RUN loadModuleList(modList, hdrList, modCnt, ok)
       IF NOT ok THEN
         END
@@ -388,11 +338,8 @@ LOOP
 
     ! Endgame may write RETURN_TO_SETUP (8) or
     ! QUIT_TO_MENU (9) back into SNBSTATE.
-    modCnt := 4
-    modList(1) := "snbPhaseCore"
-    modList(2) := "snbScreenUtil"
-    modList(3) := "snbMenuUtil"
-    modList(4) := "snbEndGame"
+    modCnt := 1
+    modList(1) := "snbEndGame"
     RUN loadModuleList(modList, hdrList, modCnt, ok)
     IF NOT ok THEN
       END

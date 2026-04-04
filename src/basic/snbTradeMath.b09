@@ -1,0 +1,76 @@
+PROCEDURE calcMgnTot
+(* ================================================== *)
+(* PROCEDURE: calcMgnTot                              *)
+(* PURPOSE:   Sum per-company margin balances into a  *)
+(*            total outstanding margin value.         *)
+(* PARAMS:    plyr   - player record to inspect       *)
+(*            mgnTot - receives total margin balance  *)
+(* EFFECTS:   None beyond output PARAM assignment.    *)
+(* ================================================== *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+PARAM plyr   : PlyrRec
+PARAM mgnTot : INTEGER
+DIM s        : INTEGER
+
+mgnTot := 0
+FOR s := 1 TO 9
+  mgnTot := mgnTot + plyr.mgnBal(s)
+NEXT s
+END
+
+PROCEDURE calcSaleMgnRpy
+(* ================================================== *)
+(* PROCEDURE: calcSaleMgnRpy                           *)
+(* PURPOSE:   Return the company-margin repayment due  *)
+(*            from a stock sale under the simplified   *)
+(*            rule: 50% of proceeds, clamped to the    *)
+(*            company's remaining margin balance.      *)
+(* PARAMS:    compMgn - current company margin balance *)
+(*            proceeds - sale proceeds                 *)
+(*            repay   - receives margin repayment      *)
+(* EFFECTS:   None beyond output PARAM assignment.     *)
+(* ================================================== *)
+PARAM compMgn : INTEGER
+PARAM proceeds: INTEGER
+PARAM repay   : INTEGER
+
+repay := proceeds / 2
+IF repay > compMgn THEN
+  repay := compMgn
+ENDIF
+IF repay < 0 THEN
+  repay := 0
+ENDIF
+END
+
+PROCEDURE findNextActivePlyr
+(* ================================================== *)
+(* PROCEDURE: findNextActivePlyr                       *)
+(* PURPOSE:   Find the next non-bankrupt player after *)
+(*            currP within 1..plyrCnt.                *)
+(* PARAMS:    plyrs   - player array                  *)
+(*            plyrCnt - valid player count            *)
+(*            currP   - current player index          *)
+(*            nextP   - receives next active player   *)
+(*                      or 0 if none remain           *)
+(* EFFECTS:   None beyond output PARAM assignment.    *)
+(* ================================================== *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+PARAM plyrs(6) : PlyrRec
+PARAM plyrCnt  : INTEGER
+PARAM currP    : INTEGER
+PARAM nextP    : INTEGER
+DIM p          : INTEGER
+
+nextP := 0
+FOR p := currP + 1 TO plyrCnt
+  IF nextP = 0 THEN
+    IF NOT plyrs(p).isBankrupt THEN
+      nextP := p
+    ENDIF
+  ENDIF
+NEXT p
+END
+

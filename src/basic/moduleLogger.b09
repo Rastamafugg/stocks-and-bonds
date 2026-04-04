@@ -12,7 +12,7 @@ PROCEDURE moduleLogger
 (* FORMAT:    packedModule,entryModule,sizeBytes      *)
 (* NOTE:      Requires SysCall machine-lang module.  *)
 (* ================================================== *)
-DIM modList(35) : STRING[20]
+DIM modList(11) : STRING[20]
 DIM modCnt      : INTEGER
 DIM i           : INTEGER
 DIM path        : BYTE
@@ -26,42 +26,18 @@ ON ERROR GOTO 900
 pathOpen := FALSE
 logPath := "/d1/modulelog"
 
-modCnt := 35
+modCnt := 11
 modList(1)  := "snb"
-modList(2)  := "snbBuy"
-modList(3)  := "snbBuyAI"
-modList(4)  := "snbBuyExec"
-modList(5)  := "snbDeckUtil"
-modList(6)  := "snbDividend"
-modList(7)  := "snbEndGame"
-modList(8)  := "snbForkUtil"
-modList(9)  := "snbGameData"
-modList(10) := "snbMarginPay"
-modList(11) := "snbMarket"
-modList(12) := "snbMenuUtil"
-modList(13) := "snbPhaseCore"
-modList(14) := "snbScreenUtil"
-modList(15) := "snbSell"
-modList(16) := "snbSellAI"
-modList(17) := "snbSellAIUtil"
-modList(18) := "snbSellDraftApply"
-modList(19) := "snbSellDraftEdit"
-modList(20) := "snbSellDrfHdr"
-modList(21) := "snbSellDraftInit"
-modList(22) := "snbSellDraftUIState"
-modList(23) := "snbSellExec"
-modList(24) := "snbSellForceUI"
-modList(25) := "snbSellLot"
-modList(26) := "snbSellMargin"
-modList(27) := "snbSellUI"
-modList(28) := "snbSetup"
-modList(29) := "snbStateIO"
-modList(30) := "snbTradeAI"
-modList(31) := "snbTradeHumanUI"
-modList(32) := "snbTradeMgn"
-modList(33) := "snbTradeShared"
-modList(34) := "snbYear10Clear"
-modList(35) := "snbSellHumanStub"
+modList(2)  := "snbSetup"
+modList(3)  := "snbDividend"
+modList(4)  := "snbMarket"
+modList(5)  := "snbSellHumanStub"
+modList(6)  := "snbSellAI"
+modList(7)  := "snbBuy"
+modList(8)  := "snbBuyAI"
+modList(9)  := "snbMarginPay"
+modList(10) := "snbYear10Clear"
+modList(11) := "snbEndGame"
 
 ON ERROR GOTO 100
 DELETE logPath

@@ -1,0 +1,43 @@
+PROCEDURE waitKey
+(* ================================================== *)
+(* PROCEDURE: waitKey                                 *)
+(* PURPOSE:   Display continue prompt, block on key. *)
+(* PARAMS:    None                                    *)
+(* EFFECTS:   Prints prompt to stdout. Waits for one *)
+(*            key from stdin, discards it, then      *)
+(*            prints newline after key.              *)
+(* ================================================== *)
+DIM k:STRING[1]
+
+ON ERROR GOTO 900
+
+PRINT
+PRINT "  Press any key to continue...";
+GET #0, k
+PRINT
+END
+
+900 \ ! Error handler
+PRINT "waitKey error ("; ERR; ")"
+END
+
+PROCEDURE clrScr
+(* ================================================== *)
+(* PROCEDURE: clrScr                                  *)
+(* PURPOSE:   Clear the terminal screen via path 1.  *)
+(* PARAMS:    None                                    *)
+(* EFFECTS:   Sends ASCII form-feed (12) to path 1.  *)
+(*            Cursor moves to top-left of terminal.  *)
+(* ================================================== *)
+DIM clsChar:BYTE
+
+ON ERROR GOTO 900
+
+clsChar := 12 \ ! ASCII form-feed clears terminal screen
+PUT #1, clsChar
+END
+
+900 \ ! Error handler
+PRINT "clrScr error ("; ERR; ")"
+END
+

@@ -1,14 +1,3 @@
-PROCEDURE snbMenuUtil
-(* ================================================== *)
-(* PROCEDURE: snbMenuUtil                             *)
-(* PURPOSE:   README entry for snbMenuUtil module.    *)
-(*            Lists all procedures in this module.    *)
-(* PARAMS:    None                                    *)
-(* ================================================== *)
-PRINT "snbMenuUtil"
-PRINT "  getMenuKey"
-END
-
 PROCEDURE getMenuKey
 (* ================================================== *)
 (* PROCEDURE: getMenuKey                              *)
@@ -46,3 +35,4 @@ END
 900 \ ! Error handler
 PRINT "getMenuKey error ("; ERR; ")"
 END
+

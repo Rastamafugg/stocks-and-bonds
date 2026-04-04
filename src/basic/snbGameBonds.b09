@@ -1,0 +1,14 @@
+PROCEDURE initBondPar
+(* ================================================== *)
+(* PROCEDURE: initBondPar                             *)
+(* PURPOSE:   Load standard bond par values.          *)
+(* PARAMS:    bPar - receives par values for ids 1..3 *)
+(* EFFECTS:   Overwrites all 3 array slots.           *)
+(* ================================================== *)
+PARAM bPar(3) : INTEGER
+
+bPar(1) := 1000
+bPar(2) := 5000
+bPar(3) := 10000
+END
+

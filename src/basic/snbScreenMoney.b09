@@ -1,0 +1,61 @@
+PROCEDURE fmtMoney
+(* ================================================== *)
+(* PROCEDURE: fmtMoney                                *)
+(* PURPOSE:   Right-justify an INTEGER into a compact *)
+(*            field, returned in result (STRING[8]).  *)
+(* PARAMS:    amt    - value to format (INTEGER)      *)
+(*            result - receives formatted string      *)
+(* EFFECTS:   result is padded to a minimum width of  *)
+(*            4 chars for positive values, wider      *)
+(*            when needed by the number itself.       *)
+(*            Negative values include leading minus.  *)
+(* LIMITS:    -32768 still produces 8 chars and       *)
+(*            overflows STRING[8].                    *)
+(* ================================================== *)
+PARAM amt:INTEGER
+PARAM result:STRING[8]
+
+RUN padNumber(amt, 4, result)
+END
+
+PROCEDURE padNumber
+(* ====================================================== *)
+(* PROCEDURE: padNumber                                   *)
+(* PURPOSE:   Right-justify an INTEGER into a compact     *)
+(*            field, returned in result (STRING[8]).      *)
+(* PARAMS:    amt    - value to format (INTEGER)          *)
+(*            minWid - minimum width for formatted string *)
+(*            result - receives formatted string          *)
+(* EFFECTS:   result is padded to a given minimum width   *)
+(*            for positive values, wider when needed by   *)
+(*            the number itself.                          *)
+(*            Negative values include leading minus.      *)
+(* LIMITS:    -32768 still produces 8 chars and           *)
+(*            overflows STRING[8].                        *)
+(* ====================================================== *)
+PARAM amt:INTEGER
+PARAM minWid:INTEGER
+PARAM result:STRING[8]
+
+DIM raw:STRING[8]
+DIM sLen:INTEGER
+DIM padLen:INTEGER
+DIM p:INTEGER
+
+raw := TRIM$(STR$(amt)) \ ! digit string, no trailing spaces
+sLen := LEN(raw)
+IF amt < 0 THEN
+  minWid := minWid + 1
+ENDIF
+padLen := minWid - sLen
+IF padLen < 0 THEN
+  padLen := 0
+ENDIF
+
+result := ""
+FOR p := 1 TO padLen
+  result := result + " "
+NEXT p
+result := result + raw
+END
+

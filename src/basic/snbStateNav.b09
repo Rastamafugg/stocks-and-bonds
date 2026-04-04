@@ -1,0 +1,34 @@
+PROCEDURE getPhaseNav
+(* ================================================== *)
+(* PROCEDURE: getPhaseNav                             *)
+(* PURPOSE:   Read a year-phase navigation key.      *)
+(*            Any key except S/Q continues. S saves  *)
+(*            and exits the current game. Q quits    *)
+(*            without saving.                        *)
+(* PARAMS:    action - receives result:              *)
+(*              1=Continue 2=Save+Exit 3=Quit        *)
+(* EFFECTS:   Prints prompt and waits for one key.   *)
+(* ================================================== *)
+PARAM action:BYTE
+
+DIM k:STRING[1]
+
+ON ERROR GOTO 900
+
+PRINT
+PRINT "  Any key=continue  S=save+exit  Q=quit: ";
+GET #0, k
+PRINT
+
+IF k = "S" OR k = "s" THEN
+  action := 2
+ELSE IF k = "Q" OR k = "q" THEN
+  action := 3
+ELSE
+  action := 1
+ENDIF \ENDIF
+END
+
+900 PRINT "getPhaseNav error ("; ERR; ")"
+END
+

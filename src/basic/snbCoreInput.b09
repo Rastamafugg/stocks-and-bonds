@@ -1,0 +1,42 @@
+PROCEDURE getNumIn
+(* ============================================================ *)
+(* PROCEDURE : getNumIn                                         *)
+(* PURPOSE   : Safe wrapper around VAL. Attempts to convert     *)
+(*             str to an INTEGER. Returns ok=FALSE and val=0    *)
+(*             if str contains non-numeric content (VAL would   *)
+(*             otherwise throw a runtime error).                *)
+(*             Caller is responsible for guarding the empty-    *)
+(*             string case before calling; empty str here       *)
+(*             will produce ok=FALSE and val=0.                 *)
+(* PARAMS    : str   - raw input string to convert              *)
+(*             value - converted INTEGER value; 0 on failure    *)
+(*             ok    - TRUE if conversion succeeded             *)
+(* SIDE EFX  : None.                                            *)
+(* ============================================================ *)
+PARAM str : STRING[8]
+PARAM value : INTEGER
+PARAM ok  : BOOLEAN
+DIM numErr : BOOLEAN
+
+ON ERROR GOTO 900
+
+numErr := FALSE
+
+! Attempt VAL. On non-numeric input, Basic09 fires a runtime
+! error. ON ERROR GOTO 100 catches it and sets numErr flag.
+! GOTO 110 skips the flag-set on the success path.
+ON ERROR GOTO 100
+value := VAL(str)
+GOTO 110
+
+100 numErr := TRUE
+    value  := 0
+
+110 ON ERROR GOTO 900
+
+ok := NOT numErr
+END
+
+900 PRINT "getNumIn error ("; ERR; ")"
+END
+

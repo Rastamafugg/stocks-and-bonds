@@ -1,14 +1,3 @@
-PROCEDURE snbDeckUtil
-(* ================================================== *)
-(* PROCEDURE: snbDeckUtil                             *)
-(* PURPOSE:   README entry for snbDeckUtil module.    *)
-(*            Lists all procedures in this module.    *)
-(* PARAMS:    None                                    *)
-(* ================================================== *)
-PRINT "snbDeckUtil"
-PRINT "  shuffleDeck"
-END
-
 PROCEDURE shuffleDeck
 (* ============================================================ *)
 (* PROCEDURE : shuffleDeck                                      *)
@@ -40,3 +29,4 @@ FOR i := 36 TO 2 STEP -1
   deckOrd(i) := tmp
 NEXT i
 END
+

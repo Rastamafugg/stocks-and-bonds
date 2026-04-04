@@ -1,84 +1,10 @@
 PROCEDURE snbSellAIUtil
 (* ================================================== *)
-(* PROCEDURE: snbSellAIUtil                           *)
-(* PURPOSE:   README entry for snbSellAIUtil module.  *)
+(* PROCEDURE: snbSellAIUtil *)
+(* PURPOSE:   README entry for snbSellAIUtil module. *)
 (*            Lists all procedures in this module.    *)
 (* PARAMS:    None                                    *)
 (* ================================================== *)
 PRINT "snbSellAIUtil"
-PRINT "  aiLiqOrdr"
 END
 
-PROCEDURE aiLiqOrdr
-(* ============================================================ *)
-(* PROCEDURE : aiLiqOrdr                                        *)
-(* PURPOSE   : Build AI liquidation sell orders to cover an     *)
-(*             immediate obligation using currently held assets. *)
-(*             Stocks are sold before bonds. Stock quantities    *)
-(*             are rounded up to the next multiple of 10.       *)
-(*             This procedure does not modify plyr or mkt.      *)
-(* PARAMS    : plyr      - player record (read-only)            *)
-(*             mkt       - market state (read-only)             *)
-(*             oblgRem   - obligation to cover                  *)
-(*             sellStkQty - OUT: staged stock qty per stock id  *)
-(*             sellBndQty - OUT: staged bond qty per bond id    *)
-(* SIDE EFX  : None beyond output PARAM population.             *)
-(* ============================================================ *)
-! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
-TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
-PARAM plyr        : PlyrRec
-PARAM mkt         : MktState
-PARAM oblgRem     : INTEGER
-PARAM sellStkQty(9): INTEGER
-PARAM sellBndQty(3): INTEGER
-DIM bPar(3) : INTEGER
-DIM needed  : INTEGER
-DIM qty     : INTEGER
-DIM prcd    : INTEGER
-DIM s       : INTEGER
-DIM b       : INTEGER
-
-RUN initBondPar(bPar)
-FOR s := 1 TO 9
-  sellStkQty(s) := 0
-NEXT s
-FOR b := 1 TO 3
-  sellBndQty(b) := 0
-NEXT b
-
-needed := oblgRem
-IF needed < 0 THEN
-  needed := 0
-ENDIF
-
-FOR s := 1 TO 9
-  IF needed > 0 THEN
-    IF plyr.stckShrs(s) > 0 AND mkt.stckPrice(s) > 0 THEN
-      qty := needed + mkt.stckPrice(s) - 1
-      qty := qty / mkt.stckPrice(s)
-      qty := ((qty + 9) / 10) * 10
-      IF qty > plyr.stckShrs(s) THEN
-        qty := plyr.stckShrs(s)
-      ENDIF
-      IF qty >= 10 THEN
-        sellStkQty(s) := qty
-        prcd := qty * mkt.stckPrice(s)
-        needed := needed - prcd
-      ENDIF
-    ENDIF
-  ENDIF
-NEXT s
-
-FOR b := 1 TO 3
-  LOOP
-    EXITIF needed <= 0 THEN
-    ENDEXIT
-    EXITIF plyr.bondUnts(b) <= 0 THEN
-    ENDEXIT
-    sellBndQty(b) := sellBndQty(b) + 1
-    needed := needed - bPar(b)
-  ENDLOOP
-NEXT b
-
-END

@@ -1,0 +1,55 @@
+PROCEDURE scrBankrupt
+(* ============================================================ *)
+(* PROCEDURE : scrBankrupt                                      *)
+(* PURPOSE   : S22 Bankruptcy Declaration screen.              *)
+(*             Sets plyr.isBankrupt := TRUE, then displays     *)
+(*             the elimination notice: player name, reason,    *)
+(*             year, and final cash balance.                   *)
+(*             Returns after waitKey. Caller is responsible    *)
+(*             for removing the player from the active turn    *)
+(*             order; this procedure only marks the record.   *)
+(*             Triggered when forced liquidation cannot        *)
+(*             satisfy the outstanding obligation, or when     *)
+(*             cashBal remains negative after all assets are   *)
+(*             sold (spec Section 12).                         *)
+(* PARAMS    : plyr      - player record; isBankrupt set TRUE  *)
+(*             finalCash - cash balance at time of elimination *)
+(*             reason    - 1=MARGIN_INTEREST 2=MARGIN_CALL     *)
+(*             currYear  - game year in which bankruptcy occurs*)
+(* SIDE EFX  : Sets plyr.isBankrupt := TRUE.                  *)
+(*             Clears screen. Waits for keypress via waitKey.  *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+PARAM plyr      : PlyrRec
+PARAM finalCash : INTEGER
+PARAM reason    : BYTE
+PARAM currYear  : INTEGER
+DIM pStr : STRING[8]
+
+plyr.isBankrupt := TRUE
+
+RUN clrScr
+PRINT "=== BANKRUPTCY ==="
+PRINT "  Player  : "; plyr.plyrName
+PRINT "  Year    : "; currYear; " of 10"
+PRINT
+IF reason = 1 THEN
+  PRINT "  Reason  : Margin interest charge"
+  PRINT "            Cash balance went negative after annual"
+  PRINT "            margin interest was deducted."
+ELSE
+  PRINT "  Reason  : Margin call"
+  PRINT "            Insufficient assets to meet the margin"
+  PRINT "            call obligation."
+ENDIF
+PRINT
+RUN fmtMoney(finalCash, pStr)
+PRINT "  Final cash : $"; pStr
+PRINT
+PRINT "  "; plyr.plyrName; " has been eliminated from the game."
+PRINT
+RUN waitKey
+
+END
+
