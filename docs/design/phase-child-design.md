@@ -219,56 +219,281 @@ Notes:
 
 ## 6. Current Module and Library Layout
 
-### 6.1 Coordinator and child-entry modules
+This section reflects the current packed-module snapshot recorded in
+`logs/modulelog`. The CSV is produced by `src/basic/moduleLogger.b09` and logs
+the current workflow-disk packed modules, their constituent procedure names,
+and each constituent module header size in bytes.
 
-| File | Primary entry procedures | Role |
-|------|--------------------------|------|
-| `snb.b09` | `snb` | Coordinator |
-| `snbSetup.b09` | `snbSetup`, `setup` | Pre-game setup child and setup orchestrator |
-| `snbDividend.b09` | `snbDividend` | Dividend/year-header child |
-| `snbMarket.b09` | `snbMarket` | Market-resolution child |
-| `snbSell.b09` | `snbSell` | Human sell-phase child |
-| `snbSellExec.b09` | `snbSellExec` | Human sell-turn child |
-| `snbSellUI.b09` | `snbSellUI` | Human sell-turn UI child |
-| `snbSellDraftInit.b09` | `snbSellDraftInit` | Sell draft bootstrap and cleanup helpers |
-| `snbSellDraftUIState.b09` | `snbSellDraftUIState` | Sell draft summary and context helpers for UI flows |
-| `snbSellDrfHdr.b09` | `snbSellDrfHdr` | Sell draft header and summary-write helpers |
-| `snbSellDraftEdit.b09` | `snbSellDraftEdit` | Sell draft order edit helpers |
-| `snbSellDraftApply.b09` | `snbSellDraftApply` | Sell draft replay/apply helpers |
-| `snbSellAI.b09` | `snbSellAI` | AI sell-phase child |
-| `snbBuy.b09` | `snbBuy` | Human buy-phase child and shared buy apply logic |
-| `snbBuyAI.b09` | `snbBuyAI` | AI buy-phase child |
-| `snbEndGame.b09` | `snbEndGame` | Endgame child |
+### 6.1 Packed module roster
 
-### 6.2 Shared library/support modules
+| Packed Module | Source File | Entry Procedure | Entry Size | Procedures | Total Bytes |
+|---------------|-------------|-----------------|------------|------------|-------------|
+| `snb` | `src/basic/snb.b09` | `snb` | 4731 | 14 | 10576 |
+| `snbSetup` | `src/basic/snbSetup.b09` | `snbSetup` | 371 | 14 | 5912 |
+| `snbDividend` | `src/basic/snbDividend.b09` | `snbDividend` | 2387 | 20 | 9137 |
+| `snbMgnInt` | `src/basic/snbMgnInt.b09` | `snbMgnInt` | 1649 | 18 | 11505 |
+| `snbMarket` | `src/basic/snbMarket.b09` | `snbMarket` | 3009 | 21 | 12756 |
+| `snbSellHumanStub` | `src/basic/snbSellHumanStub.b09` | `snbSellHumanStub` | 1014 | 8 | 2111 |
+| `snbSellAI` | `src/basic/snbSellAI.b09` | `snbSellAI` | 1716 | 22 | 10594 |
+| `snbBuy` | `src/basic/snbBuy.b09` | `snbBuy` | 391 | 17 | 11471 |
+| `snbBuyAI` | `src/basic/snbBuyAI.b09` | `snbBuyAI` | 1847 | 17 | 8348 |
+| `snbMarginPay` | `src/basic/snbMarginPay.b09` | `snbMarginPay` | 741 | 15 | 5565 |
+| `snbYear10Clear` | `src/basic/snbYear10Clear.b09` | `snbYear10Clear` | 5626 | 19 | 12567 |
+| `snbEndGame` | `src/basic/snbEndGame.b09` | `snbEndGame` | 745 | 16 | 6788 |
 
-| File | Key procedures | Role |
-|------|----------------|------|
-| `snbUtil.b09` | `clrScr`, `fmtMoney`, `fmtPlyrName`, `getMenuKey`, `waitKey`, `getNumIn`, `saveGame`, `loadGame`, `initAIProf`, `shuffleDeck` | Core utility, save/load, and shared setup helpers |
-| `snbTradeUtil.b09` | `getLotQty`, `initStockNames`, `initBondPar`, `clrOrders`, `dropOrderAt`, `findMapSel`, `findOrderSlot`, `findNextActivePlyr`, `prepAssetMaps`, `readTurnPlyrType`, `promptBondQty` | Trade and trade-adjacent shared helpers |
-| `snbMargin.b09` | `scrMgnCall`, `scrBankrupt`, `aiLiqOrdr`, `scrForceLiq`, `scrMgnClr`, `applySells` | Shared margin and liquidation engine/screens |
+### 6.2 Constituent procedures and measured sizes
 
-### 6.3 Procedures co-located inside child modules
+#### `snb`
 
-Several helpers now live inside the child module that uses them:
+- `snb`: 4731 bytes
+- `readTurnPlyrType`: 966 bytes
+- `chkStale`: 219 bytes
+- `readHdr`: 218 bytes
+- `stateExists`: 153 bytes
+- `loadModuleList`: 354 bytes
+- `unloadModuleList`: 281 bytes
+- `loadOneModule`: 456 bytes
+- `unloadOneModule`: 361 bytes
+- `loadHdrMkt`: 810 bytes
+- `loadPlyrRec`: 475 bytes
+- `savePlyrRec`: 475 bytes
+- `saveHdrOnly`: 746 bytes
+- `copySaveFile`: 331 bytes
 
-- `snbSetup.b09`: `initPlayer`, `initMkt`, setup screens
-- `snbDividend.b09`: `applyDivInt`, `scrYearHdr`, `scrDivInt`
-- `snbMarket.b09`: market tables, card decoding, roll generation, market screens
-- `snbSellExec.b09`: sell-turn orchestration and apply/writeback
-- `snbSellUI.b09`: sell-turn editor loop
-- `snbSellDraftInit.b09`: draft bootstrap and cleanup
-- `snbSellDraftUIState.b09`: draft summary and context I/O for UI flows
-- `snbSellDrfHdr.b09`: draft header and summary-write helpers
-- `snbSellDraftEdit.b09`: order mutation and summary rebuild helpers
-- `snbSellDraftApply.b09`: confirmed draft replay into the live player record
-- `snbSellAI.b09`: `aiSell`, `scrAISellTurn`
-- `snbBuy.b09`: `applyBuys`, `scrMgnRepay`, `scrBuy`
-- `snbBuyAI.b09`: `aiBuy`, `scrAIBuyTurn`
-- `snbEndGame.b09`: endgame screens
+#### `snbSetup`
 
-Because of that co-location, the older module split described in earlier design
-notes is no longer accurate.
+- `snbSetup`: 371 bytes
+- `initPlayer`: 307 bytes
+- `initMkt`: 136 bytes
+- `scrStart`: 207 bytes
+- `scrSetup`: 768 bytes
+- `scrConfirm`: 523 bytes
+- `setup`: 1181 bytes
+- `saveGame`: 775 bytes
+- `loadGame`: 820 bytes
+- `fmtPlyrName`: 171 bytes
+- `waitKey`: 140 bytes
+- `clrScr`: 97 bytes
+- `shuffleDeck`: 209 bytes
+- `getMenuKey`: 207 bytes
+
+#### `snbDividend`
+
+- `snbDividend`: 2387 bytes
+- `applyDivInt`: 639 bytes
+- `scrYearHdr`: 360 bytes
+- `scrDivInt`: 880 bytes
+- `loadHdrMkt`: 810 bytes
+- `loadPlyrRec`: 475 bytes
+- `savePlyrRec`: 475 bytes
+- `saveHdrOnly`: 746 bytes
+- `copySaveFile`: 331 bytes
+- `getPhaseNav`: 236 bytes
+- `fmtPlyrName`: 171 bytes
+- `getNumIn`: 152 bytes
+- `waitKey`: 140 bytes
+- `clrScr`: 97 bytes
+- `fmtMoney`: 81 bytes
+- `padNumber`: 240 bytes
+- `initStockNames`: 251 bytes
+- `getStockName`: 378 bytes
+- `getStockDivRate`: 202 bytes
+- `initBondPar`: 86 bytes
+
+#### `snbMgnInt`
+
+- `snbMgnInt`: 1649 bytes
+- `applyLiqPlan`: 598 bytes
+- `applyLiqOrdr`: 541 bytes
+- `scrMgnInt`: 647 bytes
+- `getPhaseNav`: 236 bytes
+- `getNumIn`: 152 bytes
+- `waitKey`: 140 bytes
+- `clrScr`: 97 bytes
+- `fmtMoney`: 81 bytes
+- `padNumber`: 240 bytes
+- `initBondPar`: 86 bytes
+- `calcMgnTot`: 163 bytes
+- `calcSaleMgnRpy`: 111 bytes
+- `findNextActivePlyr`: 208 bytes
+- `getLotQty`: 1958 bytes
+- `scrBankrupt`: 619 bytes
+- `scrForceLiq`: 3304 bytes
+- `aiLiqOrdr`: 675 bytes
+
+#### `snbMarket`
+
+- `snbMarket`: 3009 bytes
+- `loadMktState`: 881 bytes
+- `saveHdrMktState`: 637 bytes
+- `quitMktToMenu`: 186 bytes
+- `saveMktToMenu`: 304 bytes
+- `doRolls`: 753 bytes
+- `getMktStockName`: 278 bytes
+- `getMktDelta`: 938 bytes
+- `getCard`: 1667 bytes
+- `resolvePrice`: 212 bytes
+- `applyMktYear`: 747 bytes
+- `drawCard`: 123 bytes
+- `scrCard`: 549 bytes
+- `scrDice`: 593 bytes
+- `scrMktBoard`: 639 bytes
+- `scrSplit`: 429 bytes
+- `scrDivFlag`: 356 bytes
+- `getPhaseNav`: 236 bytes
+- `waitKey`: 140 bytes
+- `clrScr`: 37 bytes
+- `shuffleDeck`: 42 bytes
+
+#### `snbSellHumanStub`
+
+- `snbSellHumanStub`: 1014 bytes
+- `fmtPlyrName`: 171 bytes
+- `getMenuKey`: 207 bytes
+- `waitKey`: 140 bytes
+- `clrScr`: 97 bytes
+- `calcMgnTot`: 163 bytes
+- `calcSaleMgnRpy`: 111 bytes
+- `findNextActivePlyr`: 208 bytes
+
+#### `snbSellAI`
+
+- `snbSellAI`: 1716 bytes
+- `aiSell`: 2549 bytes
+- `scrAISellTurn`: 592 bytes
+- `fmtPlyrName`: 171 bytes
+- `waitKey`: 140 bytes
+- `clrScr`: 97 bytes
+- `fmtMoney`: 81 bytes
+- `padNumber`: 240 bytes
+- `getPhaseNav`: 236 bytes
+- `initStockNames`: 251 bytes
+- `getStockName`: 378 bytes
+- `getStockDivRate`: 202 bytes
+- `initBondPar`: 86 bytes
+- `calcMgnTot`: 163 bytes
+- `calcSaleMgnRpy`: 111 bytes
+- `findNextActivePlyr`: 208 bytes
+- `applyCashMgnRepay`: 405 bytes
+- `applyStockMgnRepay`: 255 bytes
+- `initAIProf`: 823 bytes
+- `aiLiqOrdr`: 675 bytes
+- `applySells`: 596 bytes
+- `scrBankrupt`: 619 bytes
+
+#### `snbBuy`
+
+- `snbBuy`: 391 bytes
+- `runBuyPlyr`: 989 bytes
+- `scrBuy`: 5946 bytes
+- `getSaveQuitAct`: 127 bytes
+- `quitToMenu`: 279 bytes
+- `saveQuitToMenu`: 332 bytes
+- `fmtPlyrName`: 171 bytes
+- `getNumIn`: 152 bytes
+- `waitKey`: 140 bytes
+- `clrScr`: 97 bytes
+- `fmtMoney`: 81 bytes
+- `padNumber`: 240 bytes
+- `initBondPar`: 86 bytes
+- `calcMgnTot`: 163 bytes
+- `calcSaleMgnRpy`: 111 bytes
+- `findNextActivePlyr`: 208 bytes
+- `getLotQty`: 1958 bytes
+
+#### `snbBuyAI`
+
+- `snbBuyAI`: 1847 bytes
+- `aiBuy`: 2599 bytes
+- `scrAIBuyTurn`: 715 bytes
+- `fmtPlyrName`: 171 bytes
+- `waitKey`: 140 bytes
+- `clrScr`: 97 bytes
+- `fmtMoney`: 81 bytes
+- `padNumber`: 240 bytes
+- `getPhaseNav`: 236 bytes
+- `initStockNames`: 251 bytes
+- `getStockName`: 378 bytes
+- `getStockDivRate`: 202 bytes
+- `initBondPar`: 86 bytes
+- `calcMgnTot`: 163 bytes
+- `calcSaleMgnRpy`: 111 bytes
+- `findNextActivePlyr`: 208 bytes
+- `initAIProf`: 823 bytes
+
+#### `snbMarginPay`
+
+- `snbMarginPay`: 741 bytes
+- `scrMgnRepay`: 2141 bytes
+- `getNumIn`: 152 bytes
+- `waitKey`: 140 bytes
+- `clrScr`: 97 bytes
+- `fmtMoney`: 81 bytes
+- `padNumber`: 240 bytes
+- `initStockNames`: 251 bytes
+- `getStockName`: 378 bytes
+- `getStockDivRate`: 202 bytes
+- `calcMgnTot`: 163 bytes
+- `calcSaleMgnRpy`: 111 bytes
+- `findNextActivePlyr`: 208 bytes
+- `applyCashMgnRepay`: 405 bytes
+- `applyStockMgnRepay`: 255 bytes
+
+#### `snbYear10Clear`
+
+- `snbYear10Clear`: 5626 bytes
+- `saveGame`: 775 bytes
+- `loadGame`: 820 bytes
+- `getNumIn`: 152 bytes
+- `waitKey`: 140 bytes
+- `clrScr`: 97 bytes
+- `fmtMoney`: 81 bytes
+- `padNumber`: 240 bytes
+- `initStockNames`: 251 bytes
+- `getStockName`: 378 bytes
+- `getStockDivRate`: 202 bytes
+- `initBondPar`: 86 bytes
+- `calcMgnTot`: 163 bytes
+- `calcSaleMgnRpy`: 111 bytes
+- `findNextActivePlyr`: 208 bytes
+- `applyCashMgnRepay`: 405 bytes
+- `applyStockMgnRepay`: 255 bytes
+- `getLotQty`: 1958 bytes
+- `scrBankrupt`: 619 bytes
+
+#### `snbEndGame`
+
+- `snbEndGame`: 745 bytes
+- `scrFinalMkt`: 692 bytes
+- `scrWealth`: 1241 bytes
+- `scrWinner`: 652 bytes
+- `scrPostGame`: 189 bytes
+- `saveGame`: 775 bytes
+- `loadGame`: 820 bytes
+- `getSaveQuitAct`: 127 bytes
+- `quitToMenu`: 279 bytes
+- `saveQuitToMenu`: 332 bytes
+- `fmtPlyrName`: 171 bytes
+- `waitKey`: 140 bytes
+- `clrScr`: 97 bytes
+- `fmtMoney`: 81 bytes
+- `padNumber`: 240 bytes
+- `getMenuKey`: 207 bytes
+
+### 6.3 Notes on source files versus packed modules
+
+- The `modulelog` snapshot records only the modules currently packed onto the
+  workflow disk. It does not claim that every `src/basic/*.b09` file is a
+  separate packed module.
+- In particular, `snbSell.b09`, `snbSellExec.b09`, `snbSellUI.b09`,
+  `snbSellDraftInit.b09`, `snbSellDraftUIState.b09`, `snbSellDrfHdr.b09`,
+  `snbSellDraftEdit.b09`, `snbSellDraftApply.b09`, and `snbSellLot.b09`
+  exist in source, but they are not listed as separate packed modules in the
+  current `logs/modulelog` snapshot.
+- Shared procedures such as `fmtPlyrName`, `waitKey`, `getNumIn`,
+  `findNextActivePlyr`, `getLotQty`, `saveGame`, and `loadGame` are currently
+  duplicated across packed modules rather than centralized in one measured
+  utility module.
 
 ---
 
@@ -293,18 +518,18 @@ listed above.
 
 ---
 
-## 8. Current Fork Targets
+## 8. Current Execution Targets
 
-The coordinator currently calls `forkPhase(...)` with only these child names:
+The current implementation uses two execution patterns:
 
-- `snbSetup`
-- `snbDividend`
-- `snbMarket`
-- `snbSell`
-- `snbSellAI`
-- `snbBuy`
-- `snbBuyAI`
-- `snbEndGame`
+- The top-level coordinator in `src/basic/snb.b09` loads and runs these packed
+  module entry procedures in-process: `snbSetup`, `snbDividend`, `snbMgnInt`,
+  `snbMarket`, `snbSellHumanStub`, `snbSellAI`, `snbBuy`, `snbBuyAI`,
+  `snbMarginPay`, `snbYear10Clear`, and `snbEndGame`.
+- The human-sell path still uses nested process forks inside the sell-flow
+  source modules: `snbSell` forks `snbSellExec`; `snbSellExec` forks
+  `snbSellUI` and `snbSellDraftApply`; `snbSellUI` forks `snbSellLot`.
 
-Any design note that lists other forked child entry names is historical.
+Any design note that says the coordinator directly calls `forkPhase(...)` for
+the full year-phase list is historical.
 
