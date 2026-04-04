@@ -3291,12 +3291,12 @@ Displays the present module names in the system module directory, i.e., all modu
 ```text
 OS9: mdir
 
- Module Directory at 14:44:35
-D0      Pipe    OS9     OS9P2
-Init    Boot    DDisk   D1 
-KBVDIO  TERM    IOMan   RBF
-SCF     SysGo   Clock   Shell
-PRINTER P       PipeMan Piper
+   Module Directory at 14:44:35
+D0          Pipe        OS9         OS9P2
+Init        Boot        DDisk       D1 
+KBVDIO      TERM        IOMan       RBF
+SCF         SysGo       Clock       Shell
+PRINTER     P           PipeMan     Piper
 Mdir
 ```
 
@@ -3305,16 +3305,16 @@ If the "e" option is given, a full listing of the physical address, size, type, 
 ```text
 OS9: mdir -e
 
- Module Directory at 10:55:04
+   Module Directory at 10:55:04
 
-ADDR SIZE TY RV AT UC   NAME
----- ---- -- -- -- -- -------
-C305   2F F1  1 R     D0
-F059  7EB C1  1 R     OS9
-F852  4F4 C1  1 R     OS9P2
-FD46   2E CO  1 R     INIT
-C363  798 E1  1 R   2 KBVDIO
-CAFB   38 F1  1 R   2 TERM
+Blk Ofst Size Ty Rv At Uc  Name
+___ ____ ____ __ __ __ __ ______
+ 3F  D06  12A C1  6 r   0 REL
+ 3F  E30  1D0 C1  0 r   1 Boot
+ 3F 1000  EDD C0  A r   0 Krn
+  1  A00  C74 C0  1 r   1 KrnP2
+  1 1674  11F C0  1 r   1 KrnP3
+  1 1793  A21 C1  6 r   1 IOMan
 ```
 
 **Caution** Many of the modules listed by mdir are NitrOS-9 system modules and not executable as programs: always check the module type code before running a module if you are not familiar with it!
@@ -3370,13 +3370,14 @@ For more information see: Section 5.4, Section 5.4.3
 ```text
 OS9: mfree
 
- Address  pages
---------- ----- 
- 700- 7FF    1
- B00-AEFF  164
-B100-B1FF    1
-
-Total pages free = 166
+Blk Begin   End   Blks  Size
+--- ------ ------ ---- ------
+  C  18000  1BFFF    2    16k
+ 10  20000  21FFF    1     8k
+ 19  32000  7DFFF   26   304k
+ 40  80000 1FBFFF   BE  1520k
+                  ==== ======
+           Total:   E7  1848k
 ```
 
 ### OS9GEN
