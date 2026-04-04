@@ -4,6 +4,29 @@ These instructions apply to all work in this repository.
 
 ## Durable Behavior Changes
 
+- When a task changes any Basic09 source module that is intended to be packed
+  onto the CoCo 3 workflow disk, update `src/script/packSnb` in the same task
+  unless the user explicitly says not to.
+- Treat `src/script/packSnb` as the canonical packing workflow script for this
+  repository.
+- Start that script with `basic09 #40k` so Basic09 runs with maximum memory for
+  the packing session.
+- For each module that must be packed, add this command sequence to
+  `src/script/packSnb` after the `basic09 #40k` line:
+  `load /d1/<module>.b09`, then `pack*`, then `kill*`.
+- If packing an existing module will trigger Basic09's replace confirmation,
+  insert `y` between `pack*` and `kill*` for that module in `src/script/packSnb`.
+- If a module should be deleted from the CoCo 3 workflow disk, add
+  `delete -x <module>` to `src/script/packSnb` as a shell command outside the
+  Basic09 session.
+- Place each `delete -x <module>` line either before `basic09 #40k` or after
+  the closing `bye` line, never between Basic09 interactive commands.
+- End the Basic09 command block in `src/script/packSnb` with `bye` after all
+  Basic09 `load`, `pack*`, optional `y`, and `kill*` commands have been
+  listed.
+- Do not describe `bye` as a shell command. It exits the Basic09 session and
+  returns control to the shell, after which any trailing shell-level
+  `delete -x <module>` commands may run.
 - When diagnosing Basic09 runtime `ERR=43` in NitrOS-9, do not assume the
   root cause is a genuinely missing procedure. In this project, if the target
   procedure should exist in a packed module but too many modules are already
