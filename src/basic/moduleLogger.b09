@@ -12,7 +12,7 @@ PROCEDURE moduleLogger
 (* FORMAT:    packedModule,entryModule,sizeBytes      *)
 (* NOTE:      Requires SysCall machine-lang module.  *)
 (* ================================================== *)
-DIM modList(11) : STRING[20]
+DIM modList(12) : STRING[20]
 DIM modCnt      : INTEGER
 DIM i           : INTEGER
 DIM path        : BYTE
@@ -26,18 +26,19 @@ ON ERROR GOTO 900
 pathOpen := FALSE
 logPath := "/d1/modulelog"
 
-modCnt := 11
+modCnt := 12
 modList(1)  := "snb"
 modList(2)  := "snbSetup"
 modList(3)  := "snbDividend"
-modList(4)  := "snbMarket"
-modList(5)  := "snbSellHumanStub"
-modList(6)  := "snbSellAI"
-modList(7)  := "snbBuy"
-modList(8)  := "snbBuyAI"
-modList(9)  := "snbMarginPay"
-modList(10) := "snbYear10Clear"
-modList(11) := "snbEndGame"
+modList(4)  := "snbMgnInt"
+modList(5)  := "snbMarket"
+modList(6)  := "snbSellHumanStub"
+modList(7)  := "snbSellAI"
+modList(8)  := "snbBuy"
+modList(9)  := "snbBuyAI"
+modList(10) := "snbMarginPay"
+modList(11) := "snbYear10Clear"
+modList(12) := "snbEndGame"
 
 ON ERROR GOTO 100
 DELETE logPath

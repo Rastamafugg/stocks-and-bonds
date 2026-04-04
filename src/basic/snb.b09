@@ -21,6 +21,7 @@ PROCEDURE snb
 (*                                                   *)
 (*            Phase order per year:                  *)
 (*              snbDividend                          *)
+(*              snbMgnInt when required             *)
 (*              snbMarket                            *)
 (*              snbSellHumanStub or snbSellAI       *)
 (*              snbYear10Clear when required        *)
@@ -126,9 +127,9 @@ LOOP
       EXITIF (iCYr >= iMaxYr AND iSavPh = 0) OR gameOver THEN
       ENDEXIT
 
-      ! savedPhase 0, 4, and 6 all route back into the
+      ! savedPhase 0 and 4 route back into the
       ! dividend module's resume points.
-      IF iSavPh = 0 OR iSavPh = 4 OR iSavPh = 6 THEN
+      IF iSavPh = 0 OR iSavPh = 4 THEN
         modCnt := 1
         modList(1) := "snbDividend"
         RUN loadModuleList(modList, hdrList, modCnt, ok)
@@ -141,6 +142,26 @@ LOOP
             END
           ENDIF
           GOSUB 100
+        ENDIF
+      ENDIF
+
+      IF NOT gameOver THEN
+        ! savedPhase 6 is the post-dividend
+        ! margin-interest child.
+        IF iSavPh = 6 THEN
+          modCnt := 1
+          modList(1) := "snbMgnInt"
+          RUN loadModuleList(modList, hdrList, modCnt, ok)
+          IF NOT ok THEN
+            gameOver := TRUE
+          ELSE
+            RUN snbMgnInt
+            RUN unloadModuleList(modList, hdrList, modCnt, ok)
+            IF NOT ok THEN
+              END
+            ENDIF
+            GOSUB 100
+          ENDIF
         ENDIF
       ENDIF
 

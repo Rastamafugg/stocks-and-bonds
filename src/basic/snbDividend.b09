@@ -1,29 +1,26 @@
 PROCEDURE snbDividend
 (* ============================================================ *)
 (* PROCEDURE : snbDividend                                      *)
-(* PURPOSE   : Dividend and interest phase child. Loads the    *)
-(*             save header and market once, then processes     *)
-(*             one player record at a time. Increments         *)
-(*             currYear at a fresh year start before any       *)
-(*             other work, so downstream phases read the       *)
-(*             correct year number. Applies dividends and      *)
-(*             bond interest in Years 2-10, displays S9        *)
-(*             per non-bankrupt player, and resolves any       *)
-(*             forced liquidation caused by unpaid margin      *)
-(*             interest within this phase.                     *)
-(*             Supports resumable snapshots during the         *)
-(*             dividend-display and margin-interest loops.     *)
+(* PURPOSE   : Dividend phase child. Loads the save header     *)
+(*             and market once, then processes one player      *)
+(*             record at a time. Increments currYear at a      *)
+(*             fresh year start before any other work, so      *)
+(*             downstream phases read the correct year number. *)
+(*             Applies dividends and bond interest in Years    *)
+(*             2-10, displays S9 per non-bankrupt player,      *)
+(*             and then checkpoints the separate margin-       *)
+(*             interest child when that follow-on phase is     *)
+(*             required. Supports resumable snapshots during   *)
+(*             the dividend-display loop only.                 *)
 (*             Always writes gameStage=GS_YEAR (2).            *)
 (*             Called by the SNB coordinator via forkPhase.    *)
 (* PARAMS    : None (child process; no PARAM handoff)          *)
 (* SIDE EFX  : Reads and writes SNBSTATE. Modifies one saved   *)
 (*             player record at a time.                        *)
-(* NOTE      : snbStateIO, snbTradeShared,                     *)
-(*             snbTradeHumanUI, snbSellForceUI,                *)
-(*             snbSellAIUtil, and snbDividend must be          *)
-(*             pre-loaded by coordinator.                      *)
+(* NOTE      : snbStateIO, snbTradeShared, and snbDividend     *)
+(*             must be pre-loaded by coordinator.              *)
 (*             DATA lines 700 and 710 must not conflict with   *)
-(*             any other DATA lines in this procedure.          *)
+(*             any other DATA lines in this procedure.         *)
 (* ============================================================ *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
@@ -39,28 +36,16 @@ DIM iCYr         : INTEGER
 DIM iMaxYr       : INTEGER
 DIM iPCnt        : INTEGER
 DIM startDivP    : INTEGER
-DIM startMgnP    : INTEGER
 DIM cashBef      : INTEGER
 DIM divRcvd(9)   : INTEGER
 DIM bndInt(3)    : INTEGER
 DIM divRate(9)   : INTEGER
 DIM bndRate(3)   : INTEGER
 DIM totRcvd      : INTEGER
-DIM mgnChg       : INTEGER
-DIM totalMgn     : INTEGER
-DIM cashNow      : INTEGER
-DIM oblgRem      : INTEGER
 DIM pNam         : STRING[27]
 DIM actByt       : BYTE
-DIM mgnAct       : INTEGER
-DIM liqAct       : BYTE
-DIM isNegCash    : BOOLEAN
-DIM resumeLiq    : BOOLEAN
 DIM savePhaseVal : INTEGER
 DIM savePlyrVal  : INTEGER
-DIM liqSellStk(9): INTEGER
-DIM liqSellBnd(3): INTEGER
-DIM liqHasSell   : BOOLEAN
 DIM p            : INTEGER
 DIM s            : INTEGER
 DIM b            : INTEGER
@@ -76,7 +61,6 @@ IF NOT loadOK THEN
 ENDIF
 
 startDivP := 0
-startMgnP := 0
 
 IF hdr.savedPhase = 0 THEN
   iCYr := hdr.currYear
@@ -86,25 +70,16 @@ IF hdr.savedPhase = 0 THEN
 ELSE IF hdr.savedPhase = 4 THEN
   iCYr := hdr.currYear
   startDivP := hdr.savedPlyr
-ELSE IF hdr.savedPhase = 6 THEN
-  iCYr := hdr.currYear
-  startMgnP := hdr.savedPlyr
 ELSE
   PRINT "snbDividend: invalid savedPhase"
   END
-ENDIF \ENDIF \ENDIF
+ENDIF \ENDIF
 
 iMaxYr := hdr.maxYears
 iPCnt  := hdr.plyrCount
 
 IF startDivP > 0 THEN
   IF startDivP < 1 OR startDivP > iPCnt THEN
-    PRINT "snbDividend: invalid savedPlyr"
-    END
-  ENDIF
-ENDIF
-IF startMgnP > 0 THEN
-  IF startMgnP < 1 OR startMgnP > iPCnt THEN
     PRINT "snbDividend: invalid savedPlyr"
     END
   ENDIF
@@ -206,164 +181,13 @@ IF startDivP > 0 THEN
       ENDIF
     NEXT p
   ENDIF
-  IF startMgnP = 0 THEN
-    startMgnP := 1
-  ENDIF
 ENDIF
 
-IF iCYr > 1 THEN
-  IF hdr.mgnRule = 1 THEN
-    IF iCYr < iMaxYr THEN
-      IF startMgnP > 0 THEN
-      FOR p := startMgnP TO iPCnt
-        RUN loadPlyrRec("SNBSTATE", hdr, p, plyr, loadOK)
-        IF NOT loadOK THEN
-          PRINT "snbDividend: loadPlyrRec failed"
-          END
-        ENDIF
-        IF NOT plyr.isBankrupt THEN
-          resumeLiq := FALSE
-          IF hdr.savedPhase = 6 AND p = startMgnP AND plyr.obligation > 0 THEN
-            oblgRem := plyr.obligation
-            resumeLiq := TRUE
-          ELSE
-            RUN calcMgnTot(plyr, totalMgn)
-            IF totalMgn > 0 THEN
-              mgnChg  := totalMgn / 20
-              cashNow := plyr.cashBal
-              plyr.cashBal := cashNow - mgnChg
-              isNegCash := FALSE
-              IF plyr.cashBal < 0 THEN
-                isNegCash := TRUE
-              ENDIF
-              mgnAct := 1
-              ! Line exceeds 79 chars; RUN statement cannot be split.
-              RUN scrMgnInt(iCYr, plyr.plyrName, totalMgn, mgnChg, cashNow, plyr.cashBal, isNegCash, mgnAct)
-              IF isNegCash THEN
-                oblgRem := 0 - plyr.cashBal
-                plyr.obligation := oblgRem
-              ELSE
-                plyr.obligation := 0
-              ENDIF
-              RUN savePlyrRec("SNBSTATE", hdr, p, plyr, saveOK)
-              IF NOT saveOK THEN
-                PRINT "snbDividend: savePlyrRec failed"
-                END
-              ENDIF
-              IF mgnAct = 2 THEN
-                IF isNegCash THEN
-                  savePhaseVal := 6
-                  savePlyrVal := p
-                ELSE IF p < iPCnt THEN
-                  savePhaseVal := 6
-                  savePlyrVal := p + 1
-                ELSE
-                  savePhaseVal := 7
-                  savePlyrVal := 1
-                ENDIF \ENDIF
-                hdr.savedPhase := savePhaseVal
-                hdr.savedPlyr  := savePlyrVal
-                hdr.gameStage  := 2
-                RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
-                IF NOT saveOK THEN
-                  PRINT "snbDividend: saveHdrOnly failed"
-                  END
-                ENDIF
-                RUN copySaveFile("SNBSTATE", "SNBGAME", saveOK)
-                IF NOT saveOK THEN
-                  PRINT "snbDividend: copySaveFile failed"
-                  END
-                ENDIF
-                hdr.savedPhase := 9
-                hdr.savedPlyr  := 0
-                hdr.gameStage  := 2
-                RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
-                IF NOT saveOK THEN
-                  PRINT "snbDividend: saveHdrOnly failed"
-                ENDIF
-                END
-              ELSE IF mgnAct = 3 THEN
-                hdr.savedPhase := 9
-                hdr.savedPlyr  := 0
-                hdr.gameStage  := 2
-                RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
-                IF NOT saveOK THEN
-                  PRINT "snbDividend: saveHdrOnly failed"
-                ENDIF
-                END
-              ENDIF \ENDIF
-              IF isNegCash THEN
-                resumeLiq := TRUE
-              ENDIF
-            ENDIF
-          ENDIF
-          IF resumeLiq THEN
-            IF plyr.plyrType = 1 THEN
-              FOR s := 1 TO 9
-                liqSellStk(s) := 0
-              NEXT s
-              FOR b := 1 TO 3
-                liqSellBnd(b) := 0
-              NEXT b
-              LOOP
-                plyr.obligation := oblgRem
-                liqAct := 1
-                ! Line exceeds 79 chars; RUN statement cannot be split.
-                RUN scrForceLiq(plyr.plyrName, oblgRem, plyr, mkt, liqSellStk, liqSellBnd, liqAct)
-                liqHasSell := FALSE
-                FOR s := 1 TO 9
-                  IF liqSellStk(s) > 0 THEN
-                    liqHasSell := TRUE
-                  ENDIF
-                NEXT s
-                FOR b := 1 TO 3
-                  IF liqSellBnd(b) > 0 THEN
-                    liqHasSell := TRUE
-                  ENDIF
-                NEXT b
-                IF liqAct = 2 OR NOT liqHasSell THEN
-                  RUN scrBankrupt(plyr, plyr.cashBal, 1, iCYr)
-                  plyr.obligation := 0
-                  EXITIF TRUE THEN
-                  ENDEXIT
-                ENDIF
-                RUN applyLiqPlan(plyr, mkt, liqSellStk, liqSellBnd, oblgRem)
-                plyr.obligation := oblgRem
-                EXITIF oblgRem <= 0 THEN
-                ENDEXIT
-              ENDLOOP
-            ELSE
-              LOOP
-                plyr.obligation := oblgRem
-                ! Line exceeds 79 chars; RUN statement cannot be split.
-                RUN aiLiqOrdr(plyr, mkt, oblgRem, liqOrdTyp, liqOrdId, liqOrdQty, liqOrdCnt)
-                IF liqOrdCnt = 0 THEN
-                  RUN scrBankrupt(plyr, plyr.cashBal, 1, iCYr)
-                  plyr.obligation := 0
-                  EXITIF TRUE THEN
-                  ENDEXIT
-                ENDIF
-                RUN applyLiqOrdr(plyr, mkt, liqOrdTyp, liqOrdId, liqOrdQty, liqOrdCnt, oblgRem)
-                plyr.obligation := oblgRem
-                EXITIF oblgRem <= 0 THEN
-                ENDEXIT
-              ENDLOOP
-            ENDIF
-            plyr.obligation := 0
-            RUN savePlyrRec("SNBSTATE", hdr, p, plyr, saveOK)
-            IF NOT saveOK THEN
-              PRINT "snbDividend: savePlyrRec failed"
-              END
-            ENDIF
-          ENDIF
-        ENDIF
-      NEXT p
-      ENDIF
-    ENDIF
-  ENDIF
+IF iCYr > 1 AND hdr.mgnRule = 1 AND iCYr < iMaxYr THEN
+  hdr.savedPhase := 6
+ELSE
+  hdr.savedPhase := 0
 ENDIF
-
-hdr.savedPhase := 0
 hdr.savedPlyr  := 1
 hdr.gameStage  := 2
 RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
@@ -392,8 +216,8 @@ PROCEDURE applyDivInt
 (*             players. No-ops for Year 1 only.                *)
 (* PARAMS    : currYear - current game year (1..10)            *)
 (*             plyrCnt  - number of active players (1..6)      *)
-(*             plyrs    - player record array (modified)        *)
-(*             mkt      - market state; divSuspnd flags read    *)
+(*             plyrs    - player record array (modified)       *)
+(*             mkt      - market state; divSuspnd flags read   *)
 (* SIDE EFX  : Modifies plyrs(p).cashBal for each active,      *)
 (*             non-bankrupt player. Repositions DATA pointer.  *)
 (* NOTE      : Card dividend bonus (Card 1) is NOT applied     *)
@@ -471,19 +295,19 @@ PROCEDURE scrYearHdr
 (* ============================================================ *)
 (* PROCEDURE : scrYearHdr                                       *)
 (* PURPOSE   : Display the year header screen (S8). Shows the  *)
-(*             year number and applicable rule notices:         *)
+(*             year number and applicable rule notices:        *)
 (*               - No dividends or bond interest (Year 1, 10)  *)
-(*               - No sell phase (Year 1)                       *)
-(*               - No new margin purchases (Year 10)            *)
-(*             Blocks until any key is pressed.                 *)
-(* PARAMS    : currYear - current game year (1..10)             *)
-(*             totYears - total game years (always 10)          *)
-(*             rollMode - market roll mode (1=A 2=B 3=C)        *)
-(*                        included per S8 spec; not displayed   *)
-(*             noDiv    - TRUE if divs/interest skipped         *)
-(*             noMgn    - TRUE if new margin purchases blocked  *)
-(*             noSell   - TRUE if sell phase is skipped         *)
-(*             action   - returns 1 (CONTINUE) on exit          *)
+(*               - No sell phase (Year 1)                      *)
+(*               - No new margin purchases (Year 10)           *)
+(*             Blocks until any key is pressed.                *)
+(* PARAMS    : currYear - current game year (1..10)            *)
+(*             totYears - total game years (always 10)         *)
+(*             rollMode - market roll mode (1=A 2=B 3=C)       *)
+(*                        included per S8 spec; not displayed  *)
+(*             noDiv    - TRUE if divs/interest skipped        *)
+(*             noMgn    - TRUE if new margin purchases blocked *)
+(*             noSell   - TRUE if sell phase is skipped        *)
+(*             action   - returns 1 (CONTINUE) on exit         *)
 (* SIDE EFX  : Clears screen. Blocks on keypress via waitKey.  *)
 (* ============================================================ *)
 PARAM currYear : INTEGER
@@ -542,7 +366,7 @@ PROCEDURE scrDivInt
 (*             totRcvd  - total dividends + interest received  *)
 (*             cashAft  - cash balance after dividends         *)
 (*             action   - returns 1=CONTINUE 2=SAVE 3=QUIT     *)
-(* SIDE EFX  : Clears screen. Blocks on keypress.             *)
+(* SIDE EFX  : Clears screen. Blocks on keypress.              *)
 (*             Repositions DATA pointer (RESTORE used).        *)
 (* ============================================================ *)
 PARAM currYear   : INTEGER
@@ -618,235 +442,4 @@ END
 200 DATA "Small","Medium","Large"
 
 900 PRINT "scrDivInt error ("; ERR; ")"
-END
-
-PROCEDURE applyLiqPlan
-(* ============================================================ *)
-(* PROCEDURE : applyLiqPlan                                     *)
-(* PURPOSE   : Apply forced liquidation quantities staged by    *)
-(*             security index instead of compact order arrays.  *)
-(*             Stock proceeds and bond proceeds reduce oblgRem  *)
-(*             first; any excess is added to cashBal.           *)
-(* PARAMS    : plyr       - player record (modified)            *)
-(*             mkt        - market state (read-only)            *)
-(*             sellStkQty - staged stock qty per stock id       *)
-(*             sellBndQty - staged bond qty per bond id         *)
-(*             oblgRem    - obligation remaining (modified)     *)
-(* SIDE EFX  : Modifies plyr.cashBal, plyr.stckShrs,            *)
-(*             plyr.bondUnts, and oblgRem.                      *)
-(* ============================================================ *)
-! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
-TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
-PARAM plyr         : PlyrRec
-PARAM mkt          : MktState
-PARAM sellStkQty(9): INTEGER
-PARAM sellBndQty(3): INTEGER
-PARAM oblgRem      : INTEGER
-DIM bPar(3)        : INTEGER
-DIM s              : INTEGER
-DIM b              : INTEGER
-DIM prcd           : INTEGER
-DIM applyAmt       : INTEGER
-
-RUN initBondPar(bPar)
-
-FOR s := 1 TO 9
-  IF sellStkQty(s) > 0 THEN
-    prcd := sellStkQty(s) * mkt.stckPrice(s)
-    plyr.stckShrs(s) := plyr.stckShrs(s) - sellStkQty(s)
-    applyAmt := oblgRem
-    IF prcd < applyAmt THEN
-      applyAmt := prcd
-    ENDIF
-    oblgRem := oblgRem - applyAmt
-    plyr.cashBal := plyr.cashBal + (prcd - applyAmt)
-    IF oblgRem < 0 THEN
-      oblgRem := 0
-    ENDIF
-  ENDIF
-NEXT s
-
-FOR b := 1 TO 3
-  IF sellBndQty(b) > 0 THEN
-    prcd := sellBndQty(b) * bPar(b)
-    plyr.bondUnts(b) := plyr.bondUnts(b) - sellBndQty(b)
-    applyAmt := oblgRem
-    IF prcd < applyAmt THEN
-      applyAmt := prcd
-    ENDIF
-    oblgRem := oblgRem - applyAmt
-    plyr.cashBal := plyr.cashBal + (prcd - applyAmt)
-    IF oblgRem < 0 THEN
-      oblgRem := 0
-    ENDIF
-  ENDIF
-NEXT b
-END
-
-PROCEDURE applyLiqOrdr
-(* ============================================================ *)
-(* PROCEDURE : applyLiqOrdr                                     *)
-(* PURPOSE   : Apply forced liquidation sell orders from S21   *)
-(*             to the player record. Recalculates cashBal and  *)
-(*             oblgRem after each order.                       *)
-(*             Stock sell (forced liquidation rule):           *)
-(*               prcd := qty * stckPrice(s)                    *)
-(*               oblgRem is reduced by proceeds first.         *)
-(*               Any excess after oblgRem reaches 0 is added   *)
-(*               to cashBal. Company margin balances are not   *)
-(*               reduced here;                                 *)
-(*               margin repayment happens later via normal     *)
-(*               repayment flow.                               *)
-(*               stckShrs(s) -= qty                            *)
-(*             Bond sell (same forced-liquidation rule):       *)
-(*               oblgRem reduced by proceeds first             *)
-(*               excess proceeds added to cashBal              *)
-(*               bondUnts(b) -= qty                            *)
-(*             oblgRem is clamped at 0 after each order.       *)
-(*             ordCnt = 0 is a safe no-op.                     *)
-(* PARAMS    : plyr      - player record (modified)            *)
-(*             mkt       - market state (read-only)            *)
-(*             ordType   - 1=STOCK 2=BOND per order            *)
-(*             ordId     - asset index per order               *)
-(*             ordQty    - quantity per order                  *)
-(*             ordCnt    - number of orders (0..12)            *)
-(*             oblgRem   - obligation remaining (modified)     *)
-(* SIDE EFX  : Modifies plyr.cashBal,                         *)
-(*             plyr.stckShrs, plyr.bondUnts.                   *)
-(*             Reduces oblgRem; clamps to 0.                   *)
-(* ============================================================ *)
-! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
-TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
-PARAM plyr        : PlyrRec
-PARAM mkt         : MktState
-PARAM ordType(12) : INTEGER
-PARAM ordId(12)   : INTEGER
-PARAM ordQty(12)  : INTEGER
-PARAM ordCnt      : INTEGER
-PARAM oblgRem     : INTEGER
-DIM bPar(3) : INTEGER
-DIM i       : INTEGER
-DIM s       : INTEGER
-DIM b       : INTEGER
-DIM qty     : INTEGER
-DIM prcd    : INTEGER
-DIM applyAmt: INTEGER
-
-RUN initBondPar(bPar)
-
-FOR i := 1 TO ordCnt
-
-  s   := ordId(i)
-  b   := ordId(i)
-  qty := ordQty(i)
-
-  IF ordType(i) = 1 THEN
-
-    ! Stock sell
-    prcd := qty * mkt.stckPrice(s)
-
-    plyr.stckShrs(s) := plyr.stckShrs(s) - qty
-
-  ELSE IF ordType(i) = 2 THEN
-
-    ! Bond sell
-    prcd := qty * bPar(b)
-    plyr.bondUnts(b) := plyr.bondUnts(b) - qty
-
-  ENDIF \ENDIF
-
-  ! Apply proceeds to obligation first; excess becomes cash.
-  applyAmt := oblgRem
-  IF prcd < applyAmt THEN
-    applyAmt := prcd
-  ENDIF
-  oblgRem := oblgRem - applyAmt
-  plyr.cashBal := plyr.cashBal + (prcd - applyAmt)
-  IF oblgRem < 0 THEN
-    oblgRem := 0
-  ENDIF
-
-NEXT i
-
-END
-
-PROCEDURE scrMgnInt
-(* ============================================================ *)
-(* PROCEDURE : scrMgnInt                                        *)
-(* PURPOSE   : S10 Margin Interest Notice screen.              *)
-(*             Displays annual margin interest charge and the  *)
-(*             resulting cash balance for one player.          *)
-(*             Called once per non-bankrupt player with        *)
-(*             outstanding margin after applyMgnInt runs.      *)
-(*             If isFrcLiq is TRUE, displays a forced          *)
-(*             liquidation warning before waitKey; caller is   *)
-(*             responsible for routing to scrForceLiq after    *)
-(*             this screen returns.                            *)
-(*             Internal guard: no-ops for Year 1 and Year 10; *)
-(*             those years have no margin interest charge.     *)
-(*             Caller should not invoke in Year 1 or Year 10, *)
-(*             but the guard prevents display if called in     *)
-(*             error.                                          *)
-(* PARAMS    : currYear  - current game year (1..10)           *)
-(*             plyrNam   - player name for display             *)
-(*             mgnTot    - outstanding margin before charge    *)
-(*             mgnChg    - interest deducted this year (>= 0)  *)
-(*             cashBef   - cash balance before deduction       *)
-(*             cashAft   - cash balance after deduction        *)
-(*             isFrcLiq  - TRUE if cashAft < 0                 *)
-(*             action    - OUT: always 1 (CONTINUE)            *)
-(* SIDE EFX  : Clears screen. Blocks on keypress via            *)
-(*             getPhaseNav.                                     *)
-(* ============================================================ *)
-PARAM currYear : INTEGER
-PARAM plyrNam  : STRING[20]
-PARAM mgnTot   : INTEGER
-PARAM mgnChg   : INTEGER
-PARAM cashBef  : INTEGER
-PARAM cashAft  : INTEGER
-PARAM isFrcLiq : BOOLEAN
-PARAM action   : INTEGER
-DIM pStr : STRING[8]
-DIM navAct: INTEGER
-
-! Internal guard: margin interest does not apply in Year 1 or 10.
-IF currYear = 1 OR currYear = 10 THEN
-  action := 1
-  END
-ENDIF
-
-RUN clrScr
-PRINT "=== MARGIN INTEREST ==="
-PRINT "  "; plyrNam; "  YEAR "; currYear; " OF 10"
-PRINT
-
-RUN fmtMoney(mgnTot, pStr)
-PRINT "  Outstanding margin : $"; pStr
-RUN fmtMoney(mgnChg, pStr)
-PRINT "  Annual charge (5%) : $"; pStr
-PRINT
-
-RUN fmtMoney(cashBef, pStr)
-PRINT "  Cash before charge : $"; pStr
-RUN fmtMoney(cashAft, pStr)
-PRINT "  Cash after charge  : $"; pStr
-PRINT
-
-IF isFrcLiq THEN
-  PRINT "  *** FORCED LIQUIDATION REQUIRED ***"
-  PRINT "  Cash balance is negative after margin interest."
-  PRINT "  You must liquidate assets to cover the deficit."
-  PRINT
-ENDIF
-
-RUN getPhaseNav(navAct)
-IF navAct = 2 THEN
-  action := 2
-ELSE IF navAct = 3 THEN
-  action := 3
-ELSE
-  action := 1
-ENDIF \ENDIF
 END
