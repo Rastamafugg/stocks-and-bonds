@@ -46,6 +46,7 @@ PRINT #path, "packedModule,entryModule,sizeBytes"
 
 FOR i := 1 TO modCnt
   modNam := modList(i)
+  RUN logBlockMap(modNam)
   RUN logPackedModule(path, modNam, ok)
   IF NOT ok THEN
     IF pathOpen THEN
@@ -68,6 +69,57 @@ END
     PRINT "moduleLogger error ("; ERR; ")"
 END
 
+PROCEDURE logBlockMap
+(* ================================================== *)
+(* PROCEDURE: logBlockMap                             *)
+(* PURPOSE:   Snapshot the system block map with     *)
+(*            F$GBlkMp before a module load attempt  *)
+(*            and print summary values to console.   *)
+(* PARAMS:    modNam - module about to be processed  *)
+(* NOTE:      Requires SysCall machine-lang module.  *)
+(* ================================================== *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM modNam : STRING[20]
+DIM regs        : Register
+DIM blkMap(256) : BYTE
+DIM callCode    : BYTE
+DIM iCC         : INTEGER
+DIM errCode     : INTEGER
+DIM bytesPerBlk : INTEGER
+DIM mapSize     : INTEGER
+DIM freeBlkCnt  : INTEGER
+DIM freeKb      : INTEGER
+DIM idx         : INTEGER
+
+ON ERROR GOTO 900
+
+callCode := $19          \ ! F$GBlkMp
+regs.x   := ADDR(blkMap)
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errCode := regs.b
+  PRINT "GBlkMp before "; modNam; ": fail err "; errCode
+  END
+ENDIF
+
+bytesPerBlk := regs.a * 256 + regs.b
+mapSize     := regs.y
+freeBlkCnt  := 0
+FOR idx := 1 TO mapSize
+  IF blkMap(idx) = 0 THEN
+    freeBlkCnt := freeBlkCnt + 1
+  ENDIF
+NEXT idx
+freeKb := freeBlkCnt * 8
+
+PRINT "GBlkMp before "; modNam; ": blkBytes="; bytesPerBlk; " blocks="; mapSize
+PRINT "GBlkMp before "; modNam; ": zeroValBlocks="; freeBlkCnt; " freeKB="; freeKb
+END
+
+900 PRINT "logBlockMap error ("; ERR; ")"
+END
+
 PROCEDURE logPackedModule
 (* ================================================== *)
 (* PROCEDURE: logPackedModule                         *)
@@ -84,31 +136,37 @@ TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
 PARAM pathNo    : BYTE
 PARAM packedMod : STRING[20]
 PARAM ok        : BOOLEAN
-DIM regs        : Register
-DIM callCode    : BYTE
-DIM iCC         : INTEGER
-DIM errCode     : INTEGER
-DIM hdrAddr     : INTEGER
-DIM curAddr     : INTEGER
-DIM sync1       : INTEGER
-DIM sync2       : INTEGER
-DIM modSzHi     : INTEGER
-DIM modSzLo     : INTEGER
-DIM modSz       : INTEGER
-DIM nmOfsHi     : INTEGER
-DIM nmOfsLo     : INTEGER
-DIM nmOfs       : INTEGER
-DIM nmAddr      : INTEGER
-DIM nmChar      : INTEGER
-DIM nmIdx       : INTEGER
-DIM procName    : STRING[31]
-DIM linked      : BOOLEAN
+DIM regs         : Register
+DIM callCode     : BYTE
+DIM iCC          : INTEGER
+DIM errCode      : INTEGER
+DIM hdrAddr      : INTEGER
+DIM curAddr      : INTEGER
+DIM sync1        : INTEGER
+DIM sync2        : INTEGER
+DIM modSzHi      : INTEGER
+DIM modSzLo      : INTEGER
+DIM modSz        : INTEGER
+DIM nmOfsHi      : INTEGER
+DIM nmOfsLo      : INTEGER
+DIM nmOfs        : INTEGER
+DIM nmAddr       : INTEGER
+DIM nmChar       : INTEGER
+DIM nmIdx        : INTEGER
+DIM procName     : STRING[31]
+DIM procList(16) : STRING[20]
+DIM procCnt      : INTEGER
+DIM linked       : BOOLEAN
+DIM didLoad      : BOOLEAN
+DIM goneOK       : BOOLEAN
 
 ON ERROR GOTO 900
 
 ok      := FALSE
 hdrAddr := 0
+procCnt := 0
 linked  := FALSE
+didLoad := FALSE
 
 callCode := $00          \ ! F$Link
 regs.a   := 0
@@ -128,6 +186,7 @@ IF LAND(iCC, 1) <> 0 THEN
     PRINT "logPackedModule: load failed "; packedMod; " err "; errCode
     END
   ENDIF
+  didLoad := TRUE
 ENDIF
 linked := TRUE
 
@@ -155,6 +214,10 @@ LOOP
     EXITIF nmChar >= 128 OR nmIdx >= 31 THEN
     ENDEXIT
   ENDLOOP
+  IF procCnt < 16 THEN
+    procCnt := procCnt + 1
+    procList(procCnt) := procName
+  ENDIF
   PRINT #pathNo, packedMod; ","; procName; ","; modSz
   curAddr := curAddr + modSz
 ENDLOOP
@@ -170,6 +233,17 @@ IF LAND(iCC, 1) <> 0 THEN
 ENDIF
 linked := FALSE
 
+RUN logModuleDir(packedMod)
+IF didLoad THEN
+  RUN verifyMergedGone(packedMod, procList, procCnt, goneOK)
+  IF NOT goneOK THEN
+    PRINT "logPackedModule: verify failed "; packedMod
+    END
+  ENDIF
+ELSE
+  PRINT "verify "; packedMod; ": skipped; module was already resident"
+ENDIF
+
 ok := TRUE
 END
 
@@ -180,4 +254,126 @@ END
     ENDIF
     PRINT "logPackedModule error ("; ERR; ")"
     ok := FALSE
+END
+
+PROCEDURE logModuleDir
+(* ================================================== *)
+(* PROCEDURE: logModuleDir                            *)
+(* PURPOSE:   Snapshot the module directory with     *)
+(*            F$GModDr and print the documented      *)
+(*            return values to console.              *)
+(* PARAMS:    modNam - module label for console log  *)
+(* NOTE:      Requires SysCall machine-lang module.  *)
+(* ================================================== *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM modNam : STRING[20]
+DIM regs         : Register
+DIM dirBuf(2048) : BYTE
+DIM callCode     : BYTE
+DIM iCC          : INTEGER
+DIM errCode      : INTEGER
+DIM dirEnd       : INTEGER
+DIM dirStart     : INTEGER
+
+ON ERROR GOTO 900
+
+callCode := $1A          \ ! F$GModDr
+regs.x   := ADDR(dirBuf)
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errCode := regs.b
+  PRINT "GModDr after "; modNam; ": fail err "; errCode
+  END
+ENDIF
+
+dirEnd   := regs.y
+dirStart := regs.u
+PRINT "GModDr after "; modNam; ": dirStart="; dirStart; " copyEnd="; dirEnd
+END
+
+900 PRINT "logModuleDir error ("; ERR; ")"
+END
+
+PROCEDURE verifyMergedGone
+(* ================================================== *)
+(* PROCEDURE: verifyMergedGone                        *)
+(* PURPOSE:   Verify each constituent module name    *)
+(*            from a merged load is absent after     *)
+(*            unlink and module-directory snapshot.  *)
+(* PARAMS:    packedMod - packed module label        *)
+(*            procList  - constituent module names   *)
+(*            procCnt   - active names in procList   *)
+(*            ok       - TRUE if all are absent      *)
+(* NOTE:      Requires SysCall machine-lang module.  *)
+(* ================================================== *)
+PARAM packedMod      : STRING[20]
+PARAM procList(16)   : STRING[20]
+PARAM procCnt        : INTEGER
+PARAM ok             : BOOLEAN
+DIM idx      : INTEGER
+DIM isRes    : BOOLEAN
+DIM errCode  : INTEGER
+
+ON ERROR GOTO 900
+
+ok := TRUE
+FOR idx := 1 TO procCnt
+  RUN checkModuleResidency(procList(idx), isRes, errCode)
+  IF isRes THEN
+    PRINT "verify "; packedMod; ": still present "; procList(idx)
+    ok := FALSE
+  ELSE
+    PRINT "verify "; packedMod; ": absent "; procList(idx)
+  ENDIF
+NEXT idx
+END
+
+900 PRINT "verifyMergedGone error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE checkModuleResidency
+(* ================================================== *)
+(* PROCEDURE: checkModuleResidency                    *)
+(* PURPOSE:   Test whether a named module is still   *)
+(*            resident by F$Link and immediate       *)
+(*            F$UnLink if found.                     *)
+(* PARAMS:    modNam  - module name to test          *)
+(*            isRes   - TRUE if resident             *)
+(*            errCode - error code on miss/fail      *)
+(* NOTE:      Requires SysCall machine-lang module.  *)
+(* ================================================== *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM modNam  : STRING[20]
+PARAM isRes   : BOOLEAN
+PARAM errCode : INTEGER
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+DIM hdrAddr   : INTEGER
+
+ON ERROR GOTO 900
+
+isRes   := FALSE
+errCode := 0
+hdrAddr := 0
+
+callCode := $00          \ ! F$Link
+regs.a   := 0
+regs.x   := ADDR(modNam)
+RUN SysCall(callCode, regs)
+iCC    := regs.cc
+hdrAddr := regs.u
+IF LAND(iCC, 1) = 0 THEN
+  isRes := TRUE
+  callCode := $02        \ ! F$UnLink
+  regs.u   := hdrAddr
+  RUN SysCall(callCode, regs)
+ELSE
+  errCode := regs.b
+ENDIF
+END
+
+900 PRINT "checkModuleResidency error ("; ERR; ")"
 END
