@@ -16,6 +16,8 @@ These instructions apply to all work in this repository.
   `basic09 #40k` line.
 - Add `del -x <module>` only for module names that are known existing workflow
   disk executables that must be removed before packing.
+- Any module first created in the current task must be treated as non-existent
+  on the workflow disk unless explicit current-task evidence proves otherwise.
 - Do not add `del -x <module>` for a brand-new module name that does not yet
   exist on the workflow disk.
 - Do not add `del -x <new-module-name>` for the target name of a rename.

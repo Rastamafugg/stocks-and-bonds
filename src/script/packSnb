@@ -1,6 +1,5 @@
 del -x moduleLogger
 del -x snb
-del -x snbSellHumanStub
 basic09 #40k
 load /d1/moduleLogger.b09
 pack*
