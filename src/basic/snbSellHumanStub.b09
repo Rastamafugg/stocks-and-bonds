@@ -1,0 +1,175 @@
+PROCEDURE snbSellHumanStub
+(* ============================================================ *)
+(* PROCEDURE : snbSellHumanStub                                 *)
+(* PURPOSE   : Temporary human sell-phase placeholder.          *)
+(*             Preserves sell-phase checkpoints, turn advance,  *)
+(*             save+exit, and quit-to-menu while manual sells   *)
+(*             are unavailable in this build.                   *)
+(* PARAMS    : None                                             *)
+(* SIDE EFX  : Reads and writes SNBSTATE.                       *)
+(* ============================================================ *)
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+DIM hdr      : SaveHdr
+DIM plyr     : PlyrRec
+DIM mkt      : MktState
+DIM loadOK   : BOOLEAN
+DIM saveOK   : BOOLEAN
+DIM iCYr     : INTEGER
+DIM iPCnt    : INTEGER
+DIM p        : INTEGER
+DIM nextP    : INTEGER
+DIM scanP    : INTEGER
+DIM act      : INTEGER
+DIM pTypeVal : INTEGER
+DIM aiTierVal: INTEGER
+DIM dispName : STRING[27]
+
+ON ERROR GOTO 900
+
+RUN loadHdrMkt("SNBSTATE", hdr, mkt, loadOK)
+IF NOT loadOK THEN
+  PRINT "snbSellHumanStub: loadHdrMkt failed"
+  END
+ENDIF
+
+iCYr  := hdr.currYear
+iPCnt := hdr.plyrCount
+p := 1
+IF hdr.savedPhase = 1 THEN
+  p := hdr.savedPlyr
+ENDIF
+IF p < 1 OR p > iPCnt THEN
+  PRINT "snbSellHumanStub: invalid savedPlyr"
+  END
+ENDIF
+
+LOOP
+  EXITIF p < 1 OR p > iPCnt THEN
+  ENDEXIT
+
+  RUN loadPlyrRec("SNBSTATE", hdr, p, plyr, loadOK)
+  IF NOT loadOK THEN
+    PRINT "snbSellHumanStub: loadPlyrRec failed"
+    END
+  ENDIF
+
+  IF plyr.plyrType = 2 THEN
+    hdr.savedPhase := 1
+    hdr.savedPlyr  := p
+    hdr.gameStage  := 2
+    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
+    IF NOT saveOK THEN
+      PRINT "snbSellHumanStub: saveHdrOnly failed"
+    ENDIF
+    END
+  ENDIF
+
+  act := 1
+  IF NOT plyr.isBankrupt THEN
+    IF iCYr > 1 THEN
+      pTypeVal  := plyr.plyrType
+      aiTierVal := plyr.aiTier
+      RUN fmtPlyrName(plyr.plyrName, pTypeVal, aiTierVal, dispName)
+      RUN clrScr
+      PRINT "=== SELL PHASE ==="
+      PRINT
+      PRINT "  Player: "; dispName
+      PRINT
+      PRINT "  Manual sell entry is temporarily unavailable"
+      PRINT "  in this build."
+      PRINT
+      PRINT "  1. Continue without sells"
+      PRINT "  2. Save and exit to menu"
+      PRINT "  3. Quit to menu without save"
+      PRINT
+      PRINT "  Select (1-3): ";
+      RUN getMenuKey(1, 3, act)
+      PRINT
+    ENDIF
+  ENDIF
+
+  IF act = 2 THEN
+    hdr.savedPhase := 1
+    hdr.savedPlyr  := p
+    hdr.gameStage  := 2
+    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
+    IF NOT saveOK THEN
+      PRINT "snbSellHumanStub: saveHdrOnly failed"
+      END
+    ENDIF
+    RUN copySaveFile("SNBSTATE", "SNBGAME", saveOK)
+    IF NOT saveOK THEN
+      PRINT "snbSellHumanStub: copySaveFile failed"
+      END
+    ENDIF
+    hdr.savedPhase := 9
+    hdr.savedPlyr  := 0
+    hdr.gameStage  := 2
+    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
+    IF NOT saveOK THEN
+      PRINT "snbSellHumanStub: saveHdrOnly failed"
+    ENDIF
+    END
+  ELSE IF act = 3 THEN
+    hdr.savedPhase := 9
+    hdr.savedPlyr  := 0
+    hdr.gameStage  := 2
+    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
+    IF NOT saveOK THEN
+      PRINT "snbSellHumanStub: saveHdrOnly failed"
+    ENDIF
+    END
+  ENDIF \ENDIF
+
+  nextP := 0
+  FOR scanP := p + 1 TO iPCnt
+    IF nextP = 0 THEN
+      RUN loadPlyrRec("SNBSTATE", hdr, scanP, plyr, loadOK)
+      IF NOT loadOK THEN
+        PRINT "snbSellHumanStub: loadPlyrRec failed"
+        END
+      ENDIF
+      IF NOT plyr.isBankrupt THEN
+        nextP := scanP
+      ENDIF
+    ENDIF
+  NEXT scanP
+
+  IF nextP = 0 THEN
+    hdr.savedPhase := 2
+    hdr.savedPlyr  := 1
+    hdr.gameStage  := 2
+    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
+    IF NOT saveOK THEN
+      PRINT "snbSellHumanStub: saveHdrOnly failed"
+    ENDIF
+    END
+  ENDIF
+
+  RUN loadPlyrRec("SNBSTATE", hdr, nextP, plyr, loadOK)
+  IF NOT loadOK THEN
+    PRINT "snbSellHumanStub: loadPlyrRec failed"
+    END
+  ENDIF
+
+  IF plyr.plyrType = 2 THEN
+    hdr.savedPhase := 1
+    hdr.savedPlyr  := nextP
+    hdr.gameStage  := 2
+    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
+    IF NOT saveOK THEN
+      PRINT "snbSellHumanStub: saveHdrOnly failed"
+    ENDIF
+    END
+  ENDIF
+
+  p := nextP
+ENDLOOP
+
+END
+
+900 PRINT "snbSellHumanStub error ("; ERR; ")"
+RUN waitKey
+END
