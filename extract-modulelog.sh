@@ -9,7 +9,7 @@ while [ -L "$SOURCE" ]; do
 done
 SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
 
-IMAGE_PATH="${1:-$SCRIPT_DIR/disks/snb.dsk}"
+IMAGE_PATH="${1:-$SCRIPT_DIR/disks/snbsrc.dsk}"
 SOURCE_FILE="${2:-modulelog}"
 DEST_DIR="$SCRIPT_DIR/logs"
 DEST_PATH="$DEST_DIR/modulelog"
