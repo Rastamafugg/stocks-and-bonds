@@ -221,6 +221,7 @@ ENDIF
 GOSUB 100
 PRINT
 RUN showMfree("After snbBuy load attempt")
+RUN showMdir("After snbBuy load attempt")
 RUN waitKey
 
 PRINT "-- Block 5: Attempt load snbSellDraft --"
@@ -252,6 +253,7 @@ ENDIF
 GOSUB 100
 PRINT
 RUN showMfree("After first snbSellDraft load attempt")
+RUN showMdir("After first snbSellDraft load attempt")
 RUN waitKey
 
 PRINT "-- Block 6: Remove adjacent module and retry --"
@@ -551,4 +553,22 @@ PRINT
 END
 
 900 PRINT "showMfree error ("; ERR; ")"
+END
+
+PROCEDURE showMdir
+(* ============================================================ *)
+(* PROCEDURE : showMdir                                         *)
+(* PURPOSE   : Print a label and run the compact mdir shell     *)
+(*             command for manual module-residency inspection.  *)
+(* ============================================================ *)
+PARAM labelTxt : STRING[48]
+
+ON ERROR GOTO 900
+
+PRINT "-- "; labelTxt; " --"
+SHELL "mdir"
+PRINT
+END
+
+900 PRINT "showMdir error ("; ERR; ")"
 END
