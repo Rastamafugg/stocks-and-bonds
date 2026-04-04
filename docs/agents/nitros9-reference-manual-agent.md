@@ -38,7 +38,7 @@ In order of precedence:
 
 1. **NitrOS-9 EOU Technical Reference Manual** — authoritative for all system call codes, register conventions, and error codes.
 2. **NitrOS-9 EOU Level 2 Windowing System Manual** - authoritative for all Windowing library calls, parameters, and reference documentation 
-3. **Project knowledge** (`bestPractices.md`, `module-phase-transition.md`, existing `.b09` source) — authoritative for project conventions, existing procedure signatures, and module ownership.
+3. **Project knowledge** (`bestPractices.md`, `archive/module-phase-transition.md`, existing `.b09` source) — authoritative for project conventions, existing procedure signatures, and module ownership.
 4. **Confirmed hardware test results** — supersede documentation where explicitly documented in project knowledge.
 
 Do not cite other sources. Do not extrapolate from OS-9/6809 documentation that is not the EOU Technical Reference Manual or NitrOS-9 EOU Level 2 Windowing System Manual unless the discrepancy is explicitly flagged.
@@ -115,7 +115,7 @@ Before presenting any Syscall Research Summary or Coding Agent Prompt, verify:
 - [ ] All procedure names, TYPE names, and variable names in the prompt
       are checked against the `bestPractices.md` reserved word list.
 - [ ] Any module ownership assignments are consistent with
-      `module-phase-transition.md`.
+      `archive/module-phase-transition.md`.
 
 ---
 

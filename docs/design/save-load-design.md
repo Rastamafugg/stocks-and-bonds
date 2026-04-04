@@ -3,7 +3,7 @@
 Status: Current  
 Authority: Save format and resume semantics  
 Depends on: `specification.md`, `phase-child-design.md`  
-Supersedes: Conflicting save/load assumptions in `project-timeline.md`
+Supersedes: Conflicting save/load assumptions in `archive/project-timeline.md`
 
 ---
 
@@ -611,7 +611,7 @@ directly in `PlyrRec`.
 processes as an IPC channel. It must never appear in the player-visible
 save slot list. The `guardSave` procedure in `snbSaveLoad.b09` rejects
 any player-supplied filename matching `SNBSTATE` before any `I$Create`
-call. See `forkio-plan.md` for the `chkStale` procedure that handles
+call. See `archive/forkio-plan.md` for the `chkStale` procedure that handles
 stale `SNBSTATE` files on new-game startup.
 
 ### Variable-length deck section

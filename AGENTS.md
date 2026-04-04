@@ -129,7 +129,7 @@ this order:
 1. `docs/agents/basic09-software-development-agent.md`
 2. `docs/reference/bestPractices.md`
 3. `docs/reference/basic09-error-handling.md`
-4. `docs/design/module-phase-transition.md` when module ownership or runtime
+4. `docs/design/archive/module-phase-transition.md` when module ownership or runtime
    loading is relevant
 5. `docs/reference/Basic09 Programming Language Reference Manual - NitrOS9 EOU.md`
    when syntax or built-in behavior must be confirmed

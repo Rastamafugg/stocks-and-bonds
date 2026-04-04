@@ -7,8 +7,8 @@
 Status: Historical  
 Authority: Historical planning artifact  
 Depends on: None  
-Superseded by: `specification.md`, `phase-child-design.md`,
-`save-load-design.md`, and `ui-screen-flow.md`
+Superseded by: `../specification.md`, `../phase-child-design.md`,
+`../save-load-design.md`, and `../ui-screen-flow.md`
 
 This file is retained as planning history only. It is not authoritative for
 current rules behavior, save semantics, or runtime architecture.
@@ -85,8 +85,8 @@ No game logic yet.
 
 Procedures: `SNBTYPES` (type-definition-only file; no logic).
 
-Define the following TYPEs per `save-load-design.md` and
-`ai-difficulty-tiers.md`:
+Define the following TYPEs per `../save-load-design.md` and
+`../ai-difficulty-tiers.md`:
 
 - `SaveHdr`
 - `PlyrRec`
@@ -94,7 +94,7 @@ Define the following TYPEs per `save-load-design.md` and
 - `AIProfile`
 
 Verify each TYPE compiles without error. Use `SIZE()` to confirm byte
-sizes match the values in `save-load-design.md` Section 6.
+sizes match the values in `../save-load-design.md` Section 6.
 
 **Confirmation Test 1.1:**
 
@@ -104,7 +104,7 @@ Expected output:
     SaveHdr  : 11
     PlyrRec  : 61
     MktState : 27
-    AIProfile: 15 (verify against ai-difficulty-tiers.md Section 3)
+    AIProfile: 15 (verify against ../ai-difficulty-tiers.md Section 3)
 ```
 
 ---
@@ -151,7 +151,7 @@ Expected: all FALSE.
 Procedure: `initAIProf`
 
 Accepts `tier : BYTE` (1/2/3) and populates an `AIProfile` record with
-the values from `ai-difficulty-tiers.md` Section 4.
+the values from `../ai-difficulty-tiers.md` Section 4.
 
 **Confirmation Test 1.4:**
 
@@ -383,7 +383,7 @@ at the correct point.
 
 Procedure: `saveGame`
 
-Implements the write sequence from `save-load-design.md` Section 8.
+Implements the write sequence from `../save-load-design.md` Section 8.
 Writes `SaveHdr`, `deckOrd`, `plyrs(6)`, `MktState` to a named file
 using `PUT`. Computes and writes checksum.
 
@@ -402,7 +402,7 @@ Verify file exists and has SIZE = 440 bytes.
 
 Procedure: `loadGame`
 
-Implements the read sequence from `save-load-design.md` Section 9.
+Implements the read sequence from `../save-load-design.md` Section 9.
 Reads and validates magic byte, format version, and checksum before
 applying state. Returns `loadOK : BOOLEAN`.
 
@@ -1039,7 +1039,7 @@ Easy tier, Year 7:
 ## Backfill Task 10.5 — Margin Interest Notice screen (S10)
 
 **Status:** Missing. No source file contains `scrMgnInt`. This screen
-is referenced in `ui-screen-flow.md` as S10 and sits between
+is referenced in `../ui-screen-flow.md` as S10 and sits between
 `applyMgnInt` (engine) and S11 (card display) in the year loop.
 
 **Procedure:** `scrMgnInt`

@@ -12,10 +12,10 @@ implemented.
 Status: Historical  
 Authority: Historical architecture transition record  
 Depends on: None  
-Superseded by: `phase-child-design.md`
+Superseded by: `../phase-child-design.md`
 
 This file is retained for rationale and transition history. When it conflicts
-with `phase-child-design.md`, `save-load-design.md`, or `specification.md`, the
+with `../phase-child-design.md`, `../save-load-design.md`, or `../specification.md`, the
 canonical documents win.
 
 The SNB coordinator (`SNB.b09`) runs as the persistent parent process for
@@ -256,7 +256,7 @@ Minimum: `snbSaveLoad.b09`, `SNB.b09`, `snbSetup.b09`, `snbYearLoop.b09`.
 - Caller no longer sets `bnkrFlgs` or `checksum` — computed internally
 - Caller no longer sets `deckPos` (eliminated from header)
 - Deck write: loop `FOR i := 1 TO hdr.maxYears; PUT #path, deckOrd(i)`
-- Checksum covers 10 BYTE fields (see `save-load-design.md §7`)
+- Checksum covers 10 BYTE fields (see `../save-load-design.md §7`)
 - `bnkrFlgs` computation precedes checksum computation
 
 **loadGame changes:**

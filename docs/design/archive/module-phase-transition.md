@@ -11,7 +11,7 @@ measurement. Module sizes populated by Step 1 hardware pilot.
 Status: Historical  
 Authority: Historical module-loading design and memory measurements  
 Depends on: None  
-Superseded by: `phase-child-design.md` for runtime architecture
+Superseded by: `../phase-child-design.md` for runtime architecture
 
 This file is retained for code division notes and measured module-size data.
 Its same-process load/unload model is no longer the current implementation.

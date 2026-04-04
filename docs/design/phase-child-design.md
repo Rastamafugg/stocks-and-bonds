@@ -3,7 +3,7 @@
 Status: Current  
 Authority: Runtime architecture  
 Depends on: `specification.md`, `save-load-design.md`  
-Supersedes: `forkio-plan.md` and older child-process notes that refer to
+Supersedes: `archive/forkio-plan.md` and older child-process notes that refer to
 retired modules such as `snbBuySell`, `divChild`, `tradeChild`, or `egChild`
 
 This document describes the current file-based phase-child architecture used by

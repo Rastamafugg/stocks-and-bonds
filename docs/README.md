@@ -25,15 +25,15 @@ Read these files in this order when working on the game design:
 7. `docs/design/ai-difficulty-tiers.md`
    Canonical AI parameterization document.
 
-## Supporting Design Files
+## Archived Design Files
 
-- `docs/design/forkio-plan.md`
+- `docs/design/archive/forkio-plan.md`
   Historical transition document. Useful for rationale and some retained file
   IPC details, but not authoritative where it conflicts with the canonical set.
-- `docs/design/module-phase-transition.md`
+- `docs/design/archive/module-phase-transition.md`
   Historical module-loading design. Keep for code division notes and measured
   memory figures only; the runtime loading model is superseded.
-- `docs/design/project-timeline.md`
+- `docs/design/archive/project-timeline.md`
   Historical implementation planning artifact. Not authoritative for current
   rules or architecture.
 

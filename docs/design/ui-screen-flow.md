@@ -3,7 +3,7 @@
 Status: Current  
 Authority: UI screens and navigation  
 Depends on: `specification.md`, `save-load-design.md`  
-Supersedes: Conflicting UI assumptions in `project-timeline.md`
+Supersedes: Conflicting UI assumptions in `archive/project-timeline.md`
 
 ---
 
