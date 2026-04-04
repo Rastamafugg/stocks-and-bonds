@@ -11,22 +11,27 @@ These instructions apply to all work in this repository.
   repository.
 - Start that script with `basic09 #40k` so Basic09 runs with maximum memory for
   the packing session.
+- When a packed module already exists on the CoCo 3 workflow disk and must be
+  replaced, add `del -x <module>` to `src/script/packSnb` before the
+  `basic09 #40k` line.
+- Add `del -x <module>` only for module names that are known existing workflow
+  disk executables that must be removed before packing.
+- Do not add `del -x <module>` for a brand-new module name that does not yet
+  exist on the workflow disk.
+- Do not add `del -x <new-module-name>` for the target name of a rename.
+- If a rename also requires removing the old packed module name from the
+  workflow disk, add `del -x <old-module-name>` only when that old module is
+  known to exist there.
+- Delete existing packed modules before entering Basic09 so the later `pack*`
+  step does not hit the replace prompt.
 - For each module that must be packed, add this command sequence to
   `src/script/packSnb` after the `basic09 #40k` line:
   `load /d1/<module>.b09`, then `pack*`, then `kill*`.
-- If packing an existing module will trigger Basic09's replace confirmation,
-  insert `y` between `pack*` and `kill*` for that module in `src/script/packSnb`.
-- If a module should be deleted from the CoCo 3 workflow disk, add
-  `del -x <module>` to `src/script/packSnb` as a shell command outside the
-  Basic09 session.
-- Place each `del -x <module>` line either before `basic09 #40k` or after
-  the closing `bye` line, never between Basic09 interactive commands.
 - End the Basic09 command block in `src/script/packSnb` with `bye` after all
-  Basic09 `load`, `pack*`, optional `y`, and `kill*` commands have been
+  Basic09 `load`, `pack*`, and `kill*` commands have been
   listed.
 - Do not describe `bye` as a shell command. It exits the Basic09 session and
-  returns control to the shell, after which any trailing shell-level
-  `del -x <module>` commands may run.
+  returns control to the shell.
 - When diagnosing Basic09 runtime `ERR=43` in NitrOS-9, do not assume the
   root cause is a genuinely missing procedure. In this project, if the target
   procedure should exist in a packed module but too many modules are already
