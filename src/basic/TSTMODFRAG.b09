@@ -78,6 +78,7 @@ PRINT "Predicted hole after unlink snbDividend = "; sizeDiv
 PRINT "snbBuy exceeds that hole by             = "; gapBuy
 PRINT "snbSellDraft exceeds it by              = "; gapSell
 PRINT
+RUN showMfree("Initial memory map before cleanup")
 RUN waitKey
 
 PRINT "-- Cleanup baseline --"
@@ -114,6 +115,7 @@ modNam := "snbSellDraft"
 ok := FALSE
 GOSUB 100
 PRINT
+RUN showMfree("After cleanup baseline")
 RUN waitKey
 
 PRINT "-- Block 1: Load snbDividend --"
@@ -136,6 +138,7 @@ modNam := "snbDividend"
 ok := TRUE
 GOSUB 100
 PRINT
+RUN showMfree("After loading snbDividend")
 RUN waitKey
 
 PRINT "-- Block 2: Load snb --"
@@ -158,6 +161,7 @@ modNam := "snb"
 ok := TRUE
 GOSUB 100
 PRINT
+RUN showMfree("After loading snb")
 RUN waitKey
 
 PRINT "-- Block 3: Unlink snbDividend --"
@@ -185,6 +189,7 @@ modNam := "snb"
 ok := TRUE
 GOSUB 100
 PRINT
+RUN showMfree("After unlinking snbDividend")
 RUN waitKey
 
 PRINT "-- Block 4: Attempt load snbBuy --"
@@ -215,6 +220,7 @@ ELSE
 ENDIF
 GOSUB 100
 PRINT
+RUN showMfree("After snbBuy load attempt")
 RUN waitKey
 
 PRINT "-- Block 5: Attempt load snbSellDraft --"
@@ -245,6 +251,7 @@ ELSE
 ENDIF
 GOSUB 100
 PRINT
+RUN showMfree("After first snbSellDraft load attempt")
 RUN waitKey
 
 PRINT "-- Block 6: Remove adjacent module and retry --"
@@ -266,6 +273,7 @@ modNam := "snb"
 ok := FALSE
 GOSUB 100
 PRINT
+RUN showMfree("After unlinking snb")
 RUN waitKey
 
 testNum := testNum + 1
@@ -295,6 +303,7 @@ ELSE
 ENDIF
 GOSUB 100
 PRINT
+RUN showMfree("After retrying snbSellDraft load")
 RUN waitKey
 
 PRINT "-- Cleanup end state --"
@@ -321,12 +330,7 @@ PRINT "=== SUMMARY ==="
 PRINT "Passed: "; passed
 PRINT "Failed: "; failed
 PRINT
-PRINT "-- Final shell diagnostics --"
-PRINT "Running mfree for free-block report"
-SHELL "mfree"
-PRINT
-PRINT "Running mdir -e for module directory report"
-SHELL "mdir -e"
+RUN showMfree("Final memory map after cleanup")
 END
 
 100 \ ! GOSUB: compare residency of modNam against ok.
@@ -529,4 +533,22 @@ PRINT
 END
 
 900 PRINT "waitKey error ("; ERR; ")"
+END
+
+PROCEDURE showMfree
+(* ============================================================ *)
+(* PROCEDURE : showMfree                                        *)
+(* PURPOSE   : Print a label and run the mfree shell command    *)
+(*             for manual free-block inspection.                *)
+(* ============================================================ *)
+PARAM labelTxt : STRING[48]
+
+ON ERROR GOTO 900
+
+PRINT "-- "; labelTxt; " --"
+SHELL "mfree"
+PRINT
+END
+
+900 PRINT "showMfree error ("; ERR; ")"
 END
