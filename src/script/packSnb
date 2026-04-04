@@ -1,22 +1,3 @@
-del -x moduleLogger
-del -x snb
-del -x snbSetup
-del -x snbDividend
-del -x snbMarket
-del -x snbSellAI
-del -x snbBuy
-del -x snbBuyAI
-del -x snbMarginPay
-del -x snbYear10Clear
-del -x snbEndGame
-del -x snbPhaseCore
-del -x snbScreenUtil
-del -x snbStateIO
-del -x snbGameData
-del -x snbTradeShared
-del -x snbTradeAI
-del -x snbBuyExec
-del -x snbSellAIUtil
 basic09 #40k
 load /d1/moduleLogger.b09
 pack*
