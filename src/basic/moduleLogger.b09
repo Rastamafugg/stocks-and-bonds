@@ -12,30 +12,55 @@ PROCEDURE moduleLogger
 (* FORMAT:    packedModule,entryModule,sizeBytes      *)
 (* NOTE:      Requires SysCall machine-lang module.  *)
 (* ================================================== *)
-DIM modList(9) : STRING[20]
-DIM modCnt     : INTEGER
-DIM i          : INTEGER
-DIM path       : BYTE
-DIM pathOpen   : BOOLEAN
-DIM ok         : BOOLEAN
-DIM modNam     : STRING[20]
-DIM logPath    : STRING[20]
+DIM modList(34) : STRING[20]
+DIM modCnt      : INTEGER
+DIM i           : INTEGER
+DIM path        : BYTE
+DIM pathOpen    : BOOLEAN
+DIM ok          : BOOLEAN
+DIM modNam      : STRING[20]
+DIM logPath     : STRING[20]
 
 ON ERROR GOTO 900
 
 pathOpen := FALSE
 logPath := "/d1/modulelog"
 
-modCnt := 9
-modList(1) := "snb"
-modList(2) := "snbDividend"
-modList(3) := "snbUtil"
-modList(4) := "snbSetup"
-modList(5) := "snbEndGame"
-modList(6) := "snbMarket"
-modList(7) := "snbSell"
-modList(8) := "snbBuy"
-modList(9) := "snbMargin"
+modCnt := 34
+modList(1)  := "snb"
+modList(2)  := "snbBuy"
+modList(3)  := "snbBuyAI"
+modList(4)  := "snbBuyExec"
+modList(5)  := "snbDeckUtil"
+modList(6)  := "snbDividend"
+modList(7)  := "snbEndGame"
+modList(8)  := "snbForkUtil"
+modList(9)  := "snbGameData"
+modList(10) := "snbMarginPay"
+modList(11) := "snbMarket"
+modList(12) := "snbMenuUtil"
+modList(13) := "snbPhaseCore"
+modList(14) := "snbScreenUtil"
+modList(15) := "snbSell"
+modList(16) := "snbSellAI"
+modList(17) := "snbSellAIUtil"
+modList(18) := "snbSellDraftApply"
+modList(19) := "snbSellDraftEdit"
+modList(20) := "snbSellDraftHdrState"
+modList(21) := "snbSellDraftInit"
+modList(22) := "snbSellDraftUIState"
+modList(23) := "snbSellExec"
+modList(24) := "snbSellForceUI"
+modList(25) := "snbSellLot"
+modList(26) := "snbSellMargin"
+modList(27) := "snbSellUI"
+modList(28) := "snbSetup"
+modList(29) := "snbStateIO"
+modList(30) := "snbTradeAI"
+modList(31) := "snbTradeHumanUI"
+modList(32) := "snbTradeMgn"
+modList(33) := "snbTradeShared"
+modList(34) := "snbYear10Clear"
 
 ON ERROR GOTO 100
 DELETE logPath
@@ -83,7 +108,7 @@ ON ERROR GOTO 900
 
 PRINT "-- mfree before "; modNam; " --"
 SHELL "mfree"
-RUN waitKey
+RUN moduleLoggerPause
 END
 
 900 PRINT "showMfree error ("; ERR; ")"
@@ -239,7 +264,7 @@ ON ERROR GOTO 900
 
 PRINT "-- mdir after "; modNam; " --"
 SHELL "mdir"
-RUN waitKey
+RUN moduleLoggerPause
 END
 
 900 PRINT "showMdir error ("; ERR; ")"
@@ -328,9 +353,9 @@ END
 900 PRINT "checkModuleResidency error ("; ERR; ")"
 END
 
-PROCEDURE waitKey
+PROCEDURE moduleLoggerPause
 (* ================================================== *)
-(* PROCEDURE: waitKey                                 *)
+(* PROCEDURE: moduleLoggerPause                       *)
 (* PURPOSE:   Pause after console diagnostics so the  *)
 (*            user can review the output.            *)
 (* PARAMS:    None                                    *)
@@ -344,5 +369,5 @@ GET #0, k
 PRINT
 END
 
-900 PRINT "waitKey error ("; ERR; ")"
+900 PRINT "moduleLoggerPause error ("; ERR; ")"
 END
