@@ -1,0 +1,183 @@
+PROCEDURE moduleLogger
+(* ================================================== *)
+(* PROCEDURE: moduleLogger                            *)
+(* PURPOSE:   Load each current SNB packed module on *)
+(*            the workflow disk, log every           *)
+(*            constituent module name and moduleSize *)
+(*            byte count to /d1/modulelog, then      *)
+(*            unlink the loaded module before        *)
+(*            continuing to the next packed module.  *)
+(* PARAMS:    None                                    *)
+(* OUTPUT:    /d1/modulelog                           *)
+(* FORMAT:    packedModule,entryModule,sizeBytes      *)
+(* NOTE:      Requires SysCall machine-lang module.  *)
+(* ================================================== *)
+DIM modList(9) : STRING[20]
+DIM modCnt     : INTEGER
+DIM i          : INTEGER
+DIM path       : BYTE
+DIM pathOpen   : BOOLEAN
+DIM ok         : BOOLEAN
+DIM modNam     : STRING[20]
+DIM logPath    : STRING[20]
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+logPath := "/d1/modulelog"
+
+modCnt := 9
+modList(1) := "snb"
+modList(2) := "snbDividend"
+modList(3) := "snbUtil"
+modList(4) := "snbSetup"
+modList(5) := "snbEndGame"
+modList(6) := "snbMarket"
+modList(7) := "snbSell"
+modList(8) := "snbBuy"
+modList(9) := "snbMargin"
+
+ON ERROR GOTO 100
+DELETE logPath
+100 ON ERROR GOTO 900
+CREATE #path, logPath:WRITE
+pathOpen := TRUE
+PRINT #path, "packedModule,entryModule,sizeBytes"
+
+FOR i := 1 TO modCnt
+  modNam := modList(i)
+  RUN logPackedModule(path, modNam, ok)
+  IF NOT ok THEN
+    IF pathOpen THEN
+      CLOSE #path
+      pathOpen := FALSE
+    ENDIF
+    PRINT "moduleLogger: failed on "; modNam
+    END
+  ENDIF
+NEXT i
+
+CLOSE #path
+pathOpen := FALSE
+PRINT "moduleLogger: wrote "; logPath
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "moduleLogger error ("; ERR; ")"
+END
+
+PROCEDURE logPackedModule
+(* ================================================== *)
+(* PROCEDURE: logPackedModule                         *)
+(* PURPOSE:   Link or load one packed module, walk   *)
+(*            each constituent header, write a CSV   *)
+(*            row to an open path, then unlink the   *)
+(*            loaded module.                         *)
+(* PARAMS:    pathNo    - open output path           *)
+(*            packedMod - packed module name         *)
+(*            ok       - TRUE on success             *)
+(* NOTE:      Requires SysCall machine-lang module.  *)
+(* ================================================== *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM pathNo    : BYTE
+PARAM packedMod : STRING[20]
+PARAM ok        : BOOLEAN
+DIM regs        : Register
+DIM callCode    : BYTE
+DIM iCC         : INTEGER
+DIM errCode     : INTEGER
+DIM hdrAddr     : INTEGER
+DIM curAddr     : INTEGER
+DIM sync1       : INTEGER
+DIM sync2       : INTEGER
+DIM modSzHi     : INTEGER
+DIM modSzLo     : INTEGER
+DIM modSz       : INTEGER
+DIM nmOfsHi     : INTEGER
+DIM nmOfsLo     : INTEGER
+DIM nmOfs       : INTEGER
+DIM nmAddr      : INTEGER
+DIM nmChar      : INTEGER
+DIM nmIdx       : INTEGER
+DIM procName    : STRING[31]
+DIM linked      : BOOLEAN
+
+ON ERROR GOTO 900
+
+ok      := FALSE
+hdrAddr := 0
+linked  := FALSE
+
+callCode := $00          \ ! F$Link
+regs.a   := 0
+regs.x   := ADDR(packedMod)
+RUN SysCall(callCode, regs)
+hdrAddr := regs.u
+iCC     := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  callCode := $01        \ ! F$Load
+  regs.a   := 0
+  regs.x   := ADDR(packedMod)
+  RUN SysCall(callCode, regs)
+  hdrAddr := regs.u
+  iCC     := regs.cc
+  IF LAND(iCC, 1) <> 0 THEN
+    errCode := regs.b
+    PRINT "logPackedModule: load failed "; packedMod; " err "; errCode
+    END
+  ENDIF
+ENDIF
+linked := TRUE
+
+curAddr := hdrAddr
+LOOP
+  sync1 := PEEK(curAddr)
+  sync2 := PEEK(curAddr + 1)
+  EXITIF sync1 <> $87 OR sync2 <> $CD THEN
+  ENDEXIT
+  modSzHi := PEEK(curAddr + 2)
+  modSzLo := PEEK(curAddr + 3)
+  modSz   := modSzHi * 256 + modSzLo
+  EXITIF modSz <= 0 THEN
+  ENDEXIT
+  nmOfsHi := PEEK(curAddr + 4)
+  nmOfsLo := PEEK(curAddr + 5)
+  nmOfs   := nmOfsHi * 256 + nmOfsLo
+  nmAddr  := curAddr + nmOfs
+  procName := ""
+  nmIdx    := 0
+  LOOP
+    nmChar := PEEK(nmAddr + nmIdx)
+    procName := procName + CHR$(LAND(nmChar, $7F))
+    nmIdx := nmIdx + 1
+    EXITIF nmChar >= 128 OR nmIdx >= 31 THEN
+    ENDEXIT
+  ENDLOOP
+  PRINT #pathNo, packedMod; ","; procName; ","; modSz
+  curAddr := curAddr + modSz
+ENDLOOP
+
+callCode := $02          \ ! F$UnLink
+regs.u   := hdrAddr
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errCode := regs.b
+  PRINT "logPackedModule: unlink failed "; packedMod; " err "; errCode
+  END
+ENDIF
+linked := FALSE
+
+ok := TRUE
+END
+
+900 IF linked THEN
+      callCode := $02
+      regs.u   := hdrAddr
+      RUN SysCall(callCode, regs)
+    ENDIF
+    PRINT "logPackedModule error ("; ERR; ")"
+    ok := FALSE
+END

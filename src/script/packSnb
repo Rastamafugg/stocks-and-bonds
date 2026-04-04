@@ -1,9 +1,6 @@
+delete -x moduleLogger
 basic09 #40k
-load /d1/snb.b09
+load /d1/moduleLogger.b09
 pack*
-y
 kill*
-load /d1/snbBuy.b09
-pack*
-y
 bye
