@@ -1,32 +1,34 @@
 PROCEDURE snbBuyAI
 (* ============================================================ *)
 (* PROCEDURE : snbBuyAI                                         *)
-(* PURPOSE   : AI buy-phase child process. Loads SNBSTATE,     *)
-(*             runs the buy phase for the current saved-turn   *)
-(*             AI player only, then writes the next checkpoint *)
-(*             and gameStage back to SNBSTATE.                 *)
-(* PARAMS    : None (child process; no PARAM handoff)          *)
-(* SIDE EFX  : Reads and writes SNBSTATE. Modifies player      *)
-(*             cash, margin, holdings, hadCashPur, and         *)
-(*             hdr.gameStage.                                  *)
-(* NOTE      : snbPhaseCore, snbStateIO, snbTradeShared,      *)
-(*             and snbBuyAI must be pre-loaded by the         *)
-(*             coordinator before fork.                       *)
+(* PURPOSE   : Run the single-player AI buy phase and return    *)
+(*             the next checkpoint for the coordinator to       *)
+(*             persist.                                         *)
+(* PARAMS    : currYear     - current game year                 *)
+(*             mgnRuleVal   - staged header margin-rule value   *)
+(*             plyrIdx      - active player index               *)
+(*             plyrCnt      - configured player count           *)
+(*             plyr         - active player record              *)
+(*             mkt          - current market state              *)
+(*             action       - OUT 1=continue 2=save+exit 3=quit *)
+(*             savePhaseVal - OUT next checkpoint phase         *)
+(*             savePlyrVal  - OUT next checkpoint player        *)
+(* SIDE EFX  : Modifies plyr cash, margin, holdings,            *)
+(*             hadCashPur, and obligation in memory only.       *)
 (* ============================================================ *)
-TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 TYPE AIProfile = tier,concenCap,spltSlPct,distSlPrc,mgnMaxExpo,mgnBuffer,mgnResvPct,repayFrac,mgnClrYear,endgameYr,spltSlPcE,repayFrcE:BYTE;bondIdlCsh,bndIdlCsE:INTEGER;zeroDivEl,useYldScr,useMargin,bondPriory:BOOLEAN
-DIM hdr        : SaveHdr
-DIM deckOrd(36): BYTE
-DIM plyrs(6)   : PlyrRec
-DIM mkt        : MktState
+PARAM currYear     : INTEGER
+PARAM mgnRuleVal   : INTEGER
+PARAM plyrIdx      : INTEGER
+PARAM plyrCnt      : INTEGER
+PARAM plyr         : PlyrRec
+PARAM mkt          : MktState
+PARAM action       : INTEGER
+PARAM savePhaseVal : INTEGER
+PARAM savePlyrVal  : INTEGER
 DIM prof       : AIProfile
-DIM loadOK     : BOOLEAN
-DIM iCYr       : INTEGER
-DIM iMaxYr     : INTEGER
-DIM iPCnt      : INTEGER
-DIM activePlrs : INTEGER
 DIM buyStkCsh(9): INTEGER
 DIM buyStkMgn(9): INTEGER
 DIM buyBndQty(3): INTEGER
@@ -42,83 +44,63 @@ DIM bPar(3)    : INTEGER
 DIM tInt       : INTEGER
 DIM aiTierVal  : INTEGER
 DIM pTypeVal   : INTEGER
-DIM savePhaseVal : INTEGER
-DIM savePlyrVal  : INTEGER
 DIM s          : INTEGER
 DIM b          : INTEGER
 DIM qty        : INTEGER
 DIM cost       : INTEGER
 DIM cashPay    : INTEGER
 DIM mgnPay     : INTEGER
-DIM p          : INTEGER
-DIM nextP      : INTEGER
 
 ON ERROR GOTO 900
 
-RUN loadGame("SNBSTATE", hdr, deckOrd, plyrs, mkt, loadOK)
-IF NOT loadOK THEN
-  PRINT "snbBuyAI: loadGame failed"
-  END
-ENDIF
-
-iCYr   := hdr.currYear
-iMaxYr := hdr.maxYears
-iPCnt  := hdr.plyrCount
 RUN initBondPar(bPar)
-p := 1
-IF hdr.savedPhase = 2 THEN
-  p := hdr.savedPlyr
-ENDIF
-IF p < 1 OR p > iPCnt THEN
-  PRINT "snbBuyAI: invalid savedPlyr"
-  END
-ENDIF
+action       := 1
+savePhaseVal := 2
+savePlyrVal  := plyrIdx
 
-RUN findNextActivePlyr(plyrs, iPCnt, p, nextP)
-
-IF NOT plyrs(p).isBankrupt THEN
-  pTypeVal  := plyrs(p).plyrType
-  aiTierVal := plyrs(p).aiTier
-  RUN fmtPlyrName(plyrs(p).plyrName, pTypeVal, aiTierVal, pNam)
+IF NOT plyr.isBankrupt THEN
+  pTypeVal  := plyr.plyrType
+  aiTierVal := plyr.aiTier
+  RUN fmtPlyrName(plyr.plyrName, pTypeVal, aiTierVal, pNam)
   mgnRpy := 0
 
-  aiTierVal := plyrs(p).aiTier
+  aiTierVal := plyr.aiTier
   IF aiTierVal < 1 OR aiTierVal > 3 THEN
     aiTierVal := 2
-    plyrs(p).aiTier := 2
+    plyr.aiTier := 2
   ENDIF
   tInt := aiTierVal
   RUN initAIProf(tInt, prof)
-  IF hdr.mgnRule = 0 THEN
+  IF mgnRuleVal = 0 THEN
     prof.useMargin := FALSE
   ENDIF
-  RUN aiBuy(iCYr, plyrs(p), mkt, prof, buyStkCsh, buyStkMgn, buyBndQty, mgnRpy)
+  RUN aiBuy(currYear, plyr, mkt, prof, buyStkCsh, buyStkMgn, buyBndQty, mgnRpy)
   FOR s := 1 TO 9
     qty := buyStkCsh(s)
     IF qty > 0 THEN
       cost := qty * mkt.stckPrice(s)
-      plyrs(p).cashBal    := plyrs(p).cashBal - cost
-      plyrs(p).hadCashPur := TRUE
-      plyrs(p).stckShrs(s) := plyrs(p).stckShrs(s) + qty
+      plyr.cashBal    := plyr.cashBal - cost
+      plyr.hadCashPur := TRUE
+      plyr.stckShrs(s) := plyr.stckShrs(s) + qty
     ENDIF
     qty := buyStkMgn(s)
     IF qty > 0 THEN
       cost := qty * mkt.stckPrice(s)
       cashPay := cost / 2
       mgnPay  := cost - cashPay
-      plyrs(p).cashBal    := plyrs(p).cashBal - cashPay
-      plyrs(p).mgnBal(s)  := plyrs(p).mgnBal(s) + mgnPay
-      plyrs(p).stckShrs(s) := plyrs(p).stckShrs(s) + qty
+      plyr.cashBal    := plyr.cashBal - cashPay
+      plyr.mgnBal(s)  := plyr.mgnBal(s) + mgnPay
+      plyr.stckShrs(s) := plyr.stckShrs(s) + qty
     ENDIF
   NEXT s
   FOR b := 1 TO 3
     qty := buyBndQty(b)
     IF qty > 0 THEN
-      plyrs(p).cashBal := plyrs(p).cashBal - (qty * bPar(b))
-      plyrs(p).bondUnts(b) := plyrs(p).bondUnts(b) + qty
+      plyr.cashBal := plyr.cashBal - (qty * bPar(b))
+      plyr.bondUnts(b) := plyr.bondUnts(b) + qty
     ENDIF
   NEXT b
-  plyrs(p).obligation := mgnRpy
+  plyr.obligation := mgnRpy
 
   decCnt := 0
   FOR s := 1 TO 9
@@ -157,40 +139,30 @@ IF NOT plyrs(p).isBankrupt THEN
   navAct := 1
   RUN scrAIBuyTurn(pNam, decAct, decTyp, decId, decQty, decCnt, navAct)
   IF navAct = 2 THEN
-    savePhaseVal := 0
-    savePlyrVal  := 1
-    IF nextP > 0 THEN
+    action := 2
+    IF plyrIdx < plyrCnt THEN
       savePhaseVal := 2
-      savePlyrVal  := nextP
+      savePlyrVal  := plyrIdx + 1
     ELSE
-      hdr.savedPhase := 5
-      hdr.savedPlyr  := 1
-      hdr.gameStage := 2
+      savePhaseVal := 5
+      savePlyrVal  := 1
     ENDIF
-    RUN saveQuitToMenu(savePhaseVal, savePlyrVal, hdr, deckOrd, plyrs, mkt)
     END
   ELSE IF navAct = 3 THEN
-    RUN quitToMenu(hdr, deckOrd, plyrs, mkt)
+    action := 3
     END
   ENDIF \ENDIF
 ENDIF
 
-IF nextP > 0 THEN
-  hdr.savedPhase := 2
-  hdr.savedPlyr  := nextP
-ELSE
-  hdr.savedPhase := 5
-  hdr.savedPlyr  := 1
-ENDIF
-
-activePlrs := 0
-FOR p := 1 TO iPCnt
-  IF NOT plyrs(p).isBankrupt THEN
-    activePlrs := activePlrs + 1
+IF action = 1 THEN
+  IF plyrIdx < plyrCnt THEN
+    savePhaseVal := 2
+    savePlyrVal  := plyrIdx + 1
+  ELSE
+    savePhaseVal := 5
+    savePlyrVal  := 1
   ENDIF
-NEXT p
-hdr.gameStage := 2
-RUN saveGame("SNBSTATE", hdr, deckOrd, plyrs, mkt)
+ENDIF
 END
 
 900 PRINT "snbBuyAI error ("; ERR; ")"

@@ -1,34 +1,35 @@
 PROCEDURE snbMgnInt
 (* ============================================================ *)
 (* PROCEDURE : snbMgnInt                                        *)
-(* PURPOSE   : Margin-interest phase child. Loads the save     *)
-(*             header and market once, then processes one      *)
-(*             player record at a time for annual margin       *)
-(*             interest and any resulting forced liquidation.  *)
-(*             Supports resumable snapshots during the         *)
-(*             margin-interest loop.                           *)
-(*             Always writes gameStage=GS_YEAR (2).            *)
-(* PARAMS    : None (child process; no PARAM handoff)          *)
-(* SIDE EFX  : Reads and writes SNBSTATE. Modifies one saved   *)
-(*             player record at a time.                        *)
-(* NOTE      : snbStateIO, snbTradeShared, snbTradeHumanUI,    *)
-(*             snbSellForceUI, snbSellAIUtil, and snbMgnInt    *)
-(*             must be pre-loaded by coordinator.              *)
+(* PURPOSE   : Run margin interest and any resulting forced     *)
+(*             liquidation for one passed-in player record,     *)
+(*             then return the next checkpoint for the          *)
+(*             coordinator to persist.                          *)
+(* PARAMS    : currYear     - current game year                 *)
+(*             maxYears     - configured final year             *)
+(*             mgnRuleVal   - staged header margin-rule value   *)
+(*             plyrIdx      - active player index               *)
+(*             plyrCnt      - configured player count           *)
+(*             plyr         - active player record              *)
+(*             mkt          - current market state              *)
+(*             action       - OUT 1=continue 2=save+exit 3=quit *)
+(*             savePhaseVal - OUT next checkpoint phase         *)
+(*             savePlyrVal  - OUT next checkpoint player        *)
+(* SIDE EFX  : Modifies plyr in memory only.                    *)
 (* ============================================================ *)
-! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
-DIM hdr          : SaveHdr
-DIM plyr         : PlyrRec
-DIM mkt          : MktState
-DIM loadOK       : BOOLEAN
-DIM saveOK       : BOOLEAN
-DIM iCYr         : INTEGER
-DIM iMaxYr       : INTEGER
-DIM iPCnt        : INTEGER
-DIM startMgnP    : INTEGER
+PARAM currYear     : INTEGER
+PARAM maxYears     : INTEGER
+PARAM mgnRuleVal   : INTEGER
+PARAM plyrIdx      : INTEGER
+PARAM plyrCnt      : INTEGER
+PARAM plyr         : PlyrRec
+PARAM mkt          : MktState
+PARAM action       : INTEGER
+PARAM savePhaseVal : INTEGER
+PARAM savePlyrVal  : INTEGER
 DIM mgnChg       : INTEGER
 DIM totalMgn     : INTEGER
 DIM cashNow      : INTEGER
@@ -37,8 +38,6 @@ DIM mgnAct       : INTEGER
 DIM liqAct       : BYTE
 DIM isNegCash    : BOOLEAN
 DIM resumeLiq    : BOOLEAN
-DIM savePhaseVal : INTEGER
-DIM savePlyrVal  : INTEGER
 DIM liqSellStk(9): INTEGER
 DIM liqSellBnd(3): INTEGER
 DIM liqHasSell   : BOOLEAN
@@ -46,195 +45,129 @@ DIM liqOrdTyp(12): INTEGER
 DIM liqOrdId(12) : INTEGER
 DIM liqOrdQty(12): INTEGER
 DIM liqOrdCnt    : INTEGER
-DIM p            : INTEGER
 DIM s            : INTEGER
 DIM b            : INTEGER
 
 ON ERROR GOTO 900
 
-RUN loadHdrMkt("SNBSTATE", hdr, mkt, loadOK)
-IF NOT loadOK THEN
-  PRINT "snbMgnInt: loadHdrMkt failed"
+action       := 1
+savePhaseVal := 6
+savePlyrVal  := plyrIdx
+
+IF currYear <= 1 OR currYear >= maxYears OR mgnRuleVal <> 1 THEN
+  savePhaseVal := 0
+  savePlyrVal  := 1
   END
 ENDIF
 
-IF hdr.savedPhase = 6 THEN
-  iCYr := hdr.currYear
-  startMgnP := hdr.savedPlyr
-ELSE
-  PRINT "snbMgnInt: invalid savedPhase"
-  END
-ENDIF
-
-iMaxYr := hdr.maxYears
-iPCnt  := hdr.plyrCount
-
-IF startMgnP < 1 OR startMgnP > iPCnt THEN
-  PRINT "snbMgnInt: invalid savedPlyr"
-  END
-ENDIF
-
-IF iCYr <= 1 OR iCYr >= iMaxYr OR hdr.mgnRule <> 1 THEN
-  hdr.savedPhase := 0
-  hdr.savedPlyr  := 1
-  hdr.gameStage  := 2
-  RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
-  IF NOT saveOK THEN
-    PRINT "snbMgnInt: saveHdrOnly failed"
-  ENDIF
-  END
-ENDIF
-
-FOR p := startMgnP TO iPCnt
-  RUN loadPlyrRec("SNBSTATE", hdr, p, plyr, loadOK)
-  IF NOT loadOK THEN
-    PRINT "snbMgnInt: loadPlyrRec failed"
-    END
-  ENDIF
-  IF NOT plyr.isBankrupt THEN
-    resumeLiq := FALSE
-    IF p = startMgnP AND plyr.obligation > 0 THEN
-      oblgRem := plyr.obligation
-      resumeLiq := TRUE
-    ELSE
-      RUN calcMgnTot(plyr, totalMgn)
-      IF totalMgn > 0 THEN
-        mgnChg  := totalMgn / 20
-        cashNow := plyr.cashBal
-        plyr.cashBal := cashNow - mgnChg
-        isNegCash := FALSE
-        IF plyr.cashBal < 0 THEN
-          isNegCash := TRUE
-        ENDIF
-        mgnAct := 1
-        ! Line exceeds 79 chars; RUN statement cannot be split.
-        RUN scrMgnInt(iCYr, plyr.plyrName, totalMgn, mgnChg, cashNow, plyr.cashBal, isNegCash, mgnAct)
+IF NOT plyr.isBankrupt THEN
+  resumeLiq := FALSE
+  IF plyr.obligation > 0 THEN
+    oblgRem := plyr.obligation
+    resumeLiq := TRUE
+  ELSE
+    RUN calcMgnTot(plyr, totalMgn)
+    IF totalMgn > 0 THEN
+      mgnChg  := totalMgn / 20
+      cashNow := plyr.cashBal
+      plyr.cashBal := cashNow - mgnChg
+      isNegCash := FALSE
+      IF plyr.cashBal < 0 THEN
+        isNegCash := TRUE
+      ENDIF
+      mgnAct := 1
+      ! Line exceeds 79 chars; RUN statement cannot be split.
+      RUN scrMgnInt(currYear, plyr.plyrName, totalMgn, mgnChg, cashNow, plyr.cashBal, isNegCash, mgnAct)
+      IF isNegCash THEN
+        oblgRem := 0 - plyr.cashBal
+        plyr.obligation := oblgRem
+      ELSE
+        plyr.obligation := 0
+      ENDIF
+      IF mgnAct = 2 THEN
+        action := 2
         IF isNegCash THEN
-          oblgRem := 0 - plyr.cashBal
-          plyr.obligation := oblgRem
+          savePhaseVal := 6
+          savePlyrVal  := plyrIdx
+        ELSE IF plyrIdx < plyrCnt THEN
+          savePhaseVal := 6
+          savePlyrVal  := plyrIdx + 1
         ELSE
-          plyr.obligation := 0
-        ENDIF
-        RUN savePlyrRec("SNBSTATE", hdr, p, plyr, saveOK)
-        IF NOT saveOK THEN
-          PRINT "snbMgnInt: savePlyrRec failed"
-          END
-        ENDIF
-        IF mgnAct = 2 THEN
-          IF isNegCash THEN
-            savePhaseVal := 6
-            savePlyrVal := p
-          ELSE IF p < iPCnt THEN
-            savePhaseVal := 6
-            savePlyrVal := p + 1
-          ELSE
-            savePhaseVal := 7
-            savePlyrVal := 1
-          ENDIF \ENDIF
-          hdr.savedPhase := savePhaseVal
-          hdr.savedPlyr  := savePlyrVal
-          hdr.gameStage  := 2
-          RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
-          IF NOT saveOK THEN
-            PRINT "snbMgnInt: saveHdrOnly failed"
-            END
-          ENDIF
-          RUN copySaveFile("SNBSTATE", "SNBGAME", saveOK)
-          IF NOT saveOK THEN
-            PRINT "snbMgnInt: copySaveFile failed"
-            END
-          ENDIF
-          hdr.savedPhase := 9
-          hdr.savedPlyr  := 0
-          hdr.gameStage  := 2
-          RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
-          IF NOT saveOK THEN
-            PRINT "snbMgnInt: saveHdrOnly failed"
-          ENDIF
-          END
-        ELSE IF mgnAct = 3 THEN
-          hdr.savedPhase := 9
-          hdr.savedPlyr  := 0
-          hdr.gameStage  := 2
-          RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
-          IF NOT saveOK THEN
-            PRINT "snbMgnInt: saveHdrOnly failed"
-          ENDIF
-          END
+          savePhaseVal := 7
+          savePlyrVal  := 1
         ENDIF \ENDIF
-        IF isNegCash THEN
-          resumeLiq := TRUE
-        ENDIF
+        END
+      ELSE IF mgnAct = 3 THEN
+        action := 3
+        END
+      ENDIF \ENDIF
+      IF isNegCash THEN
+        resumeLiq := TRUE
       ENDIF
     ENDIF
-    IF resumeLiq THEN
-      IF plyr.plyrType = 1 THEN
+  ENDIF
+  IF resumeLiq THEN
+    IF plyr.plyrType = 1 THEN
+      FOR s := 1 TO 9
+        liqSellStk(s) := 0
+      NEXT s
+      FOR b := 1 TO 3
+        liqSellBnd(b) := 0
+      NEXT b
+      LOOP
+        plyr.obligation := oblgRem
+        liqAct := 1
+        ! Line exceeds 79 chars; RUN statement cannot be split.
+        RUN scrForceLiq(plyr.plyrName, oblgRem, plyr, mkt, liqSellStk, liqSellBnd, liqAct)
+        liqHasSell := FALSE
         FOR s := 1 TO 9
-          liqSellStk(s) := 0
+          IF liqSellStk(s) > 0 THEN
+            liqHasSell := TRUE
+          ENDIF
         NEXT s
         FOR b := 1 TO 3
-          liqSellBnd(b) := 0
+          IF liqSellBnd(b) > 0 THEN
+            liqHasSell := TRUE
+          ENDIF
         NEXT b
-        LOOP
-          plyr.obligation := oblgRem
-          liqAct := 1
-          ! Line exceeds 79 chars; RUN statement cannot be split.
-          RUN scrForceLiq(plyr.plyrName, oblgRem, plyr, mkt, liqSellStk, liqSellBnd, liqAct)
-          liqHasSell := FALSE
-          FOR s := 1 TO 9
-            IF liqSellStk(s) > 0 THEN
-              liqHasSell := TRUE
-            ENDIF
-          NEXT s
-          FOR b := 1 TO 3
-            IF liqSellBnd(b) > 0 THEN
-              liqHasSell := TRUE
-            ENDIF
-          NEXT b
-          IF liqAct = 2 OR NOT liqHasSell THEN
-            RUN scrBankrupt(plyr, plyr.cashBal, 1, iCYr)
-            plyr.obligation := 0
-            EXITIF TRUE THEN
-            ENDEXIT
-          ENDIF
-          RUN applyLiqPlan(plyr, mkt, liqSellStk, liqSellBnd, oblgRem)
-          plyr.obligation := oblgRem
-          EXITIF oblgRem <= 0 THEN
+        IF liqAct = 2 OR NOT liqHasSell THEN
+          RUN scrBankrupt(plyr, plyr.cashBal, 1, currYear)
+          plyr.obligation := 0
+          EXITIF TRUE THEN
           ENDEXIT
-        ENDLOOP
-      ELSE
-        LOOP
-          plyr.obligation := oblgRem
-          ! Line exceeds 79 chars; RUN statement cannot be split.
-          RUN aiLiqOrdr(plyr, mkt, oblgRem, liqOrdTyp, liqOrdId, liqOrdQty, liqOrdCnt)
-          IF liqOrdCnt = 0 THEN
-            RUN scrBankrupt(plyr, plyr.cashBal, 1, iCYr)
-            plyr.obligation := 0
-            EXITIF TRUE THEN
-            ENDEXIT
-          ENDIF
-          RUN applyLiqOrdr(plyr, mkt, liqOrdTyp, liqOrdId, liqOrdQty, liqOrdCnt, oblgRem)
-          plyr.obligation := oblgRem
-          EXITIF oblgRem <= 0 THEN
+        ENDIF
+        RUN applyLiqPlan(plyr, mkt, liqSellStk, liqSellBnd, oblgRem)
+        plyr.obligation := oblgRem
+        EXITIF oblgRem <= 0 THEN
+        ENDEXIT
+      ENDLOOP
+    ELSE
+      LOOP
+        plyr.obligation := oblgRem
+        ! Line exceeds 79 chars; RUN statement cannot be split.
+        RUN aiLiqOrdr(plyr, mkt, oblgRem, liqOrdTyp, liqOrdId, liqOrdQty, liqOrdCnt)
+        IF liqOrdCnt = 0 THEN
+          RUN scrBankrupt(plyr, plyr.cashBal, 1, currYear)
+          plyr.obligation := 0
+          EXITIF TRUE THEN
           ENDEXIT
-        ENDLOOP
-      ENDIF
-      plyr.obligation := 0
-      RUN savePlyrRec("SNBSTATE", hdr, p, plyr, saveOK)
-      IF NOT saveOK THEN
-        PRINT "snbMgnInt: savePlyrRec failed"
-        END
-      ENDIF
+        ENDIF
+        RUN applyLiqOrdr(plyr, mkt, liqOrdTyp, liqOrdId, liqOrdQty, liqOrdCnt, oblgRem)
+        plyr.obligation := oblgRem
+        EXITIF oblgRem <= 0 THEN
+        ENDEXIT
+      ENDLOOP
     ENDIF
+    plyr.obligation := 0
   ENDIF
-NEXT p
+ENDIF
 
-hdr.savedPhase := 0
-hdr.savedPlyr  := 1
-hdr.gameStage  := 2
-RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
-IF NOT saveOK THEN
-  PRINT "snbMgnInt: saveHdrOnly failed"
+IF plyrIdx < plyrCnt THEN
+  savePhaseVal := 6
+  savePlyrVal  := plyrIdx + 1
+ELSE
+  savePhaseVal := 7
+  savePlyrVal  := 1
 ENDIF
 END
 

@@ -1,161 +1,57 @@
 PROCEDURE snbBuy
 (* ============================================================ *)
 (* PROCEDURE : snbBuy                                           *)
-(* PURPOSE   : Human buy-phase child process. Loads SNBSTATE    *)
-(*             header and market state once, then processes     *)
-(*             consecutive human players by loading and saving  *)
-(*             one player record at a time. Exits when the next *)
-(*             active player is AI or when margin-pay begins.   *)
-(* PARAMS    : None (child process; no PARAM handoff)           *)
-(* SIDE EFX  : Reads and writes SNBSTATE. Copies SNBSTATE to    *)
-(*             SNBGAME on save.                                 *)
-(* NOTE      : snbStateIO, snbTradeShared, snbScreenUtil,      *)
-(*             snbTradeHumanUI, and snbBuy must be pre-loaded  *)
-(*             by the coordinator before fork.                 *)
+(* PURPOSE   : Run the single-player human buy phase and        *)
+(*             return the next checkpoint for the coordinator   *)
+(*             to persist.                                      *)
+(* PARAMS    : currYear     - current game year                 *)
+(*             maxYears     - configured final year             *)
+(*             mgnRuleVal   - staged header margin-rule value   *)
+(*             plyrIdx      - active player index               *)
+(*             plyrCnt      - configured player count           *)
+(*             plyr         - active player record              *)
+(*             mkt          - current market state              *)
+(*             action       - OUT 1=continue 2=save+exit 3=quit *)
+(*             savePhaseVal - OUT next checkpoint phase         *)
+(*             savePlyrVal  - OUT next checkpoint player        *)
+(* SIDE EFX  : Modifies plyr in memory only.                    *)
 (* ============================================================ *)
-TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
-DIM hdr      : SaveHdr
-DIM plyr     : PlyrRec
-DIM mkt      : MktState
-DIM loadOK   : BOOLEAN
-DIM saveOK   : BOOLEAN
-DIM iCYr     : INTEGER
-DIM iMaxYr   : INTEGER
-DIM iPCnt    : INTEGER
-DIM mgnRuleVal : INTEGER
-DIM p        : INTEGER
-DIM nextP    : INTEGER
-DIM scanP    : INTEGER
-DIM usrAct   : INTEGER
+PARAM currYear     : INTEGER
+PARAM maxYears     : INTEGER
+PARAM mgnRuleVal   : INTEGER
+PARAM plyrIdx      : INTEGER
+PARAM plyrCnt      : INTEGER
+PARAM plyr         : PlyrRec
+PARAM mkt          : MktState
+PARAM action       : INTEGER
+PARAM savePhaseVal : INTEGER
+PARAM savePlyrVal  : INTEGER
+DIM usrAct         : INTEGER
 
 ON ERROR GOTO 900
 
-RUN loadHdrMkt("SNBSTATE", hdr, mkt, loadOK)
-IF NOT loadOK THEN
-  PRINT "snbBuy: loadHdrMkt failed"
-  END
+action       := 1
+savePhaseVal := 2
+savePlyrVal  := plyrIdx
+
+usrAct := 1
+IF NOT plyr.isBankrupt THEN
+  RUN runBuyPlyr(currYear, maxYears, mgnRuleVal, plyr, mkt, usrAct)
 ENDIF
 
-iCYr   := hdr.currYear
-iMaxYr := hdr.maxYears
-iPCnt  := hdr.plyrCount
-mgnRuleVal := hdr.mgnRule
-p := 1
-IF hdr.savedPhase = 2 THEN
-  p := hdr.savedPlyr
-ENDIF
-IF p < 1 OR p > iPCnt THEN
-  PRINT "snbBuy: invalid savedPlyr"
-  END
-ENDIF
-
-LOOP
-
-  EXITIF p < 1 OR p > iPCnt THEN
-  ENDEXIT
-
-  RUN loadPlyrRec("SNBSTATE", hdr, p, plyr, loadOK)
-  IF NOT loadOK THEN
-    PRINT "snbBuy: loadPlyrRec failed"
-    END
-  ENDIF
-
-  IF plyr.plyrType = 2 THEN
-    hdr.savedPhase := 2
-    hdr.savedPlyr  := p
-    hdr.gameStage  := 2
-    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
-    IF NOT saveOK THEN
-      PRINT "snbBuy: saveHdrOnly failed"
-    ENDIF
-    END
-  ENDIF
-
-  usrAct := 1
-  IF NOT plyr.isBankrupt THEN
-    RUN runBuyPlyr(iCYr, iMaxYr, mgnRuleVal, plyr, mkt, usrAct)
-  ENDIF
-
-  RUN savePlyrRec("SNBSTATE", hdr, p, plyr, saveOK)
-  IF NOT saveOK THEN
-    PRINT "snbBuy: savePlyrRec failed"
-    END
-  ENDIF
-
-  IF usrAct = 3 THEN
-    hdr.savedPhase := 2
-    hdr.savedPlyr  := p
-    hdr.gameStage  := 2
-    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
-    IF NOT saveOK THEN
-      PRINT "snbBuy: saveHdrOnly failed"
-      END
-    ENDIF
-    RUN copySaveFile("SNBSTATE", "SNBGAME", saveOK)
-    IF NOT saveOK THEN
-      PRINT "snbBuy: copySaveFile failed"
-      END
-    ENDIF
-    hdr.savedPhase := 9
-    hdr.savedPlyr  := 0
-    hdr.gameStage  := 2
-    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
-    IF NOT saveOK THEN
-      PRINT "snbBuy: saveHdrOnly failed"
-    ENDIF
-    END
-  ELSE IF usrAct = 4 THEN
-    hdr.savedPhase := 9
-    hdr.savedPlyr  := 0
-    hdr.gameStage  := 2
-    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
-    IF NOT saveOK THEN
-      PRINT "snbBuy: saveHdrOnly failed"
-    ENDIF
-    END
-  ENDIF \ENDIF
-
-  nextP := 0
-  FOR scanP := p + 1 TO iPCnt
-    IF nextP = 0 THEN
-      RUN loadPlyrRec("SNBSTATE", hdr, scanP, plyr, loadOK)
-      IF NOT loadOK THEN
-        PRINT "snbBuy: loadPlyrRec failed"
-        END
-      ENDIF
-      IF NOT plyr.isBankrupt THEN
-        nextP := scanP
-      ENDIF
-    ENDIF
-  NEXT scanP
-
-  IF nextP = 0 THEN
-    hdr.savedPhase := 5
-    hdr.savedPlyr  := 1
-    hdr.gameStage  := 2
-    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
-    IF NOT saveOK THEN
-      PRINT "snbBuy: saveHdrOnly failed"
-    ENDIF
-    END
-  ENDIF
-
-  IF plyr.plyrType = 2 THEN
-    hdr.savedPhase := 2
-    hdr.savedPlyr  := nextP
-    hdr.gameStage  := 2
-    RUN saveHdrOnly("SNBSTATE", hdr, saveOK)
-    IF NOT saveOK THEN
-      PRINT "snbBuy: saveHdrOnly failed"
-    ENDIF
-    END
-  ENDIF
-
-  p := nextP
-
-ENDLOOP
+IF usrAct = 3 THEN
+  action := 2
+ELSE IF usrAct = 4 THEN
+  action := 3
+ELSE IF plyrIdx < plyrCnt THEN
+  savePhaseVal := 2
+  savePlyrVal  := plyrIdx + 1
+ELSE
+  savePhaseVal := 5
+  savePlyrVal  := 1
+ENDIF \ENDIF \ENDIF
 
 END
 
