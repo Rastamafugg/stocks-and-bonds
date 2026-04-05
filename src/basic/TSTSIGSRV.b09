@@ -1,7 +1,7 @@
 PROCEDURE TSTSIGSRV
 (* ============================================================ *)
-(* PROCEDURE : TSTSIGSRV                                        *)
-(* PURPOSE   : Child process for TSTSIGIPC. Waits for wake      *)
+(* PROCEDURE : TSTSIGSRV                                       *)
+(* PURPOSE   : Child process for TSTSIGIPC. Waits for wake     *)
 (*             signals, reads a shared state file, and performs *)
 (*             module load/unlink requests in the child         *)
 (*             process only.                                    *)
@@ -21,10 +21,9 @@ DIM iErrCode   : INTEGER
 
 ON ERROR GOTO 900
 
-logVerbose := TRUE
-
-lastReq   := 0
-targetHdr := 0
+logVerbose := FALSE
+lastReq    := 0
+targetHdr  := 0
 
 RUN srvGetProcID(iChildPID, pidOK)
 IF NOT pidOK THEN
@@ -82,7 +81,7 @@ LOOP
       PRINT "TSTSIGSRV: wake reqSeq "; state.reqSeq
     ENDIF
   ELSE
-    lastReq := state.reqSeq
+    lastReq  := state.reqSeq
     statCode := 255
     iErrCode := 0
     IF logVerbose THEN
@@ -147,8 +146,8 @@ END
 
 PROCEDURE srvReadState
 (* ============================================================ *)
-(* PROCEDURE : srvReadState                                     *)
-(* PURPOSE   : Read the shared TSTSIGST state record.           *)
+(* PROCEDURE : srvReadState                                    *)
+(* PURPOSE   : Read the shared TSTSIGS state record.           *)
 (* ============================================================ *)
 TYPE SigState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,statusCode,errCode:BYTE
 PARAM state : SigState
@@ -161,7 +160,7 @@ ON ERROR GOTO 900
 pathOpen := FALSE
 ok       := FALSE
 
-OPEN #path, "TSTSIGST":READ
+OPEN #path, "TSTSIGS":READ
 pathOpen := TRUE
 GET #path, state
 IF state.magic <> $53 THEN
@@ -183,8 +182,8 @@ END
 
 PROCEDURE srvWriteState
 (* ============================================================ *)
-(* PROCEDURE : srvWriteState                                    *)
-(* PURPOSE   : Rewrite the shared TSTSIGST state record.        *)
+(* PROCEDURE : srvWriteState                                   *)
+(* PURPOSE   : Rewrite the shared TSTSIGS state record.        *)
 (* ============================================================ *)
 TYPE SigState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,statusCode,errCode:BYTE
 PARAM state : SigState
@@ -197,7 +196,7 @@ ON ERROR GOTO 900
 pathOpen := FALSE
 ok       := FALSE
 
-OPEN #path, "TSTSIGST":UPDATE
+OPEN #path, "TSTSIGS":UPDATE
 pathOpen := TRUE
 PUT #path, state
 
@@ -215,7 +214,7 @@ END
 
 PROCEDURE srvGetProcID
 (* ============================================================ *)
-(* PROCEDURE : srvGetProcID                                     *)
+(* PROCEDURE : srvGetProcID                                    *)
 (* PURPOSE   : Return the current process ID via F$ID.          *)
 (* ============================================================ *)
 TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
@@ -246,7 +245,7 @@ END
 
 PROCEDURE srvSendWake
 (* ============================================================ *)
-(* PROCEDURE : srvSendWake                                      *)
+(* PROCEDURE : srvSendWake                                     *)
 (* PURPOSE   : Send the wake signal to another process.         *)
 (* ============================================================ *)
 TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
@@ -281,7 +280,7 @@ END
 
 PROCEDURE srvSleep
 (* ============================================================ *)
-(* PROCEDURE : srvSleep                                         *)
+(* PROCEDURE : srvSleep                                        *)
 (* PURPOSE   : Sleep briefly so a missed wake does not block    *)
 (*             the child forever. A later wake can still break  *)
 (*             the sleep early.                                 *)
@@ -316,8 +315,8 @@ END
 
 PROCEDURE srvLoadModule
 (* ============================================================ *)
-(* PROCEDURE : srvLoadModule                                    *)
-(* PURPOSE   : Link or load TSTSIGMOD in the child process and  *)
+(* PROCEDURE : srvLoadModule                                   *)
+(* PURPOSE   : Link or load TSTSIGMOD in the child process and *)
 (*             report which path succeeded.                     *)
 (* ============================================================ *)
 TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
@@ -329,6 +328,7 @@ PARAM errCode  : INTEGER
 DIM regs       : Register
 DIM callCode   : BYTE
 DIM iCC        : INTEGER
+DIM listOK     : BOOLEAN
 
 ON ERROR GOTO 900
 
@@ -338,6 +338,11 @@ statCode := 255
 PRINT "srvLoadModule: begin "; modName; " hdr "; hdrAddr
 
 IF hdrAddr <> 0 THEN
+  RUN srvWriteModuleList(hdrAddr, listOK)
+  IF NOT listOK THEN
+    PRINT "srvLoadModule: write list failed"
+    END
+  ENDIF
   ok       := TRUE
   statCode := 21
   PRINT "srvLoadModule: already linked"
@@ -351,6 +356,11 @@ RUN SysCall(callCode, regs)
 iCC := regs.cc
 IF LAND(iCC, 1) = 0 THEN
   hdrAddr  := regs.u
+  RUN srvWriteModuleList(hdrAddr, listOK)
+  IF NOT listOK THEN
+    PRINT "srvLoadModule: write list failed"
+    END
+  ENDIF
   ok       := TRUE
   statCode := 21
   PRINT "srvLoadModule: linked hdr "; hdrAddr
@@ -369,6 +379,11 @@ IF LAND(iCC, 1) <> 0 THEN
 ENDIF
 
 hdrAddr  := regs.u
+RUN srvWriteModuleList(hdrAddr, listOK)
+IF NOT listOK THEN
+  PRINT "srvLoadModule: write list failed"
+  END
+ENDIF
 ok       := TRUE
 statCode := 22
 PRINT "srvLoadModule: loaded hdr "; hdrAddr
@@ -380,10 +395,97 @@ END
     statCode := 255
 END
 
+PROCEDURE srvWriteModuleList
+(* ============================================================ *)
+(* PROCEDURE : srvWriteModuleList                              *)
+(* PURPOSE   : Walk the loaded merged module at hdrAddr and     *)
+(*             write each constituent module name to            *)
+(*             MODULELIST for parent-side unload tests.         *)
+(* ============================================================ *)
+PARAM hdrAddr : INTEGER
+PARAM ok      : BOOLEAN
+DIM path      : BYTE
+DIM pathOpen  : BOOLEAN
+DIM curAddr   : INTEGER
+DIM sync1     : INTEGER
+DIM sync2     : INTEGER
+DIM modSzHi   : INTEGER
+DIM modSzLo   : INTEGER
+DIM modSz     : INTEGER
+DIM nmOfsHi   : INTEGER
+DIM nmOfsLo   : INTEGER
+DIM nmOfs     : INTEGER
+DIM nmAddr    : INTEGER
+DIM nmChar    : INTEGER
+DIM nmIdx     : INTEGER
+DIM modCnt    : BYTE
+DIM modName   : STRING[20]
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+ok       := FALSE
+modCnt   := 0
+
+ON ERROR GOTO 100
+DELETE "MODULELIST"
+
+100 ON ERROR GOTO 900
+
+CREATE #path, "MODULELIST":UPDATE
+pathOpen := TRUE
+PUT #path, modCnt
+
+curAddr := hdrAddr
+LOOP
+  sync1 := PEEK(curAddr)
+  sync2 := PEEK(curAddr + 1)
+  EXITIF sync1 <> $87 OR sync2 <> $CD THEN
+  ENDEXIT
+  modSzHi := PEEK(curAddr + 2)
+  modSzLo := PEEK(curAddr + 3)
+  modSz   := modSzHi * 256 + modSzLo
+  EXITIF modSz <= 0 THEN
+  ENDEXIT
+  nmOfsHi := PEEK(curAddr + 4)
+  nmOfsLo := PEEK(curAddr + 5)
+  nmOfs   := nmOfsHi * 256 + nmOfsLo
+  nmAddr  := curAddr + nmOfs
+  modName := ""
+  nmIdx   := 0
+  LOOP
+    nmChar  := PEEK(nmAddr + nmIdx)
+    modName := modName + CHR$(LAND(nmChar, $7F))
+    nmIdx   := nmIdx + 1
+    EXITIF nmChar >= 128 OR nmIdx >= 20 THEN
+    ENDEXIT
+  ENDLOOP
+  modCnt := modCnt + 1
+  PRINT "srvWriteModuleList: wrote "; modName; " count "; modCnt
+  PUT #path, modName
+  curAddr := curAddr + modSz
+ENDLOOP
+
+SEEK #path, 0
+PUT #path, modCnt
+
+CLOSE #path
+pathOpen := FALSE
+PRINT "srvWriteModuleList: wrote "; modCnt; " names"
+ok := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "srvWriteModuleList error ("; ERR; ")"
+    ok := FALSE
+END
+
 PROCEDURE srvUnloadModule
 (* ============================================================ *)
-(* PROCEDURE : srvUnloadModule                                  *)
-(* PURPOSE   : Unlink TSTSIGMOD from the child process.         *)
+(* PROCEDURE : srvUnloadModule                                 *)
+(* PURPOSE   : Unlink TSTSIGMOD from the child process.        *)
 (* ============================================================ *)
 TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
 PARAM modName  : STRING[20]

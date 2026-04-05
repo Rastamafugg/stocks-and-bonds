@@ -30,7 +30,7 @@ ON ERROR GOTO 900
 
 PRINT "=== TSTSIGIPC ==="
 PRINT
-PRINT "Child loads TSTSIGMOD2."
+PRINT "Child loads TSTSIGMOD."
 PRINT "Parent calls A only."
 PRINT "Parent sends child unload request only."
 PRINT "Parent then runs mdir and probes A and B."
@@ -66,7 +66,7 @@ PRINT
 PRINT "Baseline direct probe A before child load:"
 RUN probeDirectA(callAOK, callAErr)
 IF callAOK THEN
-  PRINT "FAIL: tstSig2PingA already callable in parent"
+  PRINT "FAIL: tstSigPingA already callable in parent"
 ELSE
   PRINT "Observed direct-call A failure err = "; callAErr
 ENDIF
@@ -75,7 +75,7 @@ PRINT
 PRINT "Baseline direct probe B before child load:"
 RUN probeDirectB(callBOK, callBErr)
 IF callBOK THEN
-  PRINT "FAIL: tstSig2PingB already callable in parent"
+  PRINT "FAIL: tstSigPingB already callable in parent"
 ELSE
   PRINT "Observed direct-call B failure err = "; callBErr
 ENDIF
@@ -108,9 +108,9 @@ RUN pauseForKey
 PRINT "Direct probe A after child load:"
 RUN probeDirectA(callAOK, callAErr)
 IF callAOK THEN
-  PRINT "PASS: tstSig2PingA callable without local link"
+  PRINT "PASS: tstSigPingA callable without local link"
 ELSE
-  PRINT "FAIL: tstSig2PingA direct call err = "; callAErr
+  PRINT "FAIL: tstSigPingA direct call err = "; callAErr
 ENDIF
 PRINT
 
@@ -154,18 +154,18 @@ RUN pauseForKey
 PRINT "Repeat direct probe A after parent unload and child unload:"
 RUN probeDirectA(callAOK, callAErr)
 IF callAOK THEN
-  PRINT "PASS: tstSig2PingA still callable"
+  PRINT "PASS: tstSigPingA still callable"
 ELSE
-  PRINT "FAIL: tstSig2PingA after unloads err = "; callAErr
+  PRINT "FAIL: tstSigPingA after unloads err = "; callAErr
 ENDIF
 PRINT
 
 PRINT "First direct probe B after parent unload and child unload:"
 RUN probeDirectB(callBOK, callBErr)
 IF callBOK THEN
-  PRINT "PASS: tstSig2PingB still callable"
+  PRINT "PASS: tstSigPingB still callable"
 ELSE
-  PRINT "FAIL: tstSig2PingB after unloads err = "; callBErr
+  PRINT "FAIL: tstSigPingB after unloads err = "; callBErr
 ENDIF
 PRINT
 
@@ -203,8 +203,8 @@ END
 PROCEDURE initSigState
 (* ============================================================ *)
 (* PROCEDURE : initSigState                                    *)
-(* PURPOSE   : Create the shared TSTSIGS2 state file for        *)
-(*             TSTSIGSRV2 with parent PID and zeroed bytes.     *)
+(* PURPOSE   : Create the shared TSTSIGS state file for        *)
+(*             TSTSIGSRV with parent PID and zeroed bytes.     *)
 (* ============================================================ *)
 TYPE SigState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,statusCode,errCode:BYTE
 PARAM iParentPID : INTEGER
@@ -219,7 +219,7 @@ pathOpen := FALSE
 ok       := FALSE
 
 ON ERROR GOTO 100
-DELETE "TSTSIGS2"
+DELETE "TSTSIGS"
 
 100 ON ERROR GOTO 900
 
@@ -232,7 +232,7 @@ state.cmdCode    := 0
 state.statusCode := 0
 state.errCode    := 0
 
-CREATE #path, "TSTSIGS2":UPDATE
+CREATE #path, "TSTSIGS":UPDATE
 pathOpen := TRUE
 PUT #path, state
 
@@ -251,7 +251,7 @@ END
 PROCEDURE ipcReadState
 (* ============================================================ *)
 (* PROCEDURE : ipcReadState                                    *)
-(* PURPOSE   : Read the shared TSTSIGS2 state record.           *)
+(* PURPOSE   : Read the shared TSTSIGS state record.           *)
 (* ============================================================ *)
 TYPE SigState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,statusCode,errCode:BYTE
 PARAM state : SigState
@@ -264,7 +264,7 @@ ON ERROR GOTO 900
 pathOpen := FALSE
 ok       := FALSE
 
-OPEN #path, "TSTSIGS2":READ
+OPEN #path, "TSTSIGS":READ
 pathOpen := TRUE
 GET #path, state
 IF state.magic <> $53 THEN
@@ -287,7 +287,7 @@ END
 PROCEDURE ipcWriteState
 (* ============================================================ *)
 (* PROCEDURE : ipcWriteState                                   *)
-(* PURPOSE   : Rewrite the shared TSTSIGS2 state record.        *)
+(* PURPOSE   : Rewrite the shared TSTSIGS state record.        *)
 (* ============================================================ *)
 TYPE SigState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,statusCode,errCode:BYTE
 PARAM state : SigState
@@ -300,7 +300,7 @@ ON ERROR GOTO 900
 pathOpen := FALSE
 ok       := FALSE
 
-OPEN #path, "TSTSIGS2":UPDATE
+OPEN #path, "TSTSIGS":UPDATE
 pathOpen := TRUE
 PUT #path, state
 
@@ -350,7 +350,7 @@ END
 PROCEDURE forkSigChild
 (* ============================================================ *)
 (* PROCEDURE : forkSigChild                                    *)
-(* PURPOSE   : Fork the TSTSIGSRV2 child process.               *)
+(* PURPOSE   : Fork the TSTSIGSRV child process.               *)
 (* ============================================================ *)
 TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
 PARAM ok      : BOOLEAN
@@ -368,7 +368,7 @@ ON ERROR GOTO 900
 
 ok        := FALSE
 errCode   := 0
-childName := "TSTSIGSRV2"
+childName := "TSTSIGSRV"
 
 runbBuf(1) := ASC("R")
 runbBuf(2) := ASC("u")
@@ -520,7 +520,7 @@ PROCEDURE waitForReady
 (* ============================================================ *)
 (* PROCEDURE : waitForReady                                    *)
 (* PURPOSE   : Wait until the child publishes its PID and ready *)
-(*             status in TSTSIGS2.                              *)
+(*             status in TSTSIGS.                              *)
 (* ============================================================ *)
 TYPE SigState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,statusCode,errCode:BYTE
 PARAM state : SigState
@@ -563,7 +563,7 @@ END
 PROCEDURE probeDirectA
 (* ============================================================ *)
 (* PROCEDURE : probeDirectA                                    *)
-(* PURPOSE   : Attempt to RUN tstSig2PingA without local link.  *)
+(* PURPOSE   : Attempt to RUN tstSigPingA without local link.  *)
 (* ============================================================ *)
 PARAM ok      : BOOLEAN
 PARAM errCode : INTEGER
@@ -572,7 +572,7 @@ ON ERROR GOTO 900
 
 ok      := FALSE
 errCode := 0
-RUN tstSig2PingA(ok)
+RUN tstSigPingA(ok)
 END
 
 900 errCode := ERR
@@ -582,7 +582,7 @@ END
 PROCEDURE probeDirectB
 (* ============================================================ *)
 (* PROCEDURE : probeDirectB                                    *)
-(* PURPOSE   : Attempt to RUN tstSig2PingB without local link.  *)
+(* PURPOSE   : Attempt to RUN tstSigPingB without local link.  *)
 (* ============================================================ *)
 PARAM ok      : BOOLEAN
 PARAM errCode : INTEGER
@@ -591,7 +591,7 @@ ON ERROR GOTO 900
 
 ok      := FALSE
 errCode := 0
-RUN tstSig2PingB(ok)
+RUN tstSigPingB(ok)
 END
 
 900 errCode := ERR
@@ -601,7 +601,7 @@ END
 PROCEDURE linkLocalModule
 (* ============================================================ *)
 (* PROCEDURE : linkLocalModule                                 *)
-(* PURPOSE   : Probe parent visibility of TSTSIGMOD2 via        *)
+(* PURPOSE   : Probe parent visibility of TSTSIGMOD via        *)
 (*             F$Link.                                          *)
 (* ============================================================ *)
 TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
@@ -793,7 +793,7 @@ END
 PROCEDURE waitChildExit
 (* ============================================================ *)
 (* PROCEDURE : waitChildExit                                   *)
-(* PURPOSE   : Wait for the TSTSIGSRV2 child to exit.           *)
+(* PURPOSE   : Wait for the TSTSIGSRV child to exit.           *)
 (* ============================================================ *)
 TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
 PARAM exitStat : INTEGER

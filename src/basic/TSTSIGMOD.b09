@@ -1,18 +1,31 @@
 PROCEDURE TSTSIGMOD
 (* ============================================================ *)
-(* PROCEDURE : TSTSIGMOD                                        *)
-(* PURPOSE   : Module anchor for signal-load visibility probe.  *)
+(* PROCEDURE : TSTSIGMOD                                       *)
+(* PURPOSE   : Module anchor for post-unload direct-call probe. *)
 (* ============================================================ *)
 PRINT "TSTSIGMOD"
-PRINT "  tstSigPing"
+PRINT "  tstSigPingA"
+PRINT "  tstSigPingB"
 END
 
-PROCEDURE tstSigPing
+PROCEDURE tstSigPingA
 (* ============================================================ *)
-(* PROCEDURE : tstSigPing                                       *)
-(* PURPOSE   : Minimal callable procedure used by TSTSIGIPC to  *)
-(*             test whether a child-loaded module is directly   *)
-(*             callable in the parent without a local link.     *)
+(* PROCEDURE : tstSigPingA                                     *)
+(* PURPOSE   : First callable probe used before and after child *)
+(*             unload to test repeated direct-call behavior.    *)
+(* PARAMS    : ok - TRUE on successful call                     *)
+(* SIDE EFX  : None                                             *)
+(* ============================================================ *)
+PARAM ok : BOOLEAN
+
+ok := TRUE
+END
+
+PROCEDURE tstSigPingB
+(* ============================================================ *)
+(* PROCEDURE : tstSigPingB                                     *)
+(* PURPOSE   : Fresh callable probe used only after child       *)
+(*             unload to test new direct resolution behavior.   *)
 (* PARAMS    : ok - TRUE on successful call                     *)
 (* SIDE EFX  : None                                             *)
 (* ============================================================ *)

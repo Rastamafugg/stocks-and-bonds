@@ -418,7 +418,7 @@ DIM nmOfs     : INTEGER
 DIM nmAddr    : INTEGER
 DIM nmChar    : INTEGER
 DIM nmIdx     : INTEGER
-DIM modCnt    : INTEGER
+DIM modCnt    : BYTE
 DIM modName   : STRING[20]
 
 ON ERROR GOTO 900
