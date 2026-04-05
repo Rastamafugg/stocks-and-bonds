@@ -470,10 +470,12 @@ ON ERROR GOTO 900
 
 ok := FALSE
 FOR tries := 1 TO 20
+  PRINT "waitForResponse: poll "; tries; " want "; wantRsp
   RUN ipcReadState(state, ok)
   IF NOT ok THEN
     END
   ENDIF
+  PRINT "waitForResponse: got rsp "; state.rspSeq; " cmd "; state.cmdCode; " stat "; state.statusCode; " err "; state.errCode
   IF state.rspSeq = wantRsp THEN
     ok := TRUE
     END
@@ -510,10 +512,12 @@ ON ERROR GOTO 900
 
 ok := FALSE
 FOR tries := 1 TO 20
+  PRINT "waitForReady: poll "; tries
   RUN ipcReadState(state, ok)
   IF NOT ok THEN
     END
   ENDIF
+  PRINT "waitForReady: child "; state.childPid; " stat "; state.statusCode
   IF state.childPid <> 0 THEN
     IF state.statusCode = 10 THEN
       ok := TRUE

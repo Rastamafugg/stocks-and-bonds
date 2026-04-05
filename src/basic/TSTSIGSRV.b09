@@ -12,6 +12,7 @@ DIM ok         : BOOLEAN
 DIM sigOK      : BOOLEAN
 DIM pidOK      : BOOLEAN
 DIM fileOK     : BOOLEAN
+DIM logVerbose : BOOLEAN
 DIM iChildPID  : INTEGER
 DIM lastReq    : INTEGER
 DIM targetHdr  : INTEGER
@@ -19,6 +20,8 @@ DIM statCode   : INTEGER
 DIM iErrCode   : INTEGER
 
 ON ERROR GOTO 900
+
+logVerbose := TRUE
 
 lastReq   := 0
 targetHdr := 0
@@ -28,11 +31,17 @@ IF NOT pidOK THEN
   PRINT "TSTSIGSRV: srvGetProcID failed"
   END
 ENDIF
+IF logVerbose THEN
+  PRINT "TSTSIGSRV: start child PID "; iChildPID
+ENDIF
 
 RUN srvReadState(state, fileOK)
 IF NOT fileOK THEN
   PRINT "TSTSIGSRV: initial state read failed"
   END
+ENDIF
+IF logVerbose THEN
+  PRINT "TSTSIGSRV: parent PID "; state.parentPid
 ENDIF
 
 state.childPid   := iChildPID
@@ -49,6 +58,9 @@ IF NOT sigOK THEN
   PRINT "TSTSIGSRV: ready wake failed err "; iErrCode
   END
 ENDIF
+IF logVerbose THEN
+  PRINT "TSTSIGSRV: ready sent"
+ENDIF
 
 LOOP
   RUN srvReadState(state, fileOK)
@@ -58,15 +70,24 @@ LOOP
   ENDIF
 
   IF state.reqSeq = lastReq THEN
+    IF logVerbose THEN
+      PRINT "TSTSIGSRV: sleep reqSeq "; state.reqSeq
+    ENDIF
     RUN srvSleep(sigOK, iErrCode)
     IF NOT sigOK THEN
       PRINT "TSTSIGSRV: sleep failed err "; iErrCode
       END
     ENDIF
+    IF logVerbose THEN
+      PRINT "TSTSIGSRV: wake reqSeq "; state.reqSeq
+    ENDIF
   ELSE
     lastReq := state.reqSeq
     statCode := 255
     iErrCode := 0
+    IF logVerbose THEN
+      PRINT "TSTSIGSRV: req "; state.reqSeq; " cmd "; state.cmdCode
+    ENDIF
 
     IF state.cmdCode = 1 THEN
       RUN srvLoadModule("TSTSIGMOD", targetHdr, statCode, ok, iErrCode)
@@ -93,6 +114,9 @@ LOOP
     state.statusCode := statCode
     state.errCode    := iErrCode
     state.rspSeq     := state.reqSeq
+    IF logVerbose THEN
+      PRINT "TSTSIGSRV: rsp "; state.rspSeq; " stat "; statCode; " err "; iErrCode; " hdr "; targetHdr
+    ENDIF
     RUN srvWriteState(state, fileOK)
     IF NOT fileOK THEN
       PRINT "TSTSIGSRV: loop state write failed"
@@ -104,8 +128,14 @@ LOOP
       PRINT "TSTSIGSRV: response wake failed err "; iErrCode
       END
     ENDIF
+    IF logVerbose THEN
+      PRINT "TSTSIGSRV: response wake sent"
+    ENDIF
 
     IF state.cmdCode = 3 THEN
+      IF logVerbose THEN
+        PRINT "TSTSIGSRV: exit"
+      ENDIF
       END
     ENDIF
   ENDIF
@@ -303,10 +333,12 @@ ON ERROR GOTO 900
 ok       := FALSE
 errCode  := 0
 statCode := 255
+PRINT "srvLoadModule: begin "; modName; " hdr "; hdrAddr
 
 IF hdrAddr <> 0 THEN
   ok       := TRUE
   statCode := 21
+  PRINT "srvLoadModule: already linked"
   END
 ENDIF
 
@@ -319,6 +351,7 @@ IF LAND(iCC, 1) = 0 THEN
   hdrAddr  := regs.u
   ok       := TRUE
   statCode := 21
+  PRINT "srvLoadModule: linked hdr "; hdrAddr
   END
 ENDIF
 
@@ -329,12 +362,14 @@ RUN SysCall(callCode, regs)
 iCC := regs.cc
 IF LAND(iCC, 1) <> 0 THEN
   errCode := regs.b
+  PRINT "srvLoadModule: load failed err "; errCode
   END
 ENDIF
 
 hdrAddr  := regs.u
 ok       := TRUE
 statCode := 22
+PRINT "srvLoadModule: loaded hdr "; hdrAddr
 END
 
 900 PRINT "srvLoadModule error ("; ERR; ")"
@@ -363,10 +398,12 @@ ON ERROR GOTO 900
 ok       := FALSE
 errCode  := 0
 statCode := 255
+PRINT "srvUnloadModule: begin "; modName; " hdr "; hdrAddr
 
 IF hdrAddr = 0 THEN
   ok       := TRUE
   statCode := 30
+  PRINT "srvUnloadModule: nothing to unlink"
   END
 ENDIF
 
@@ -383,6 +420,7 @@ ENDIF
 hdrAddr  := 0
 ok       := TRUE
 statCode := 30
+PRINT "srvUnloadModule: unlinked"
 END
 
 900 PRINT "srvUnloadModule error ("; ERR; ")"
