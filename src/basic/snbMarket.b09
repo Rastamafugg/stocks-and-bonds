@@ -1,28 +1,34 @@
 PROCEDURE snbMarket
 (* ============================================================ *)
 (* PROCEDURE : snbMarket                                        *)
-(* PURPOSE   : Market resolution phase child. Runs every year. *)
-(*             Draws the situation card, generates dice rolls,  *)
-(*             resolves all stock prices, and displays          *)
-(*             S11-S15. When called after final-year GS_DONE,  *)
-(*             it performs the one closing-price draw using    *)
-(*             the next card slot beyond the last played year. *)
-(*             Always writes gameStage=GS_YEAR (2).            *)
-(*             Called by the SNB coordinator via forkPhase.    *)
-(* PARAMS    : None (child process; no PARAM handoff)          *)
-(* SIDE EFX  : Reads and writes SNBSTATE. Modifies             *)
-(*             mkt.stckPrice, mkt.divSuspnd, and split         *)
-(*             stock holdings in player records.               *)
-(* NOTE      : snbStateIO, snbDeckUtil, and snbMarket must be  *)
-(*             pre-loaded by coordinator.                      *)
+(* PURPOSE   : Market calculation phase child. Draws the       *)
+(*             situation card, generates dice rolls, resolves  *)
+(*             all stock prices, and returns the derived       *)
+(*             market-display arrays to the coordinator.       *)
+(*             S11 and S12 remain here. S13-S15 now run after  *)
+(*             the coordinator-owned player split-update loop. *)
+(* PARAMS    : action  - OUT 1=continue 2=save+exit 3=quit     *)
+(*             prcBef  - OUT pre-card price per stock          *)
+(*             mktDlt  - OUT market-table delta per stock      *)
+(*             crdDlt  - OUT situation-card delta per stock    *)
+(*             spOcc   - OUT TRUE per stock when split hit     *)
+(*             dvSusp  - OUT TRUE per stock when div suspended *)
+(*             dvRnst  - OUT TRUE per stock when div restored  *)
+(* SIDE EFX  : Reads and writes SNBSTATE header, deck, and     *)
+(*             market state. Player records are not modified.  *)
 (* ============================================================ *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 ! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
-! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE CardRec = crdType:INTEGER;efxCnt:INTEGER;efxStk(4):INTEGER;efxDlt(4):INTEGER;divBonus:INTEGER
+PARAM action     : INTEGER
+PARAM prcBef(9)  : INTEGER
+PARAM mktDlt(9)  : INTEGER
+PARAM crdDlt(9)  : INTEGER
+PARAM spOcc(9)   : BOOLEAN
+PARAM dvSusp(9)  : BOOLEAN
+PARAM dvRnst(9)  : BOOLEAN
 DIM hdr        : SaveHdr
 DIM deckOrd(36): BYTE
 DIM mkt        : MktState
@@ -33,39 +39,22 @@ DIM iCYr       : INTEGER  \ ! staged hdr.currYear BYTE
 DIM iMaxYr     : INTEGER  \ ! staged hdr.maxYears BYTE
 DIM iRMode     : INTEGER  \ ! staged hdr.rollMode BYTE
 DIM iDkPos     : INTEGER  \ ! staged deck position within deckOrd
-DIM wasDone    : BOOLEAN  \ ! TRUE on closing-price pass after GS_DONE
 DIM cardId     : INTEGER  \ ! drawn card ID (1..36)
 DIM rolls(9)   : INTEGER  \ ! INTEGER copy of rTot for applyMktYear
 DIM dOne(9)    : BYTE     \ ! die 1 per stock slot
 DIM dTwo(9)    : BYTE     \ ! die 2 per stock slot
 DIM rTot(9)    : BYTE     \ ! roll total per stock slot
 DIM rCnt       : BYTE     \ ! populated slot count from doRolls
-DIM oAct       : BOOLEAN  \ ! TRUE if Mode C 2/12 override fired
-DIM prcBef(9)  : INTEGER  \ ! price after mkt table, before card delta
-DIM mktDlt(9)  : INTEGER  \ ! market table delta per stock
-DIM crdDlt(9)  : INTEGER  \ ! card delta per stock
-DIM spOcc(9)   : BOOLEAN  \ ! TRUE if split triggered this stock
-DIM dvSusp(9)  : BOOLEAN  \ ! TRUE if dividends newly suspended
-DIM dvRnst(9)  : BOOLEAN  \ ! TRUE if dividends reinstated
+DIM oAct       : BOOLEAN  \ ! TRUE when Mode C 2/12 override fired
 DIM flavTxt    : STRING[160] \ ! flavour text (stub; empty for now)
-DIM sNam       : STRING[12]  \ ! stock name for split/divflag display
-DIM pNames(6)  : STRING[27]  \ ! empty arrays for scrSplit
-DIM shrBf(6)   : INTEGER
-DIM shrAf(6)   : INTEGER
-DIM evTyp      : INTEGER     \ ! 1=suspended 2=reinstated
-DIM oDPrc      : INTEGER     \ ! pre-split price for scrSplit display
-DIM actByt     : BYTE     \ ! action return from screens (discarded)
+DIM actByt     : BYTE     \ ! action return from screens
 DIM iSeed      : INTEGER  \ ! per-year RNG seed for child-process roll variance
 DIM tInt       : INTEGER  \ ! reused loop counter / staging variable
-DIM iPlyrCnt   : INTEGER  \ ! staged hdr.plyrCount BYTE
-DIM plyr       : PlyrRec
-DIM plyrOK     : BOOLEAN
-DIM plyrDirty  : BOOLEAN
-DIM p          : INTEGER
 DIM s          : INTEGER
 
 ON ERROR GOTO 900
 
+action := 1
 RUN loadMktState("SNBSTATE", hdr, deckOrd, mkt, loadOK)
 IF NOT loadOK THEN
   PRINT "snbMarket: loadMktState failed"
@@ -75,11 +64,6 @@ ENDIF
 iCYr   := hdr.currYear   \ ! stage BYTE
 iMaxYr := hdr.maxYears   \ ! stage BYTE
 iRMode := hdr.rollMode   \ ! stage BYTE
-iPlyrCnt := hdr.plyrCount \ ! stage BYTE
-wasDone := FALSE
-IF hdr.gameStage = 3 THEN
-  wasDone := TRUE
-ENDIF
 
 ! Draw and decode the situation card for this year.
 ! deckOrd is indexed by deckPos; drawCard advances it and
@@ -100,9 +84,11 @@ flavTxt := ""
 RUN scrCard(cardId, crd, flavTxt, actByt)
 IF actByt = 2 THEN
   RUN saveMktToMenu(4, 1, hdr, mkt, saveOK)
+  action := 2
   END
 ELSE IF actByt = 3 THEN
   RUN quitMktToMenu(hdr, mkt, saveOK)
+  action := 3
   END
 ENDIF \ENDIF
 
@@ -130,9 +116,11 @@ NEXT s
 RUN scrDice(crd.crdType, rCnt, dOne, dTwo, rTot, mktDlt, actByt)
 IF actByt = 2 THEN
   RUN saveMktToMenu(4, 1, hdr, mkt, saveOK)
+  action := 2
   END
 ELSE IF actByt = 3 THEN
   RUN quitMktToMenu(hdr, mkt, saveOK)
+  action := 3
   END
 ENDIF \ENDIF
 
@@ -140,38 +128,87 @@ ENDIF \ENDIF
 ! Line exceeds 79 chars; RUN statement cannot be split.
 RUN applyMktYear(cardId, rolls, mkt, prcBef, mktDlt, crdDlt, spOcc, dvSusp, dvRnst)
 
-! Apply all stock splits to player records before any
-! market save/quit checkpoint can be taken from S13-S15.
-FOR p := 1 TO iPlyrCnt
-    RUN loadPlyrRec("SNBSTATE", hdr, p, plyr, plyrOK)
-  IF NOT plyrOK THEN
-      PRINT "snbMarket: loadPlyrRec failed"
-    END
-  ENDIF
-  plyrDirty := FALSE
-  FOR s := 1 TO 9
-    IF spOcc(s) AND plyr.stckShrs(s) > 0 THEN
-      plyr.stckShrs(s) := plyr.stckShrs(s) * 2
-      plyrDirty := TRUE
-    ENDIF
-  NEXT s
-  IF plyrDirty THEN
-    RUN savePlyrRec("SNBSTATE", hdr, p, plyr, plyrOK)
-    IF NOT plyrOK THEN
-      PRINT "snbMarket: savePlyrRec failed"
-      END
-    ENDIF
-  ENDIF
-NEXT p
+! Write the market result and expose an internal coordinator
+! checkpoint for the split-update player loop.
+hdr.gameStage := 2  \ ! GS_YEAR
+hdr.savedPhase := 10
+hdr.savedPlyr  := 1
+
+RUN saveHdrMktState("SNBSTATE", hdr, mkt, saveOK)
+IF NOT saveOK THEN
+  PRINT "snbMarket: saveHdrMktState failed"
+ENDIF
+END
+
+900 PRINT "snbMarket error ("; ERR; ")"
+END
+
+PROCEDURE snbMarketPost
+(* ============================================================ *)
+(* PROCEDURE : snbMarketPost                                    *)
+(* PURPOSE   : Post-update market display phase. Displays       *)
+(*             S13-S15 after the coordinator-owned player       *)
+(*             split-update loop has written player records.    *)
+(* PARAMS    : plyrCnt - configured player count                *)
+(*             prcBef  - pre-card price per stock               *)
+(*             mktDlt  - market-table delta per stock           *)
+(*             crdDlt  - situation-card delta per stock         *)
+(*             spOcc   - TRUE per stock when split hit          *)
+(*             dvSusp  - TRUE per stock when div suspended      *)
+(*             dvRnst  - TRUE per stock when div restored       *)
+(*             action  - OUT 1=continue 2=save+exit 3=quit      *)
+(* SIDE EFX  : Reads SNBSTATE header, market, and players.      *)
+(*             May write save/quit checkpoints.                 *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+PARAM plyrCnt     : INTEGER
+PARAM prcBef(9)   : INTEGER
+PARAM mktDlt(9)   : INTEGER
+PARAM crdDlt(9)   : INTEGER
+PARAM spOcc(9)    : BOOLEAN
+PARAM dvSusp(9)   : BOOLEAN
+PARAM dvRnst(9)   : BOOLEAN
+PARAM action      : INTEGER
+DIM hdr           : SaveHdr
+DIM mkt           : MktState
+DIM loadOK        : BOOLEAN
+DIM saveOK        : BOOLEAN
+DIM sNam          : STRING[12]
+DIM pNames(6)     : STRING[27]
+DIM shrBf(6)      : INTEGER
+DIM shrAf(6)      : INTEGER
+DIM plyr          : PlyrRec
+DIM plyrOK        : BOOLEAN
+DIM evTyp         : INTEGER
+DIM oDPrc         : INTEGER
+DIM actByt        : BYTE
+DIM p             : INTEGER
+DIM s             : INTEGER
+DIM tInt          : INTEGER
+
+ON ERROR GOTO 900
+
+action := 1
+RUN loadHdrMkt("SNBSTATE", hdr, mkt, loadOK)
+IF NOT loadOK THEN
+  PRINT "snbMarketPost: loadHdrMkt failed"
+  END
+ENDIF
 
 ! Display S13 market results board.
 ! Line exceeds 79 chars; RUN statement cannot be split.
 RUN scrMktBoard(prcBef, mktDlt, crdDlt, mkt.stckPrice, spOcc, dvSusp, dvRnst, actByt)
 IF actByt = 2 THEN
   RUN saveMktToMenu(1, 1, hdr, mkt, saveOK)
+  action := 2
   END
 ELSE IF actByt = 3 THEN
   RUN quitMktToMenu(hdr, mkt, saveOK)
+  action := 3
   END
 ENDIF \ENDIF
 
@@ -183,13 +220,12 @@ FOR s := 1 TO 9
       shrAf(tInt)  := 0
       shrBf(tInt)  := 0
     NEXT tInt
-    ! Pre-split price = post-split price * 2.
     oDPrc := mkt.stckPrice(s) * 2
     RUN getMktStockName(s, sNam)
-    FOR p := 1 TO iPlyrCnt
+    FOR p := 1 TO plyrCnt
       RUN loadPlyrRec("SNBSTATE", hdr, p, plyr, plyrOK)
       IF NOT plyrOK THEN
-        PRINT "snbMarket: loadPlyrRec failed"
+        PRINT "snbMarketPost: loadPlyrRec failed"
         END
       ENDIF
       pNames(p) := plyr.plyrName
@@ -201,50 +237,47 @@ FOR s := 1 TO 9
       ENDIF
     NEXT p
     ! Line exceeds 79 chars; RUN statement cannot be split.
-    RUN scrSplit(sNam, oDPrc, mkt.stckPrice(s), iPlyrCnt, pNames, shrBf, shrAf, actByt)
+    RUN scrSplit(sNam, oDPrc, mkt.stckPrice(s), plyrCnt, pNames, shrBf, shrAf, actByt)
     IF actByt = 2 THEN
       RUN saveMktToMenu(1, 1, hdr, mkt, saveOK)
+      action := 2
       END
     ELSE IF actByt = 3 THEN
       RUN quitMktToMenu(hdr, mkt, saveOK)
+      action := 3
       END
     ENDIF \ENDIF
   ENDIF
   IF dvSusp(s) OR dvRnst(s) THEN
     RUN getMktStockName(s, sNam)
     IF dvSusp(s) THEN
-      evTyp := 1  \ ! SUSPENDED
+      evTyp := 1
     ELSE
-      evTyp := 2  \ ! REINSTATED
+      evTyp := 2
     ENDIF
     RUN scrDivFlag(sNam, evTyp, mkt.stckPrice(s), 50, actByt)
     IF actByt = 2 THEN
       RUN saveMktToMenu(1, 1, hdr, mkt, saveOK)
+      action := 2
       END
     ELSE IF actByt = 3 THEN
       RUN quitMktToMenu(hdr, mkt, saveOK)
+      action := 3
       END
     ENDIF \ENDIF
   ENDIF
 NEXT s
 
-! Always write GS_YEAR (2); snbMarket never terminates the game.
-! On a normal yearly market pass, advance the resume checkpoint
-! to the first sell turn. The closing-price draw runs after
-! GS_DONE and must not re-enter the sell phase.
-hdr.gameStage := 2  \ ! GS_YEAR
-IF NOT wasDone THEN
-  hdr.savedPhase := 1  \ ! SELL_PHASE
-  hdr.savedPlyr  := 1
-ENDIF
-
+hdr.gameStage := 2
+hdr.savedPhase := 1
+hdr.savedPlyr  := 1
 RUN saveHdrMktState("SNBSTATE", hdr, mkt, saveOK)
 IF NOT saveOK THEN
-  PRINT "snbMarket: saveHdrMktState failed"
+  PRINT "snbMarketPost: saveHdrMktState failed"
 ENDIF
 END
 
-900 PRINT "snbMarket error ("; ERR; ")"
+900 PRINT "snbMarketPost error ("; ERR; ")"
 END
 
 PROCEDURE loadMktState

@@ -23,6 +23,7 @@ PROCEDURE snb
 (*              snbDividend                          *)
 (*              snbMgnInt when required             *)
 (*              snbMarket                            *)
+(*              snbMarketPlayer / snbMarketPost     *)
 (*              snbSellHumanStub or snbSellAI       *)
 (*              snbYear10Clear when required        *)
 (*              snbBuy or snbBuyAI                  *)
@@ -68,6 +69,13 @@ DIM phaseAct   : INTEGER
 DIM savePhVal  : INTEGER
 DIM savePlyrVal: INTEGER
 DIM phaseDone  : BOOLEAN
+DIM marketAct  : INTEGER
+DIM mkPrcBef(9): INTEGER
+DIM mkMktDlt(9): INTEGER
+DIM mkCrdDlt(9): INTEGER
+DIM mkSpOcc(9) : BOOLEAN
+DIM mkDvSusp(9): BOOLEAN
+DIM mkDvRnst(9): BOOLEAN
 DIM stateHdrAdr: INTEGER
 DIM i          : INTEGER
 
@@ -156,212 +164,11 @@ LOOP
       ENDIF
 
       IF NOT gameOver THEN
-        ! savedPhase 6/1/2/5 share one coordinator-owned
+        ! savedPhase 6/1/2/5/10 share one coordinator-owned
         ! player loop. snb loads and saves each player record,
         ! then branches to the target phase module.
-        IF iSavPh = 6 OR iSavPh = 1 OR iSavPh = 2 OR iSavPh = 5 THEN
-          phaseDone := FALSE
-          stateHdrAdr := 0
-          RUN loadOneModule("snbStateHdrPlyr", stateHdrAdr, ok)
-          IF NOT ok THEN
-            gameOver := TRUE
-          ELSE
-            RUN loadHdrMkt("SNBSTATE", hdr, mkt, loadOK)
-            IF NOT loadOK THEN
-              PRINT "SNB: loadHdrMkt failed for phase "; iSavPh
-              RUN unloadOneModule("snbStateHdrPlyr", stateHdrAdr, ok)
-              IF NOT ok THEN
-                END
-              ENDIF
-              gameOver := TRUE
-            ELSE
-              iCYr     := hdr.currYear
-              iMaxYr   := hdr.maxYears
-              iPlyrCnt := hdr.plyrCount
-              iMgnRule := hdr.mgnRule
-              phasePlyr := hdr.savedPlyr
-              IF phasePlyr < 1 OR phasePlyr > iPlyrCnt THEN
-                PRINT "SNB: invalid savedPlyr for phase "; iSavPh
-                RUN unloadOneModule("snbStateHdrPlyr", stateHdrAdr, ok)
-                IF NOT ok THEN
-                  END
-                ENDIF
-                gameOver := TRUE
-              ELSE
-                LOOP
-                  EXITIF phasePlyr < 1 OR phasePlyr > iPlyrCnt OR gameOver THEN
-                  ENDEXIT
-
-                  RUN loadPlyrRec("SNBSTATE", hdr, phasePlyr, plyr, loadOK)
-                  IF NOT loadOK THEN
-                    PRINT "SNB: loadPlyrRec failed for player "; phasePlyr
-                    gameOver := TRUE
-                  ELSE
-                    phaseAct   := 1
-                    savePhVal  := iSavPh
-                    savePlyrVal := phasePlyr
-
-                    IF iSavPh = 6 THEN
-                      modCnt := 1
-                      modList(1) := "snbMgnInt"
-                      RUN loadModuleList(modList, hdrList, modCnt, ok)
-                      IF NOT ok THEN
-                        gameOver := TRUE
-                      ELSE
-                        ! Line exceeds 79 chars; RUN statement cannot be split.
-                        RUN snbMgnInt(iCYr, iMaxYr, iMgnRule, phasePlyr, iPlyrCnt, plyr, mkt, phaseAct, savePhVal, savePlyrVal)
-                      ENDIF
-                    ELSE IF iSavPh = 1 THEN
-                      modCnt := 1
-                      IF plyr.plyrType = 2 THEN
-                        modList(1) := "snbSellAI"
-                        RUN loadModuleList(modList, hdrList, modCnt, ok)
-                        IF NOT ok THEN
-                          gameOver := TRUE
-                        ELSE
-                          ! Line exceeds 79 chars; RUN statement cannot be split.
-                          RUN snbSellAI(iCYr, iMgnRule, phasePlyr, iPlyrCnt, plyr, mkt, phaseAct, savePhVal, savePlyrVal)
-                        ENDIF
-                      ELSE
-                        modList(1) := "snbSellHumanStub"
-                        RUN loadModuleList(modList, hdrList, modCnt, ok)
-                        IF NOT ok THEN
-                          gameOver := TRUE
-                        ELSE
-                          ! Line exceeds 79 chars; RUN statement cannot be split.
-                          RUN snbSellHumanStub(iCYr, iMgnRule, phasePlyr, iPlyrCnt, plyr, phaseAct, savePhVal, savePlyrVal)
-                        ENDIF
-                      ENDIF
-                    ELSE IF iSavPh = 2 THEN
-                      modCnt := 1
-                      IF plyr.plyrType = 2 THEN
-                        modList(1) := "snbBuyAI"
-                        RUN loadModuleList(modList, hdrList, modCnt, ok)
-                        IF NOT ok THEN
-                          gameOver := TRUE
-                        ELSE
-                          ! Line exceeds 79 chars; RUN statement cannot be split.
-                          RUN snbBuyAI(iCYr, iMgnRule, phasePlyr, iPlyrCnt, plyr, mkt, phaseAct, savePhVal, savePlyrVal)
-                        ENDIF
-                      ELSE
-                        modList(1) := "snbBuy"
-                        RUN loadModuleList(modList, hdrList, modCnt, ok)
-                        IF NOT ok THEN
-                          gameOver := TRUE
-                        ELSE
-                          ! Line exceeds 79 chars; RUN statement cannot be split.
-                          RUN snbBuy(iCYr, iMaxYr, iMgnRule, phasePlyr, iPlyrCnt, plyr, mkt, phaseAct, savePhVal, savePlyrVal)
-                        ENDIF
-                      ENDIF
-                    ELSE
-                      modCnt := 1
-                      modList(1) := "snbMarginPay"
-                      RUN loadModuleList(modList, hdrList, modCnt, ok)
-                      IF NOT ok THEN
-                        gameOver := TRUE
-                      ELSE
-                        ! Line exceeds 79 chars; RUN statement cannot be split.
-                        RUN snbMarginPay(iCYr, iMaxYr, iMgnRule, phasePlyr, iPlyrCnt, plyr, phaseAct, savePhVal, savePlyrVal)
-                      ENDIF
-                    ENDIF \ENDIF \ENDIF
-
-                    IF NOT gameOver THEN
-                      RUN unloadModuleList(modList, hdrList, modCnt, ok)
-                      IF NOT ok THEN
-                        END
-                      ENDIF
-
-                      RUN savePlyrRec("SNBSTATE", hdr, phasePlyr, plyr, ok)
-                      IF NOT ok THEN
-                        PRINT "SNB: savePlyrRec failed for player "; phasePlyr
-                        gameOver := TRUE
-                      ELSE
-                        hdr.savedPhase := savePhVal
-                        hdr.savedPlyr  := savePlyrVal
-                        hdr.gameStage  := 2
-                        RUN saveHdrOnly("SNBSTATE", hdr, ok)
-                        IF NOT ok THEN
-                          PRINT "SNB: saveHdrOnly failed after player "; phasePlyr
-                          gameOver := TRUE
-                        ELSE
-                          phaseDone := TRUE
-                          IF iSavPh = 5 AND savePhVal = 0 THEN
-                            IF iCYr >= iMaxYr THEN
-                              hdr.gameStage := 3
-                            ELSE
-                              iBnkr := hdr.bnkrFlgs
-                              bankrCnt := 0
-                              FOR i := 1 TO 6
-                                IF LAND(iBnkr, 1) = 1 THEN
-                                  bankrCnt := bankrCnt + 1
-                                ENDIF
-                                iBnkr := iBnkr / 2
-                              NEXT i
-                              activePlrs := iPlyrCnt - bankrCnt
-                              IF iPlyrCnt > 1 AND activePlrs <= 1 THEN
-                                hdr.gameStage := 3
-                              ENDIF
-                            ENDIF
-                            IF hdr.gameStage = 3 THEN
-                              RUN saveHdrOnly("SNBSTATE", hdr, ok)
-                              IF NOT ok THEN
-                                PRINT "SNB: saveHdrOnly failed after margin pay"
-                                gameOver := TRUE
-                              ENDIF
-                            ENDIF
-                          ENDIF
-                          IF phaseAct = 2 THEN
-                            RUN copySaveFile("SNBSTATE", "SNBGAME", ok)
-                            IF NOT ok THEN
-                              PRINT "SNB: copySaveFile failed"
-                              gameOver := TRUE
-                            ELSE
-                              hdr.savedPhase := 9
-                              hdr.savedPlyr  := 0
-                              hdr.gameStage  := 2
-                              RUN saveHdrOnly("SNBSTATE", hdr, ok)
-                              IF NOT ok THEN
-                                PRINT "SNB: saveHdrOnly failed after save+exit"
-                                gameOver := TRUE
-                              ELSE
-                                gameOver := TRUE
-                                runEndGame := FALSE
-                              ENDIF
-                            ENDIF
-                          ELSE IF phaseAct = 3 THEN
-                            hdr.savedPhase := 9
-                            hdr.savedPlyr  := 0
-                            hdr.gameStage  := 2
-                            RUN saveHdrOnly("SNBSTATE", hdr, ok)
-                            IF NOT ok THEN
-                              PRINT "SNB: saveHdrOnly failed after quit"
-                              gameOver := TRUE
-                            ELSE
-                              gameOver := TRUE
-                              runEndGame := FALSE
-                            ENDIF
-                          ELSE IF savePhVal = iSavPh THEN
-                            phasePlyr := savePlyrVal
-                          ELSE
-                            phasePlyr := iPlyrCnt + 1
-                          ENDIF \ENDIF \ENDIF
-                        ENDIF
-                      ENDIF
-                    ENDIF
-                  ENDIF
-                ENDLOOP
-              ENDIF
-              IF stateHdrAdr <> 0 THEN
-                RUN unloadOneModule("snbStateHdrPlyr", stateHdrAdr, ok)
-                IF NOT ok THEN
-                  END
-                ENDIF
-              ENDIF
-              IF phaseDone THEN
-                GOSUB 100
-              ENDIF
-            ENDIF
-          ENDIF
+        IF iSavPh = 6 OR iSavPh = 1 OR iSavPh = 2 OR iSavPh = 5 OR iSavPh = 10 THEN
+          GOSUB 200
         ENDIF
       ENDIF
 
@@ -374,12 +181,46 @@ LOOP
           IF NOT ok THEN
             gameOver := TRUE
           ELSE
-            RUN snbMarket
+            marketAct := 1
+            ! Line exceeds 79 chars; RUN statement cannot be split.
+            RUN snbMarket(marketAct, mkPrcBef, mkMktDlt, mkCrdDlt, mkSpOcc, mkDvSusp, mkDvRnst)
             RUN unloadModuleList(modList, hdrList, modCnt, ok)
             IF NOT ok THEN
               END
             ENDIF
-            GOSUB 100
+            IF marketAct = 1 THEN
+              GOSUB 100
+            ELSE
+              gameOver := TRUE
+              runEndGame := FALSE
+            ENDIF
+          ENDIF
+        ENDIF
+      ENDIF
+
+      IF NOT gameOver THEN
+        ! savedPhase 11 is the post-update market display pass.
+        IF iSavPh = 11 THEN
+          modCnt := 1
+          modList(1) := "snbMarket"
+          RUN loadModuleList(modList, hdrList, modCnt, ok)
+          IF NOT ok THEN
+            gameOver := TRUE
+          ELSE
+            iPlyrCnt := hdr.plyrCount
+            marketAct := 1
+            ! Line exceeds 79 chars; RUN statement cannot be split.
+            RUN snbMarketPost(iPlyrCnt, mkPrcBef, mkMktDlt, mkCrdDlt, mkSpOcc, mkDvSusp, mkDvRnst, marketAct)
+            RUN unloadModuleList(modList, hdrList, modCnt, ok)
+            IF NOT ok THEN
+              END
+            ENDIF
+            IF marketAct = 1 THEN
+              GOSUB 100
+            ELSE
+              gameOver := TRUE
+              runEndGame := FALSE
+            ENDIF
           ENDIF
         ENDIF
       ENDIF
@@ -448,14 +289,42 @@ LOOP
       IF NOT ok THEN
         END
       ENDIF
-      RUN snbMarket
+      marketAct := 1
+      ! Line exceeds 79 chars; RUN statement cannot be split.
+      RUN snbMarket(marketAct, mkPrcBef, mkMktDlt, mkCrdDlt, mkSpOcc, mkDvSusp, mkDvRnst)
       RUN unloadModuleList(modList, hdrList, modCnt, ok)
       IF NOT ok THEN
         END
       ENDIF
-      RUN readHdr(hdr, loadOK)
-      IF NOT loadOK THEN
+      IF marketAct <> 1 THEN
         END
+      ENDIF
+      GOSUB 100
+      IF iSavPh = 10 THEN
+        GOSUB 200
+      ENDIF
+      IF gameOver AND NOT runEndGame THEN
+        END
+      ENDIF
+      IF iSavPh = 11 THEN
+        modCnt := 1
+        modList(1) := "snbMarket"
+        RUN loadModuleList(modList, hdrList, modCnt, ok)
+        IF NOT ok THEN
+          END
+        ENDIF
+        iPlyrCnt := hdr.plyrCount
+        marketAct := 1
+        ! Line exceeds 79 chars; RUN statement cannot be split.
+        RUN snbMarketPost(iPlyrCnt, mkPrcBef, mkMktDlt, mkCrdDlt, mkSpOcc, mkDvSusp, mkDvRnst, marketAct)
+        RUN unloadModuleList(modList, hdrList, modCnt, ok)
+        IF NOT ok THEN
+          END
+        ENDIF
+        IF marketAct <> 1 THEN
+          END
+        ENDIF
+        GOSUB 100
       ENDIF
     ENDIF
 
@@ -509,6 +378,222 @@ ENDLOOP
       gameOver := TRUE
       runEndGame := TRUE
     ENDIF \ENDIF
+    RETURN
+
+200 phaseDone := FALSE
+    stateHdrAdr := 0
+    RUN loadOneModule("snbStateHdrPlyr", stateHdrAdr, ok)
+    IF NOT ok THEN
+      gameOver := TRUE
+      RETURN
+    ENDIF
+    RUN loadHdrMkt("SNBSTATE", hdr, mkt, loadOK)
+    IF NOT loadOK THEN
+      PRINT "SNB: loadHdrMkt failed for phase "; iSavPh
+      RUN unloadOneModule("snbStateHdrPlyr", stateHdrAdr, ok)
+      IF NOT ok THEN
+        END
+      ENDIF
+      gameOver := TRUE
+      RETURN
+    ENDIF
+    iCYr     := hdr.currYear
+    iMaxYr   := hdr.maxYears
+    iPlyrCnt := hdr.plyrCount
+    iMgnRule := hdr.mgnRule
+    phasePlyr := hdr.savedPlyr
+    IF phasePlyr < 1 OR phasePlyr > iPlyrCnt THEN
+      PRINT "SNB: invalid savedPlyr for phase "; iSavPh
+      RUN unloadOneModule("snbStateHdrPlyr", stateHdrAdr, ok)
+      IF NOT ok THEN
+        END
+      ENDIF
+      gameOver := TRUE
+      RETURN
+    ENDIF
+
+    LOOP
+      EXITIF phasePlyr < 1 OR phasePlyr > iPlyrCnt OR gameOver THEN
+      ENDEXIT
+
+      RUN loadPlyrRec("SNBSTATE", hdr, phasePlyr, plyr, loadOK)
+      IF NOT loadOK THEN
+        PRINT "SNB: loadPlyrRec failed for player "; phasePlyr
+        gameOver := TRUE
+      ELSE
+        phaseAct    := 1
+        savePhVal   := iSavPh
+        savePlyrVal := phasePlyr
+
+        IF iSavPh = 6 THEN
+          modCnt := 1
+          modList(1) := "snbMgnInt"
+          RUN loadModuleList(modList, hdrList, modCnt, ok)
+          IF NOT ok THEN
+            gameOver := TRUE
+          ELSE
+            ! Line exceeds 79 chars; RUN statement cannot be split.
+            RUN snbMgnInt(iCYr, iMaxYr, iMgnRule, phasePlyr, iPlyrCnt, plyr, mkt, phaseAct, savePhVal, savePlyrVal)
+          ENDIF
+        ELSE IF iSavPh = 1 THEN
+          modCnt := 1
+          IF plyr.plyrType = 2 THEN
+            modList(1) := "snbSellAI"
+            RUN loadModuleList(modList, hdrList, modCnt, ok)
+            IF NOT ok THEN
+              gameOver := TRUE
+            ELSE
+              ! Line exceeds 79 chars; RUN statement cannot be split.
+              RUN snbSellAI(iCYr, iMgnRule, phasePlyr, iPlyrCnt, plyr, mkt, phaseAct, savePhVal, savePlyrVal)
+            ENDIF
+          ELSE
+            modList(1) := "snbSellHumanStub"
+            RUN loadModuleList(modList, hdrList, modCnt, ok)
+            IF NOT ok THEN
+              gameOver := TRUE
+            ELSE
+              ! Line exceeds 79 chars; RUN statement cannot be split.
+              RUN snbSellHumanStub(iCYr, iMgnRule, phasePlyr, iPlyrCnt, plyr, phaseAct, savePhVal, savePlyrVal)
+            ENDIF
+          ENDIF
+        ELSE IF iSavPh = 2 THEN
+          modCnt := 1
+          IF plyr.plyrType = 2 THEN
+            modList(1) := "snbBuyAI"
+            RUN loadModuleList(modList, hdrList, modCnt, ok)
+            IF NOT ok THEN
+              gameOver := TRUE
+            ELSE
+              ! Line exceeds 79 chars; RUN statement cannot be split.
+              RUN snbBuyAI(iCYr, iMgnRule, phasePlyr, iPlyrCnt, plyr, mkt, phaseAct, savePhVal, savePlyrVal)
+            ENDIF
+          ELSE
+            modList(1) := "snbBuy"
+            RUN loadModuleList(modList, hdrList, modCnt, ok)
+            IF NOT ok THEN
+              gameOver := TRUE
+            ELSE
+              ! Line exceeds 79 chars; RUN statement cannot be split.
+              RUN snbBuy(iCYr, iMaxYr, iMgnRule, phasePlyr, iPlyrCnt, plyr, mkt, phaseAct, savePhVal, savePlyrVal)
+            ENDIF
+          ENDIF
+        ELSE IF iSavPh = 10 THEN
+          modCnt := 1
+          modList(1) := "snbMarketPlayer"
+          RUN loadModuleList(modList, hdrList, modCnt, ok)
+          IF NOT ok THEN
+            gameOver := TRUE
+          ELSE
+            ! Line exceeds 79 chars; RUN statement cannot be split.
+            RUN snbMarketPlayer(phasePlyr, iPlyrCnt, plyr, mkSpOcc, phaseAct, savePhVal, savePlyrVal)
+          ENDIF
+        ELSE
+          modCnt := 1
+          modList(1) := "snbMarginPay"
+          RUN loadModuleList(modList, hdrList, modCnt, ok)
+          IF NOT ok THEN
+            gameOver := TRUE
+          ELSE
+            ! Line exceeds 79 chars; RUN statement cannot be split.
+            RUN snbMarginPay(iCYr, iMaxYr, iMgnRule, phasePlyr, iPlyrCnt, plyr, phaseAct, savePhVal, savePlyrVal)
+          ENDIF
+        ENDIF \ENDIF \ENDIF \ENDIF
+
+        IF NOT gameOver THEN
+          RUN unloadModuleList(modList, hdrList, modCnt, ok)
+          IF NOT ok THEN
+            END
+          ENDIF
+
+          RUN savePlyrRec("SNBSTATE", hdr, phasePlyr, plyr, ok)
+          IF NOT ok THEN
+            PRINT "SNB: savePlyrRec failed for player "; phasePlyr
+            gameOver := TRUE
+          ELSE
+            hdr.savedPhase := savePhVal
+            hdr.savedPlyr  := savePlyrVal
+            hdr.gameStage  := 2
+            RUN saveHdrOnly("SNBSTATE", hdr, ok)
+            IF NOT ok THEN
+              PRINT "SNB: saveHdrOnly failed after player "; phasePlyr
+              gameOver := TRUE
+            ELSE
+              phaseDone := TRUE
+              IF iSavPh = 5 AND savePhVal = 0 THEN
+                IF iCYr >= iMaxYr THEN
+                  hdr.gameStage := 3
+                ELSE
+                  iBnkr := hdr.bnkrFlgs
+                  bankrCnt := 0
+                  FOR i := 1 TO 6
+                    IF LAND(iBnkr, 1) = 1 THEN
+                      bankrCnt := bankrCnt + 1
+                    ENDIF
+                    iBnkr := iBnkr / 2
+                  NEXT i
+                  activePlrs := iPlyrCnt - bankrCnt
+                  IF iPlyrCnt > 1 AND activePlrs <= 1 THEN
+                    hdr.gameStage := 3
+                  ENDIF
+                ENDIF
+                IF hdr.gameStage = 3 THEN
+                  RUN saveHdrOnly("SNBSTATE", hdr, ok)
+                  IF NOT ok THEN
+                    PRINT "SNB: saveHdrOnly failed after margin pay"
+                    gameOver := TRUE
+                  ENDIF
+                ENDIF
+              ENDIF
+              IF phaseAct = 2 THEN
+                RUN copySaveFile("SNBSTATE", "SNBGAME", ok)
+                IF NOT ok THEN
+                  PRINT "SNB: copySaveFile failed"
+                  gameOver := TRUE
+                ELSE
+                  hdr.savedPhase := 9
+                  hdr.savedPlyr  := 0
+                  hdr.gameStage  := 2
+                  RUN saveHdrOnly("SNBSTATE", hdr, ok)
+                  IF NOT ok THEN
+                    PRINT "SNB: saveHdrOnly failed after save+exit"
+                    gameOver := TRUE
+                  ELSE
+                    gameOver := TRUE
+                    runEndGame := FALSE
+                  ENDIF
+                ENDIF
+              ELSE IF phaseAct = 3 THEN
+                hdr.savedPhase := 9
+                hdr.savedPlyr  := 0
+                hdr.gameStage  := 2
+                RUN saveHdrOnly("SNBSTATE", hdr, ok)
+                IF NOT ok THEN
+                  PRINT "SNB: saveHdrOnly failed after quit"
+                  gameOver := TRUE
+                ELSE
+                  gameOver := TRUE
+                  runEndGame := FALSE
+                ENDIF
+              ELSE IF savePhVal = iSavPh THEN
+                phasePlyr := savePlyrVal
+              ELSE
+                phasePlyr := iPlyrCnt + 1
+              ENDIF \ENDIF \ENDIF
+            ENDIF
+          ENDIF
+        ENDIF
+      ENDIF
+    ENDLOOP
+
+    IF stateHdrAdr <> 0 THEN
+      RUN unloadOneModule("snbStateHdrPlyr", stateHdrAdr, ok)
+      IF NOT ok THEN
+        END
+      ENDIF
+    ENDIF
+    IF phaseDone THEN
+      GOSUB 100
+    ENDIF
     RETURN
 
 900 PRINT "SNB error ("; ERR; ")"
