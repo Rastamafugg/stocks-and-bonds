@@ -1,36 +1,38 @@
 PROCEDURE TSTSIGIPC
 (* ============================================================ *)
-(* PROCEDURE : TSTSIGIPC                                        *)
-(* PURPOSE   : Parent/child signal harness for testing whether  *)
-(*             a child-loaded module becomes directly callable  *)
-(*             in the parent without a local link.              *)
+(* PROCEDURE : TSTSIGIPC                                       *)
+(* PURPOSE   : Parent/child signal harness for testing what     *)
+(*             happens when only the child owns both the load   *)
+(*             and unload of a merged module while the parent   *)
+(*             only sends commands, runs mdir, and probes the   *)
+(*             procedures after child unload.                   *)
 (* ============================================================ *)
 TYPE SigState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,statusCode,errCode:BYTE
-DIM state      : SigState
-DIM ok         : BOOLEAN
-DIM fileOK     : BOOLEAN
-DIM pidOK      : BOOLEAN
-DIM waitOK     : BOOLEAN
-DIM callOK     : BOOLEAN
-DIM childOK    : BOOLEAN
-DIM iParentPID : INTEGER
-DIM iChildPID  : INTEGER
-DIM hdrAddr    : INTEGER
-DIM iErrCode   : INTEGER
-DIM callErr    : INTEGER
-DIM exitStat   : INTEGER
+DIM state       : SigState
+DIM ok          : BOOLEAN
+DIM fileOK      : BOOLEAN
+DIM pidOK       : BOOLEAN
+DIM waitOK      : BOOLEAN
+DIM callAOK     : BOOLEAN
+DIM callBOK     : BOOLEAN
+DIM childOK     : BOOLEAN
+DIM iParentPID  : INTEGER
+DIM iChildPID   : INTEGER
+DIM hdrAddr     : INTEGER
+DIM iErrCode    : INTEGER
+DIM callAErr    : INTEGER
+DIM callBErr    : INTEGER
+DIM exitStat    : INTEGER
 
 ON ERROR GOTO 900
 
 PRINT "=== TSTSIGIPC ==="
 PRINT
-PRINT "Wake signals carry requests through TSTSIGST."
-PRINT "The child loads TSTSIGMOD. The parent then tries"
-PRINT "to RUN tstSigPing without any local link."
+PRINT "Child loads TSTSIGMOD2."
+PRINT "Parent calls A only."
+PRINT "Parent sends child unload request only."
+PRINT "Parent then runs mdir and probes A and B."
 PRINT
-
-RUN dropStateFile
-RUN dropLocalModule("TSTSIGMOD")
 
 RUN ipcGetProcID(iParentPID, pidOK)
 IF NOT pidOK THEN
@@ -59,23 +61,16 @@ iChildPID := state.childPid
 PRINT "Child PID = "; iChildPID; " status = "; state.statusCode
 PRINT
 
-PRINT "Baseline probe before child load:"
-RUN probeDirectRun(callOK, callErr)
-IF callOK THEN
-  PRINT "FAIL: tstSigPing already callable in parent"
-ELSE
-  PRINT "Observed direct-call failure err = "; callErr
-ENDIF
-PRINT
-
-state.reqSeq   := 1
-state.cmdCode  := 1
-state.errCode  := 0
+state.reqSeq  := 1
+state.cmdCode := 1
+state.errCode := 0
+PRINT "Parent: write load request seq "; state.reqSeq
 RUN ipcWriteState(state, fileOK)
 IF NOT fileOK THEN
   PRINT "TSTSIGIPC: write load request failed"
   END
 ENDIF
+PRINT "Parent: send load wake to "; iChildPID
 RUN ipcSendWake(iChildPID, childOK, iErrCode)
 IF NOT childOK THEN
   PRINT "TSTSIGIPC: send load wake failed err "; iErrCode
@@ -89,42 +84,16 @@ ENDIF
 PRINT "Child load status = "; state.statusCode; " err = "; state.errCode
 PRINT
 
-PRINT "Probe after child load, still without local parent link:"
-RUN probeDirectRun(callOK, callErr)
-IF callOK THEN
-  PRINT "PASS: tstSigPing callable without local link"
-ELSE
-  PRINT "Observed direct-call failure err = "; callErr
-ENDIF
-PRINT
-
-PRINT "Parent F$Link probe after child load:"
-RUN linkLocalModule("TSTSIGMOD", hdrAddr, ok, iErrCode)
-IF ok THEN
-  PRINT "Parent F$Link succeeded hdr = "; hdrAddr
-  RUN probeDirectRun(callOK, callErr)
-  IF callOK THEN
-    PRINT "Direct call succeeded after local parent link"
-  ELSE
-    PRINT "Direct call still failed err = "; callErr
-  ENDIF
-  RUN unlinkLocalModule("TSTSIGMOD", hdrAddr, ok, iErrCode)
-  IF NOT ok THEN
-    PRINT "Parent unlink failed err = "; iErrCode
-  ENDIF
-ELSE
-  PRINT "Parent F$Link failed err = "; iErrCode
-ENDIF
-PRINT
-
 state.reqSeq  := 2
 state.cmdCode := 2
 state.errCode := 0
+PRINT "Parent: write child unload request seq "; state.reqSeq
 RUN ipcWriteState(state, fileOK)
 IF NOT fileOK THEN
   PRINT "TSTSIGIPC: write unload request failed"
   END
 ENDIF
+PRINT "Parent: send unload wake to "; iChildPID
 RUN ipcSendWake(iChildPID, childOK, iErrCode)
 IF NOT childOK THEN
   PRINT "TSTSIGIPC: send unload wake failed err "; iErrCode
@@ -138,24 +107,20 @@ ENDIF
 PRINT "Child unload status = "; state.statusCode; " err = "; state.errCode
 PRINT
 
-PRINT "Parent F$Link probe after child unload:"
-RUN linkLocalModule("TSTSIGMOD", hdrAddr, ok, iErrCode)
-IF ok THEN
-  PRINT "Parent still linked TSTSIGMOD hdr = "; hdrAddr
-  RUN unlinkLocalModule("TSTSIGMOD", hdrAddr, ok, iErrCode)
-ELSE
-  PRINT "Parent F$Link now fails err = "; iErrCode
-ENDIF
-PRINT
+PRINT "-- mdir before post-unload direct probes --"
+SHELL "mdir"
+RUN pauseMdir
 
 state.reqSeq  := 3
 state.cmdCode := 3
 state.errCode := 0
+PRINT "Parent: write quit request seq "; state.reqSeq
 RUN ipcWriteState(state, fileOK)
 IF NOT fileOK THEN
   PRINT "TSTSIGIPC: write quit request failed"
   END
 ENDIF
+PRINT "Parent: send quit wake to "; iChildPID
 RUN ipcSendWake(iChildPID, childOK, iErrCode)
 IF NOT childOK THEN
   PRINT "TSTSIGIPC: send quit wake failed err "; iErrCode
@@ -172,8 +137,6 @@ IF ok THEN
 ELSE
   PRINT "Child wait failed err = "; iErrCode
 ENDIF
-
-RUN dropStateFile
 END
 
 900 PRINT "TSTSIGIPC error ("; ERR; ")"
@@ -181,9 +144,9 @@ END
 
 PROCEDURE initSigState
 (* ============================================================ *)
-(* PROCEDURE : initSigState                                     *)
-(* PURPOSE   : Create the shared state file with parent PID and *)
-(*             zeroed request and response bytes.               *)
+(* PROCEDURE : initSigState                                    *)
+(* PURPOSE   : Create the shared TSTSIGS2 state file for        *)
+(*             TSTSIGSRV2 with parent PID and zeroed bytes.     *)
 (* ============================================================ *)
 TYPE SigState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,statusCode,errCode:BYTE
 PARAM iParentPID : INTEGER
@@ -198,7 +161,7 @@ pathOpen := FALSE
 ok       := FALSE
 
 ON ERROR GOTO 100
-DELETE "TSTSIGST"
+DELETE "TSTSIGS2"
 
 100 ON ERROR GOTO 900
 
@@ -211,7 +174,7 @@ state.cmdCode    := 0
 state.statusCode := 0
 state.errCode    := 0
 
-CREATE #path, "TSTSIGST":UPDATE
+CREATE #path, "TSTSIGS2":UPDATE
 pathOpen := TRUE
 PUT #path, state
 
@@ -229,8 +192,8 @@ END
 
 PROCEDURE ipcReadState
 (* ============================================================ *)
-(* PROCEDURE : ipcReadState                                     *)
-(* PURPOSE   : Read the shared TSTSIGST state record.           *)
+(* PROCEDURE : ipcReadState                                    *)
+(* PURPOSE   : Read the shared TSTSIGS2 state record.           *)
 (* ============================================================ *)
 TYPE SigState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,statusCode,errCode:BYTE
 PARAM state : SigState
@@ -243,7 +206,7 @@ ON ERROR GOTO 900
 pathOpen := FALSE
 ok       := FALSE
 
-OPEN #path, "TSTSIGST":READ
+OPEN #path, "TSTSIGS2":READ
 pathOpen := TRUE
 GET #path, state
 IF state.magic <> $53 THEN
@@ -265,8 +228,8 @@ END
 
 PROCEDURE ipcWriteState
 (* ============================================================ *)
-(* PROCEDURE : ipcWriteState                                    *)
-(* PURPOSE   : Rewrite the shared TSTSIGST state record.        *)
+(* PROCEDURE : ipcWriteState                                   *)
+(* PURPOSE   : Rewrite the shared TSTSIGS2 state record.        *)
 (* ============================================================ *)
 TYPE SigState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,statusCode,errCode:BYTE
 PARAM state : SigState
@@ -279,7 +242,7 @@ ON ERROR GOTO 900
 pathOpen := FALSE
 ok       := FALSE
 
-OPEN #path, "TSTSIGST":UPDATE
+OPEN #path, "TSTSIGS2":UPDATE
 pathOpen := TRUE
 PUT #path, state
 
@@ -297,7 +260,7 @@ END
 
 PROCEDURE ipcGetProcID
 (* ============================================================ *)
-(* PROCEDURE : ipcGetProcID                                     *)
+(* PROCEDURE : ipcGetProcID                                    *)
 (* PURPOSE   : Return the current process ID via F$ID.          *)
 (* ============================================================ *)
 TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
@@ -328,8 +291,8 @@ END
 
 PROCEDURE forkSigChild
 (* ============================================================ *)
-(* PROCEDURE : forkSigChild                                     *)
-(* PURPOSE   : Fork the TSTSIGSRV child process.                *)
+(* PROCEDURE : forkSigChild                                    *)
+(* PURPOSE   : Fork the TSTSIGSRV2 child process.               *)
 (* ============================================================ *)
 TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
 PARAM ok      : BOOLEAN
@@ -341,13 +304,13 @@ DIM paramBuf(24): BYTE
 DIM iCC        : INTEGER
 DIM nameLen    : INTEGER
 DIM i          : INTEGER
-DIM childName  : STRING[9]
+DIM childName  : STRING[10]
 
 ON ERROR GOTO 900
 
 ok        := FALSE
 errCode   := 0
-childName := "TSTSIGSRV"
+childName := "TSTSIGSRV2"
 
 runbBuf(1) := ASC("R")
 runbBuf(2) := ASC("u")
@@ -386,7 +349,7 @@ END
 
 PROCEDURE ipcSendWake
 (* ============================================================ *)
-(* PROCEDURE : ipcSendWake                                      *)
+(* PROCEDURE : ipcSendWake                                     *)
 (* PURPOSE   : Send the wake signal to another process.         *)
 (* ============================================================ *)
 TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
@@ -421,10 +384,9 @@ END
 
 PROCEDURE ipcSleep
 (* ============================================================ *)
-(* PROCEDURE : ipcSleep                                         *)
+(* PROCEDURE : ipcSleep                                        *)
 (* PURPOSE   : Sleep briefly so a missed wake does not block    *)
-(*             the parent forever. A later wake can still break *)
-(*             the sleep early.                                 *)
+(*             the parent forever.                              *)
 (* ============================================================ *)
 TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
 PARAM ok      : BOOLEAN
@@ -456,9 +418,8 @@ END
 
 PROCEDURE waitForResponse
 (* ============================================================ *)
-(* PROCEDURE : waitForResponse                                  *)
-(* PURPOSE   : Wait until rspSeq reaches the requested value,   *)
-(*             sleeping between polls and waking on F$Send.     *)
+(* PROCEDURE : waitForResponse                                 *)
+(* PURPOSE   : Wait until rspSeq reaches the requested value.   *)
 (* ============================================================ *)
 TYPE SigState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,statusCode,errCode:BYTE
 PARAM wantRsp : INTEGER
@@ -499,9 +460,9 @@ END
 
 PROCEDURE waitForReady
 (* ============================================================ *)
-(* PROCEDURE : waitForReady                                     *)
+(* PROCEDURE : waitForReady                                    *)
 (* PURPOSE   : Wait until the child publishes its PID and ready *)
-(*             status in TSTSIGST.                              *)
+(*             status in TSTSIGS2.                              *)
 (* ============================================================ *)
 TYPE SigState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,statusCode,errCode:BYTE
 PARAM state : SigState
@@ -541,11 +502,10 @@ END
     ok := FALSE
 END
 
-PROCEDURE probeDirectRun
+PROCEDURE probeDirectA
 (* ============================================================ *)
-(* PROCEDURE : probeDirectRun                                   *)
-(* PURPOSE   : Attempt to RUN tstSigPing without any local      *)
-(*             link/load helper in this procedure.              *)
+(* PROCEDURE : probeDirectA                                    *)
+(* PURPOSE   : Attempt to RUN tstSig2PingA without local link.  *)
 (* ============================================================ *)
 PARAM ok      : BOOLEAN
 PARAM errCode : INTEGER
@@ -554,7 +514,26 @@ ON ERROR GOTO 900
 
 ok      := FALSE
 errCode := 0
-RUN tstSigPing(ok)
+RUN tstSig2PingA(ok)
+END
+
+900 errCode := ERR
+    ok := FALSE
+END
+
+PROCEDURE probeDirectB
+(* ============================================================ *)
+(* PROCEDURE : probeDirectB                                    *)
+(* PURPOSE   : Attempt to RUN tstSig2PingB without local link.  *)
+(* ============================================================ *)
+PARAM ok      : BOOLEAN
+PARAM errCode : INTEGER
+
+ON ERROR GOTO 900
+
+ok      := FALSE
+errCode := 0
+RUN tstSig2PingB(ok)
 END
 
 900 errCode := ERR
@@ -563,8 +542,9 @@ END
 
 PROCEDURE linkLocalModule
 (* ============================================================ *)
-(* PROCEDURE : linkLocalModule                                  *)
-(* PURPOSE   : Probe parent visibility of TSTSIGMOD via F$Link. *)
+(* PROCEDURE : linkLocalModule                                 *)
+(* PURPOSE   : Probe parent visibility of TSTSIGMOD2 via        *)
+(*             F$Link.                                          *)
 (* ============================================================ *)
 TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
 PARAM modName : STRING[20]
@@ -577,12 +557,12 @@ DIM iCC       : INTEGER
 
 ON ERROR GOTO 900
 
-hdrAddr   := 0
-ok        := FALSE
-errCode   := 0
-callCode  := $00
-regs.a    := 0
-regs.x    := ADDR(modName)
+hdrAddr  := 0
+ok       := FALSE
+errCode  := 0
+callCode := $00
+regs.a   := 0
+regs.x   := ADDR(modName)
 RUN SysCall(callCode, regs)
 iCC := regs.cc
 IF LAND(iCC, 1) <> 0 THEN
@@ -601,7 +581,7 @@ END
 
 PROCEDURE unlinkLocalModule
 (* ============================================================ *)
-(* PROCEDURE : unlinkLocalModule                                *)
+(* PROCEDURE : unlinkLocalModule                               *)
 (* PURPOSE   : Unlink a locally linked module by header addr.   *)
 (* ============================================================ *)
 TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
@@ -615,8 +595,8 @@ DIM iCC       : INTEGER
 
 ON ERROR GOTO 900
 
-ok       := FALSE
-errCode  := 0
+ok      := FALSE
+errCode := 0
 IF hdrAddr = 0 THEN
   ok := TRUE
   END
@@ -641,10 +621,99 @@ END
     errCode := ERR
 END
 
+PROCEDURE unloadByName
+(* ============================================================ *)
+(* PROCEDURE : unloadByName                                    *)
+(* PURPOSE   : Issue F$UnLoad by merged module name.            *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM modName  : STRING[20]
+PARAM ok       : BOOLEAN
+PARAM errCode  : INTEGER
+DIM regs       : Register
+DIM callCode   : BYTE
+DIM iCC        : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errCode  := 0
+callCode := $1D
+regs.a   := 0
+regs.x   := ADDR(modName)
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errCode := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "unloadByName error ("; ERR; ")"
+    ok := FALSE
+    errCode := ERR
+END
+
+PROCEDURE unloadModuleList
+(* ============================================================ *)
+(* PROCEDURE : unloadModuleList                                *)
+(* PURPOSE   : Read MODULELIST and issue F$UnLoad for each      *)
+(*             listed module name.                              *)
+(* ============================================================ *)
+PARAM ok      : BOOLEAN
+PARAM errCode : INTEGER
+DIM path      : BYTE
+DIM pathOpen  : BOOLEAN
+DIM cnt       : BYTE
+DIM modCnt    : INTEGER
+DIM idx       : INTEGER
+DIM modName   : STRING[20]
+DIM oneOK     : BOOLEAN
+DIM oneErr    : INTEGER
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+ok       := FALSE
+errCode  := 0
+
+OPEN #path, "MODULELIST":READ
+pathOpen := TRUE
+GET #path, cnt
+modCnt := cnt
+PRINT "unloadModuleList: count "; modCnt
+
+FOR idx := 1 TO modCnt
+  GET #path, modName
+  PRINT "unloadModuleList: "; idx; " "; modName
+  RUN unloadByName(modName, oneOK, oneErr)
+  IF NOT oneOK THEN
+    errCode := oneErr
+    PRINT "unloadModuleList: unload failed "; modName; " err "; oneErr
+    END
+  ENDIF
+NEXT idx
+
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "unloadModuleList error ("; ERR; ")"
+    ok := FALSE
+    errCode := ERR
+END
+
 PROCEDURE dropLocalModule
 (* ============================================================ *)
-(* PROCEDURE : dropLocalModule                                  *)
-(* PURPOSE   : Best-effort unlink of a locally visible module.  *)
+(* PROCEDURE : dropLocalModule                                 *)
+(* PURPOSE   : Best-effort release of a locally visible module  *)
+(*             by name and header probe.                        *)
 (* ============================================================ *)
 PARAM modName : STRING[20]
 DIM hdrAddr   : INTEGER
@@ -653,6 +722,7 @@ DIM errCode   : INTEGER
 
 ON ERROR GOTO 900
 
+RUN unloadByName(modName, ok, errCode)
 RUN linkLocalModule(modName, hdrAddr, ok, errCode)
 IF ok THEN
   RUN unlinkLocalModule(modName, hdrAddr, ok, errCode)
@@ -664,8 +734,8 @@ END
 
 PROCEDURE waitChildExit
 (* ============================================================ *)
-(* PROCEDURE : waitChildExit                                    *)
-(* PURPOSE   : Wait for the TSTSIGSRV child to exit.            *)
+(* PROCEDURE : waitChildExit                                   *)
+(* PURPOSE   : Wait for the TSTSIGSRV2 child to exit.           *)
 (* ============================================================ *)
 TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
 PARAM exitStat : INTEGER
@@ -697,11 +767,20 @@ END
     errCode := ERR
 END
 
-PROCEDURE dropStateFile
+PROCEDURE pauseMdir
 (* ============================================================ *)
-(* PROCEDURE : dropStateFile                                    *)
-(* PURPOSE   : Best-effort cleanup of the shared state file.    *)
+(* PROCEDURE : pauseMdir                                       *)
+(* PURPOSE   : Pause after mdir output so the module listing    *)
+(*             can be reviewed before the post-unload probes.   *)
 (* ============================================================ *)
-ON ERROR GOTO 100
-DELETE "TSTSIGST"
-100 END
+DIM k : STRING[1]
+
+ON ERROR GOTO 900
+
+PRINT "Press any key to continue...";
+GET #0, k
+PRINT
+END
+
+900 PRINT "pauseMdir error ("; ERR; ")"
+END
