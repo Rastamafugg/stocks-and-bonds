@@ -2,16 +2,19 @@ PROCEDURE snbMarketPlayer
 (* ============================================================ *)
 (* PROCEDURE : snbMarketPlayer                                  *)
 (* PURPOSE   : Apply this year's split flags to one passed-in   *)
-(*             player record, then return the next checkpoint   *)
-(*             for the coordinator-owned market player loop.    *)
+(*             player record, show one per-player split screen  *)
+(*             that lists all of that player's split stocks,    *)
+(*             then return the next checkpoint for the          *)
+(*             coordinator-owned market player loop.            *)
 (* PARAMS    : plyrIdx      - active player index               *)
 (*             plyrCnt      - configured player count           *)
 (*             plyr         - active player record              *)
 (*             splitOcc     - TRUE per stock when split hit     *)
-(*             action       - OUT 1=continue                    *)
+(*             action       - OUT 1=continue 2=save+exit 3=quit *)
 (*             savePhaseVal - OUT next checkpoint phase         *)
 (*             savePlyrVal  - OUT next checkpoint player        *)
 (* SIDE EFX  : Modifies plyr share counts in memory only.       *)
+(*             Displays one split screen when applicable.       *)
 (* ============================================================ *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
@@ -22,17 +25,33 @@ PARAM splitOcc(9)  : BOOLEAN
 PARAM action       : INTEGER
 PARAM savePhaseVal : INTEGER
 PARAM savePlyrVal  : INTEGER
+DIM navAct         : BYTE
+DIM hasSplit       : BOOLEAN
 DIM s              : INTEGER
+
+ON ERROR GOTO 900
 
 action := 1
 savePhaseVal := 10
 savePlyrVal  := plyrIdx
+hasSplit := FALSE
 
 FOR s := 1 TO 9
   IF splitOcc(s) AND plyr.stckShrs(s) > 0 THEN
     plyr.stckShrs(s) := plyr.stckShrs(s) * 2
+    hasSplit := TRUE
   ENDIF
 NEXT s
+
+IF hasSplit THEN
+  navAct := 1
+  RUN scrPlyrSplit(plyr, splitOcc, navAct)
+  IF navAct = 2 THEN
+    action := 2
+  ELSE IF navAct = 3 THEN
+    action := 3
+  ENDIF \ENDIF
+ENDIF
 
 IF plyrIdx < plyrCnt THEN
   savePhaseVal := 10
@@ -41,4 +60,50 @@ ELSE
   savePhaseVal := 11
   savePlyrVal  := 1
 ENDIF
+END
+
+900 PRINT "snbMarketPlayer error ("; ERR; ")"
+END
+
+PROCEDURE scrPlyrSplit
+(* ============================================================ *)
+(* PROCEDURE : scrPlyrSplit                                     *)
+(* PURPOSE   : Display one player's stock splits for the year.  *)
+(*             Lists only the player's split stocks and shows   *)
+(*             share counts before and after the split.         *)
+(* PARAMS    : plyr     - updated player record after splits    *)
+(*             splitOcc - TRUE per stock when split hit         *)
+(*             action   - OUT 1=continue 2=save+exit 3=quit     *)
+(* SIDE EFX  : Clears screen and reads phase navigation input.  *)
+(* ============================================================ *)
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+PARAM plyr        : PlyrRec
+PARAM splitOcc(9) : BOOLEAN
+PARAM action      : BYTE
+DIM sNam          : STRING[14]
+DIM befQty        : INTEGER
+DIM s             : INTEGER
+
+ON ERROR GOTO 900
+
+RUN clrScr
+PRINT "=== STOCK SPLITS ==="
+PRINT
+PRINT "  "; plyr.plyrName
+PRINT
+PRINT "  STOCK          BEFORE   AFTER"
+PRINT "  ------------   ------  ------"
+FOR s := 1 TO 9
+  IF splitOcc(s) AND plyr.stckShrs(s) > 0 THEN
+    RUN getStockName(s, sNam)
+    befQty := plyr.stckShrs(s) / 2
+    PRINT USING "'  ',S12<,X3,I6>,X2,I6>", sNam, befQty, plyr.stckShrs(s)
+  ENDIF
+NEXT s
+PRINT
+RUN getPhaseNav(action)
+END
+
+900 PRINT "scrPlyrSplit error ("; ERR; ")"
 END

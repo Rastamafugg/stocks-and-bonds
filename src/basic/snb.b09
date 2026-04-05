@@ -207,10 +207,9 @@ LOOP
           IF NOT ok THEN
             gameOver := TRUE
           ELSE
-            iPlyrCnt := hdr.plyrCount
             marketAct := 1
             ! Line exceeds 79 chars; RUN statement cannot be split.
-            RUN snbMarketPost(iPlyrCnt, mkPrcBef, mkMktDlt, mkCrdDlt, mkSpOcc, mkDvSusp, mkDvRnst, marketAct)
+            RUN snbMarketPost(mkPrcBef, mkMktDlt, mkCrdDlt, mkSpOcc, mkDvSusp, mkDvRnst, marketAct)
             RUN unloadModuleList(modList, hdrList, modCnt, ok)
             IF NOT ok THEN
               END
@@ -313,10 +312,9 @@ LOOP
         IF NOT ok THEN
           END
         ENDIF
-        iPlyrCnt := hdr.plyrCount
         marketAct := 1
         ! Line exceeds 79 chars; RUN statement cannot be split.
-        RUN snbMarketPost(iPlyrCnt, mkPrcBef, mkMktDlt, mkCrdDlt, mkSpOcc, mkDvSusp, mkDvRnst, marketAct)
+        RUN snbMarketPost(mkPrcBef, mkMktDlt, mkCrdDlt, mkSpOcc, mkDvSusp, mkDvRnst, marketAct)
         RUN unloadModuleList(modList, hdrList, modCnt, ok)
         IF NOT ok THEN
           END

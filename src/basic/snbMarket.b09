@@ -147,25 +147,21 @@ PROCEDURE snbMarketPost
 (* ============================================================ *)
 (* PROCEDURE : snbMarketPost                                    *)
 (* PURPOSE   : Post-update market display phase. Displays       *)
-(*             S13-S15 after the coordinator-owned player       *)
+(*             S13 and S15 after the coordinator-owned player   *)
 (*             split-update loop has written player records.    *)
-(* PARAMS    : plyrCnt - configured player count                *)
-(*             prcBef  - pre-card price per stock               *)
+(* PARAMS    : prcBef  - pre-card price per stock               *)
 (*             mktDlt  - market-table delta per stock           *)
 (*             crdDlt  - situation-card delta per stock         *)
 (*             spOcc   - TRUE per stock when split hit          *)
 (*             dvSusp  - TRUE per stock when div suspended      *)
 (*             dvRnst  - TRUE per stock when div restored       *)
 (*             action  - OUT 1=continue 2=save+exit 3=quit      *)
-(* SIDE EFX  : Reads SNBSTATE header, market, and players.      *)
-(*             May write save/quit checkpoints.                 *)
+(* SIDE EFX  : Reads SNBSTATE header and market. May write      *)
+(*             save/quit checkpoints.                           *)
 (* ============================================================ *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
 TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
-! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
-PARAM plyrCnt     : INTEGER
 PARAM prcBef(9)   : INTEGER
 PARAM mktDlt(9)   : INTEGER
 PARAM crdDlt(9)   : INTEGER
@@ -178,17 +174,9 @@ DIM mkt           : MktState
 DIM loadOK        : BOOLEAN
 DIM saveOK        : BOOLEAN
 DIM sNam          : STRING[12]
-DIM pNames(6)     : STRING[27]
-DIM shrBf(6)      : INTEGER
-DIM shrAf(6)      : INTEGER
-DIM plyr          : PlyrRec
-DIM plyrOK        : BOOLEAN
 DIM evTyp         : INTEGER
-DIM oDPrc         : INTEGER
 DIM actByt        : BYTE
-DIM p             : INTEGER
 DIM s             : INTEGER
-DIM tInt          : INTEGER
 
 ON ERROR GOTO 900
 
@@ -212,42 +200,8 @@ ELSE IF actByt = 3 THEN
   END
 ENDIF \ENDIF
 
-! Display S14/S15 per stock where a notable event occurred.
+! Display S15 per stock where a dividend-status event occurred.
 FOR s := 1 TO 9
-  IF spOcc(s) THEN
-    FOR tInt := 1 TO 6
-      pNames(tInt) := ""
-      shrAf(tInt)  := 0
-      shrBf(tInt)  := 0
-    NEXT tInt
-    oDPrc := mkt.stckPrice(s) * 2
-    RUN getMktStockName(s, sNam)
-    FOR p := 1 TO plyrCnt
-      RUN loadPlyrRec("SNBSTATE", hdr, p, plyr, plyrOK)
-      IF NOT plyrOK THEN
-        PRINT "snbMarketPost: loadPlyrRec failed"
-        END
-      ENDIF
-      pNames(p) := plyr.plyrName
-      shrAf(p)  := plyr.stckShrs(s)
-      IF shrAf(p) > 0 THEN
-        shrBf(p) := shrAf(p) / 2
-      ELSE
-        shrBf(p) := 0
-      ENDIF
-    NEXT p
-    ! Line exceeds 79 chars; RUN statement cannot be split.
-    RUN scrSplit(sNam, oDPrc, mkt.stckPrice(s), plyrCnt, pNames, shrBf, shrAf, actByt)
-    IF actByt = 2 THEN
-      RUN saveMktToMenu(1, 1, hdr, mkt, saveOK)
-      action := 2
-      END
-    ELSE IF actByt = 3 THEN
-      RUN quitMktToMenu(hdr, mkt, saveOK)
-      action := 3
-      END
-    ENDIF \ENDIF
-  ENDIF
   IF dvSusp(s) OR dvRnst(s) THEN
     RUN getMktStockName(s, sNam)
     IF dvSusp(s) THEN
@@ -1191,55 +1145,6 @@ RUN getPhaseNav(action)
 END
 
 900 PRINT "scrMktBoard error ("; ERR; ")"
-END
-
-PROCEDURE scrSplit
-(* ============================================================ *)
-(* PROCEDURE : scrSplit                                         *)
-(* PURPOSE   : Display the stock split notification (S14) for  *)
-(*             one split event. Shows the stock name, old and  *)
-(*             new price, and one row per player who held       *)
-(*             shares before the split (shrBef > 0). Players   *)
-(*             with zero shares before the split are skipped.  *)
-(*             Blocks until any key is pressed.                *)
-(* PARAMS    : stkName  - stock name for display               *)
-(*             oldPrc   - price before split                    *)
-(*             newPrc   - price after split                     *)
-(*             plyrCnt  - number of active players (1..6)      *)
-(*             plyrName - player name per slot (1..plyrCnt)    *)
-(*             shrBef   - shares held before split per player  *)
-(*             shrAft   - shares held after split per player   *)
-(*             action   - returns 1=CONTINUE 2=SAVE 3=QUIT     *)
-(* SIDE EFX  : Clears screen. Blocks on keypress via waitKey. *)
-(* ============================================================ *)
-PARAM stkName     : STRING[12]
-PARAM oldPrc      : INTEGER
-PARAM newPrc      : INTEGER
-PARAM plyrCnt     : INTEGER
-PARAM plyrName(6) : STRING[27]
-PARAM shrBef(6)   : INTEGER
-PARAM shrAft(6)   : INTEGER
-PARAM action      : BYTE
-DIM p : INTEGER
-
-RUN clrScr
-PRINT
-PRINT "  STOCK SPLIT  2 FOR 1"
-PRINT
-PRINT "  "; stkName
-PRINT
-PRINT USING "'  Old price:  $',I4>", oldPrc
-PRINT USING "'  New price:  $',I4>", newPrc
-PRINT
-PRINT "  PLAYER                      BEFORE   AFTER"
-PRINT "  --------------------------  ------  ------"
-FOR p := 1 TO plyrCnt
-  IF shrBef(p) > 0 THEN
-    PRINT USING "'  ',S27<,I6>,X2,I6>", plyrName(p), shrBef(p), shrAft(p)
-  ENDIF
-NEXT p
-PRINT
-RUN getPhaseNav(action)
 END
 
 PROCEDURE scrDivFlag
