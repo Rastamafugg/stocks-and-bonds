@@ -148,6 +148,10 @@ ENDIF
 PRINT "Child unload status = "; state.statusCode; " err = "; state.errCode
 PRINT
 
+PRINT "-- mdir before post-unload direct probes --"
+SHELL "mdir"
+RUN pause3Mdir
+
 PRINT "Repeat direct probe A after parent unload and child unload:"
 RUN probe3DirectA(callAOK, callAErr)
 IF callAOK THEN
@@ -833,4 +837,22 @@ END
 900 PRINT "wait3ChildExit error ("; ERR; ")"
     ok := FALSE
     errCode := ERR
+END
+
+PROCEDURE pause3Mdir
+(* ============================================================ *)
+(* PROCEDURE : pause3Mdir                                       *)
+(* PURPOSE   : Pause after mdir output so the module listing    *)
+(*             can be reviewed before the post-unload probes.   *)
+(* ============================================================ *)
+DIM k : STRING[1]
+
+ON ERROR GOTO 900
+
+PRINT "Press any key to continue...";
+GET #0, k
+PRINT
+END
+
+900 PRINT "pause3Mdir error ("; ERR; ")"
 END
