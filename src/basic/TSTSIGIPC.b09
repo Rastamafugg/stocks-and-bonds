@@ -103,6 +103,7 @@ IF NOT waitOK THEN
 ENDIF
 PRINT "Child load status = "; state.statusCode; " err = "; state.errCode
 PRINT
+RUN pauseForKey
 
 PRINT "Direct probe A after child load:"
 RUN probeDirectA(callAOK, callAErr)
