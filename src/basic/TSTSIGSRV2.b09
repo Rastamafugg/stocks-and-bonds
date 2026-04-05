@@ -461,6 +461,7 @@ LOOP
     ENDEXIT
   ENDLOOP
   modCnt := modCnt + 1
+  PRINT "srv2WriteModuleList: wrote "; modName; " count "; modCnt
   PUT #path, modName
   curAddr := curAddr + modSz
 ENDLOOP
