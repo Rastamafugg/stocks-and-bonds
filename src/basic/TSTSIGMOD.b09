@@ -1,0 +1,22 @@
+PROCEDURE TSTSIGMOD
+(* ============================================================ *)
+(* PROCEDURE : TSTSIGMOD                                        *)
+(* PURPOSE   : Module anchor for signal-load visibility probe.  *)
+(* ============================================================ *)
+PRINT "TSTSIGMOD"
+PRINT "  tstSigPing"
+END
+
+PROCEDURE tstSigPing
+(* ============================================================ *)
+(* PROCEDURE : tstSigPing                                       *)
+(* PURPOSE   : Minimal callable procedure used by TSTSIGIPC to  *)
+(*             test whether a child-loaded module is directly   *)
+(*             callable in the parent without a local link.     *)
+(* PARAMS    : ok - TRUE on successful call                     *)
+(* SIDE EFX  : None                                             *)
+(* ============================================================ *)
+PARAM ok : BOOLEAN
+
+ok := TRUE
+END

@@ -1,0 +1,392 @@
+PROCEDURE TSTSIGSRV
+(* ============================================================ *)
+(* PROCEDURE : TSTSIGSRV                                        *)
+(* PURPOSE   : Child process for TSTSIGIPC. Waits for wake      *)
+(*             signals, reads a shared state file, and performs *)
+(*             module load/unlink requests in the child         *)
+(*             process only.                                    *)
+(* ============================================================ *)
+TYPE SigState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,statusCode,errCode:BYTE
+DIM state      : SigState
+DIM ok         : BOOLEAN
+DIM sigOK      : BOOLEAN
+DIM pidOK      : BOOLEAN
+DIM fileOK     : BOOLEAN
+DIM iChildPID  : INTEGER
+DIM lastReq    : INTEGER
+DIM targetHdr  : INTEGER
+DIM statCode   : INTEGER
+DIM iErrCode   : INTEGER
+
+ON ERROR GOTO 900
+
+lastReq   := 0
+targetHdr := 0
+
+RUN srvGetProcID(iChildPID, pidOK)
+IF NOT pidOK THEN
+  PRINT "TSTSIGSRV: srvGetProcID failed"
+  END
+ENDIF
+
+RUN srvReadState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTSIGSRV: initial state read failed"
+  END
+ENDIF
+
+state.childPid   := iChildPID
+state.statusCode := 10
+state.errCode    := 0
+RUN srvWriteState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTSIGSRV: initial state write failed"
+  END
+ENDIF
+
+RUN srvSendWake(state.parentPid, sigOK, iErrCode)
+IF NOT sigOK THEN
+  PRINT "TSTSIGSRV: ready wake failed err "; iErrCode
+  END
+ENDIF
+
+LOOP
+  RUN srvReadState(state, fileOK)
+  IF NOT fileOK THEN
+    PRINT "TSTSIGSRV: loop state read failed"
+    END
+  ENDIF
+
+  IF state.reqSeq = lastReq THEN
+    RUN srvSleep(sigOK, iErrCode)
+    IF NOT sigOK THEN
+      PRINT "TSTSIGSRV: sleep failed err "; iErrCode
+      END
+    ENDIF
+  ELSE
+    lastReq := state.reqSeq
+    statCode := 255
+    iErrCode := 0
+
+    IF state.cmdCode = 1 THEN
+      RUN srvLoadModule("TSTSIGMOD", targetHdr, statCode, ok, iErrCode)
+    ELSE IF state.cmdCode = 2 THEN
+      RUN srvUnloadModule("TSTSIGMOD", targetHdr, statCode, ok, iErrCode)
+    ELSE IF state.cmdCode = 3 THEN
+      IF targetHdr <> 0 THEN
+        RUN srvUnloadModule("TSTSIGMOD", targetHdr, statCode, ok, iErrCode)
+        IF NOT ok THEN
+          statCode := 255
+        ELSE
+          statCode := 40
+        ENDIF
+      ELSE
+        ok       := TRUE
+        statCode := 40
+      ENDIF
+    ELSE
+      ok       := FALSE
+      statCode := 254
+      iErrCode := state.cmdCode
+    ENDIF \ENDIF \ENDIF
+
+    state.statusCode := statCode
+    state.errCode    := iErrCode
+    state.rspSeq     := state.reqSeq
+    RUN srvWriteState(state, fileOK)
+    IF NOT fileOK THEN
+      PRINT "TSTSIGSRV: loop state write failed"
+      END
+    ENDIF
+
+    RUN srvSendWake(state.parentPid, sigOK, iErrCode)
+    IF NOT sigOK THEN
+      PRINT "TSTSIGSRV: response wake failed err "; iErrCode
+      END
+    ENDIF
+
+    IF state.cmdCode = 3 THEN
+      END
+    ENDIF
+  ENDIF
+ENDLOOP
+END
+
+900 PRINT "TSTSIGSRV error ("; ERR; ")"
+END
+
+PROCEDURE srvReadState
+(* ============================================================ *)
+(* PROCEDURE : srvReadState                                     *)
+(* PURPOSE   : Read the shared TSTSIGST state record.           *)
+(* ============================================================ *)
+TYPE SigState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,statusCode,errCode:BYTE
+PARAM state : SigState
+PARAM ok    : BOOLEAN
+DIM path    : BYTE
+DIM pathOpen: BOOLEAN
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+ok       := FALSE
+
+OPEN #path, "TSTSIGST":READ
+pathOpen := TRUE
+GET #path, state
+IF state.magic <> $53 THEN
+  PRINT "srvReadState: invalid magic"
+  END
+ENDIF
+
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "srvReadState error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE srvWriteState
+(* ============================================================ *)
+(* PROCEDURE : srvWriteState                                    *)
+(* PURPOSE   : Rewrite the shared TSTSIGST state record.        *)
+(* ============================================================ *)
+TYPE SigState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,statusCode,errCode:BYTE
+PARAM state : SigState
+PARAM ok    : BOOLEAN
+DIM path    : BYTE
+DIM pathOpen: BOOLEAN
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+ok       := FALSE
+
+OPEN #path, "TSTSIGST":UPDATE
+pathOpen := TRUE
+PUT #path, state
+
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "srvWriteState error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE srvGetProcID
+(* ============================================================ *)
+(* PROCEDURE : srvGetProcID                                     *)
+(* PURPOSE   : Return the current process ID via F$ID.          *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM procID : INTEGER
+PARAM ok     : BOOLEAN
+DIM regs     : Register
+DIM callCode : BYTE
+DIM iCC      : INTEGER
+
+ON ERROR GOTO 900
+
+procID   := 0
+ok       := FALSE
+callCode := $0C
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  END
+ENDIF
+
+procID := regs.a
+ok := TRUE
+END
+
+900 PRINT "srvGetProcID error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE srvSendWake
+(* ============================================================ *)
+(* PROCEDURE : srvSendWake                                      *)
+(* PURPOSE   : Send the wake signal to another process.         *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM procID  : INTEGER
+PARAM ok      : BOOLEAN
+PARAM errCode : INTEGER
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errCode  := 0
+callCode := $08
+regs.a   := procID
+regs.b   := 1
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errCode := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "srvSendWake error ("; ERR; ")"
+    ok := FALSE
+    errCode := ERR
+END
+
+PROCEDURE srvSleep
+(* ============================================================ *)
+(* PROCEDURE : srvSleep                                         *)
+(* PURPOSE   : Sleep until awakened by a signal.                *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM ok      : BOOLEAN
+PARAM errCode : INTEGER
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errCode  := 0
+callCode := $0A
+regs.x   := 0
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errCode := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "srvSleep error ("; ERR; ")"
+    ok := FALSE
+    errCode := ERR
+END
+
+PROCEDURE srvLoadModule
+(* ============================================================ *)
+(* PROCEDURE : srvLoadModule                                    *)
+(* PURPOSE   : Link or load TSTSIGMOD in the child process and  *)
+(*             report which path succeeded.                     *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM modName  : STRING[20]
+PARAM hdrAddr  : INTEGER
+PARAM statCode : INTEGER
+PARAM ok       : BOOLEAN
+PARAM errCode  : INTEGER
+DIM regs       : Register
+DIM callCode   : BYTE
+DIM iCC        : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errCode  := 0
+statCode := 255
+
+IF hdrAddr <> 0 THEN
+  ok       := TRUE
+  statCode := 21
+  END
+ENDIF
+
+callCode := $00
+regs.a   := 0
+regs.x   := ADDR(modName)
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) = 0 THEN
+  hdrAddr  := regs.u
+  ok       := TRUE
+  statCode := 21
+  END
+ENDIF
+
+callCode := $01
+regs.a   := 0
+regs.x   := ADDR(modName)
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errCode := regs.b
+  END
+ENDIF
+
+hdrAddr  := regs.u
+ok       := TRUE
+statCode := 22
+END
+
+900 PRINT "srvLoadModule error ("; ERR; ")"
+    ok := FALSE
+    errCode := ERR
+    statCode := 255
+END
+
+PROCEDURE srvUnloadModule
+(* ============================================================ *)
+(* PROCEDURE : srvUnloadModule                                  *)
+(* PURPOSE   : Unlink TSTSIGMOD from the child process.         *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM modName  : STRING[20]
+PARAM hdrAddr  : INTEGER
+PARAM statCode : INTEGER
+PARAM ok       : BOOLEAN
+PARAM errCode  : INTEGER
+DIM regs       : Register
+DIM callCode   : BYTE
+DIM iCC        : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errCode  := 0
+statCode := 255
+
+IF hdrAddr = 0 THEN
+  ok       := TRUE
+  statCode := 30
+  END
+ENDIF
+
+callCode := $02
+regs.u   := hdrAddr
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errCode := regs.b
+  PRINT "srvUnloadModule: unlink failed "; modName; " err "; errCode
+  END
+ENDIF
+
+hdrAddr  := 0
+ok       := TRUE
+statCode := 30
+END
+
+900 PRINT "srvUnloadModule error ("; ERR; ")"
+    ok := FALSE
+    errCode := ERR
+    statCode := 255
+END
