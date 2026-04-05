@@ -1,3 +1,13 @@
+PROCEDURE snbStateHdrPlyr
+(* ============================================================ *)
+(* PROCEDURE : snbStateHdrPlyr                                  *)
+(* PURPOSE   : Module anchor procedure for the state-header and *)
+(*             player-record I/O helper module.                 *)
+(* PARAMS    : None                                             *)
+(* SIDE EFX  : None                                             *)
+(* ============================================================ *)
+END
+
 PROCEDURE loadHdrMkt
 (* ============================================================ *)
 (* PROCEDURE : loadHdrMkt                                       *)
