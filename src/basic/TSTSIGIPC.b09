@@ -422,7 +422,9 @@ END
 PROCEDURE ipcSleep
 (* ============================================================ *)
 (* PROCEDURE : ipcSleep                                         *)
-(* PURPOSE   : Sleep until awakened by a signal.                *)
+(* PURPOSE   : Sleep briefly so a missed wake does not block    *)
+(*             the parent forever. A later wake can still break *)
+(*             the sleep early.                                 *)
 (* ============================================================ *)
 TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
 PARAM ok      : BOOLEAN
@@ -436,7 +438,7 @@ ON ERROR GOTO 900
 ok       := FALSE
 errCode  := 0
 callCode := $0A
-regs.x   := 0
+regs.x   := 2
 RUN SysCall(callCode, regs)
 iCC := regs.cc
 IF LAND(iCC, 1) <> 0 THEN
