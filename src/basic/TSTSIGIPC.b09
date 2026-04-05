@@ -16,12 +16,14 @@ DIM waitOK      : BOOLEAN
 DIM callAOK     : BOOLEAN
 DIM callBOK     : BOOLEAN
 DIM childOK     : BOOLEAN
+DIM unloadOK    : BOOLEAN
 DIM iParentPID  : INTEGER
 DIM iChildPID   : INTEGER
 DIM hdrAddr     : INTEGER
 DIM iErrCode    : INTEGER
 DIM callAErr    : INTEGER
 DIM callBErr    : INTEGER
+DIM unloadErr   : INTEGER
 DIM exitStat    : INTEGER
 
 ON ERROR GOTO 900
@@ -145,10 +147,10 @@ PRINT
 
 PRINT "-- mdir before post-unload direct probes --"
 SHELL "mdir"
-RUN pause3Mdir
+RUN pauseMdir
 
 PRINT "Repeat direct probe A after parent unload and child unload:"
-RUN probe3DirectA(callAOK, callAErr)
+RUN probeDirectA(callAOK, callAErr)
 IF callAOK THEN
   PRINT "PASS: tstSig2PingA still callable"
 ELSE
@@ -157,7 +159,7 @@ ENDIF
 PRINT
 
 PRINT "First direct probe B after parent unload and child unload:"
-RUN probe3DirectB(callBOK, callBErr)
+RUN probeDirectB(callBOK, callBErr)
 IF callBOK THEN
   PRINT "PASS: tstSig2PingB still callable"
 ELSE

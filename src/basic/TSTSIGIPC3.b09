@@ -23,7 +23,6 @@ DIM hdrAddr     : INTEGER
 DIM iErrCode    : INTEGER
 DIM callAErr    : INTEGER
 DIM callBErr    : INTEGER
-DIM unloadErr   : INTEGER
 DIM exitStat    : INTEGER
 
 ON ERROR GOTO 900
