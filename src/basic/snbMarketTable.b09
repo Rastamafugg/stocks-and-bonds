@@ -1,0 +1,600 @@
+PROCEDURE snbMarketTable
+(* ============================================================ *)
+(* PROCEDURE : snbMarketTable                                   *)
+(* PURPOSE   : Market table phase child. Applies the market     *)
+(*             and card deltas prepared by snbMarket, updates   *)
+(*             market prices, and writes the split-update       *)
+(*             checkpoint for the coordinator.                  *)
+(* PARAMS    : mktDlt  - market-table delta per stock           *)
+(*             crdDlt  - situation-card delta per stock         *)
+(*             prcBef  - OUT pre-card price per stock           *)
+(*             spOcc   - OUT TRUE per stock when split hit      *)
+(*             dvSusp  - OUT TRUE per stock when div suspended  *)
+(*             dvRnst  - OUT TRUE per stock when div restored   *)
+(* SIDE EFX  : Reads and writes SNBSTATE header and market.     *)
+(* ============================================================ *)
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+PARAM mktDlt(9)  : INTEGER
+PARAM crdDlt(9)  : INTEGER
+PARAM prcBef(9)  : INTEGER
+PARAM spOcc(9)   : BOOLEAN
+PARAM dvSusp(9)  : BOOLEAN
+PARAM dvRnst(9)  : BOOLEAN
+DIM hdr          : SaveHdr
+DIM deckOrd(36)  : BYTE
+DIM mkt          : MktState
+DIM loadOK       : BOOLEAN
+DIM saveOK       : BOOLEAN
+
+ON ERROR GOTO 900
+
+RUN loadMktState("SNBSTATE", hdr, deckOrd, mkt, loadOK)
+IF NOT loadOK THEN
+  PRINT "snbMarketTable: loadMktState failed"
+  END
+ENDIF
+
+RUN applyMktDeltaYear(mkt, mktDlt, crdDlt, prcBef, spOcc, dvSusp, dvRnst)
+
+hdr.gameStage := 2
+hdr.savedPhase := 10
+hdr.savedPlyr  := 1
+RUN saveHdrMktState("SNBSTATE", hdr, mkt, saveOK)
+IF NOT saveOK THEN
+  PRINT "snbMarketTable: saveHdrMktState failed"
+ENDIF
+END
+
+900 PRINT "snbMarketTable error ("; ERR; ")"
+END
+
+PROCEDURE snbMarketPost
+(* ============================================================ *)
+(* PROCEDURE : snbMarketPost                                    *)
+(* PURPOSE   : Post-update market display phase. Displays       *)
+(*             S13 and S15 after the coordinator-owned player   *)
+(*             split-update loop has written player records.    *)
+(* PARAMS    : prcBef  - pre-card price per stock               *)
+(*             mktDlt  - market-table delta per stock           *)
+(*             crdDlt  - situation-card delta per stock         *)
+(*             spOcc   - TRUE per stock when split hit          *)
+(*             dvSusp  - TRUE per stock when div suspended      *)
+(*             dvRnst  - TRUE per stock when div restored       *)
+(*             action  - OUT 1=continue 2=save+exit 3=quit      *)
+(* SIDE EFX  : Reads SNBSTATE header and market. May write      *)
+(*             save/quit checkpoints.                           *)
+(* ============================================================ *)
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+PARAM prcBef(9)   : INTEGER
+PARAM mktDlt(9)   : INTEGER
+PARAM crdDlt(9)   : INTEGER
+PARAM spOcc(9)    : BOOLEAN
+PARAM dvSusp(9)   : BOOLEAN
+PARAM dvRnst(9)   : BOOLEAN
+PARAM action      : INTEGER
+DIM hdr           : SaveHdr
+DIM deckOrd(36)   : BYTE
+DIM mkt           : MktState
+DIM loadOK        : BOOLEAN
+DIM saveOK        : BOOLEAN
+DIM sNam          : STRING[12]
+DIM evTyp         : INTEGER
+DIM actByt        : BYTE
+DIM s             : INTEGER
+
+ON ERROR GOTO 900
+
+action := 1
+RUN loadMktState("SNBSTATE", hdr, deckOrd, mkt, loadOK)
+IF NOT loadOK THEN
+  PRINT "snbMarketPost: loadMktState failed"
+  END
+ENDIF
+
+! Display S13 market results board.
+! Line exceeds 79 chars; RUN statement cannot be split.
+RUN scrMktBoard(prcBef, mktDlt, crdDlt, mkt.stckPrice, spOcc, dvSusp, dvRnst, actByt)
+IF actByt = 2 THEN
+  RUN saveMktToMenu(1, 1, hdr, mkt, saveOK)
+  action := 2
+  END
+ELSE IF actByt = 3 THEN
+  RUN quitMktToMenu(hdr, mkt, saveOK)
+  action := 3
+  END
+ENDIF \ENDIF
+
+! Display S15 per stock where a dividend-status event occurred.
+FOR s := 1 TO 9
+  IF dvSusp(s) OR dvRnst(s) THEN
+    RUN getMktStockName(s, sNam)
+    IF dvSusp(s) THEN
+      evTyp := 1
+    ELSE
+      evTyp := 2
+    ENDIF
+    RUN scrDivFlag(sNam, evTyp, mkt.stckPrice(s), 50, actByt)
+    IF actByt = 2 THEN
+      RUN saveMktToMenu(1, 1, hdr, mkt, saveOK)
+      action := 2
+      END
+    ELSE IF actByt = 3 THEN
+      RUN quitMktToMenu(hdr, mkt, saveOK)
+      action := 3
+      END
+    ENDIF \ENDIF
+  ENDIF
+NEXT s
+
+hdr.gameStage := 2
+hdr.savedPhase := 1
+hdr.savedPlyr  := 1
+RUN saveHdrMktState("SNBSTATE", hdr, mkt, saveOK)
+IF NOT saveOK THEN
+  PRINT "snbMarketPost: saveHdrMktState failed"
+ENDIF
+END
+
+900 PRINT "snbMarketPost error ("; ERR; ")"
+END
+
+PROCEDURE loadMktState
+(* ============================================================ *)
+(* PROCEDURE : loadMktState                                     *)
+(* PURPOSE   : Load save header, trimmed deck, and market only. *)
+(*             Player records are skipped.                      *)
+(* PARAMS    : savePath - source filename                       *)
+(*             hdr      - receives SaveHdr                      *)
+(*             deckOrd  - receives trimmed deck entries         *)
+(*             mkt      - receives market state                 *)
+(*             loadOK   - TRUE on success                       *)
+(* SIDE EFX  : Prints diagnostic on failure.                    *)
+(* ============================================================ *)
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+PARAM savePath   : STRING[20]
+PARAM hdr        : SaveHdr
+PARAM deckOrd(36): BYTE
+PARAM mkt        : MktState
+PARAM loadOK     : BOOLEAN
+DIM path       : BYTE
+DIM pathOpen   : BOOLEAN
+DIM chkExp     : INTEGER
+DIM iMaxYr     : INTEGER
+DIM iDeckCnt   : INTEGER
+DIM i          : INTEGER
+DIM seekPos    : INTEGER
+DIM skipPlyr   : PlyrRec
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+loadOK   := FALSE
+
+OPEN #path, savePath:READ
+pathOpen := TRUE
+GET #path, hdr
+
+IF hdr.magic <> $53 THEN
+  PRINT "loadMktState: not a valid save file: "; savePath
+  END
+ENDIF
+IF hdr.fmtVersion <> 2 THEN
+  PRINT "loadMktState: incompatible save file version: "; savePath
+  END
+ENDIF
+
+chkExp := hdr.magic      + hdr.fmtVersion + hdr.maxYears
+chkExp := chkExp + hdr.plyrCount  + hdr.rollMode
+chkExp := chkExp + hdr.mgnRule    + hdr.currYear
+chkExp := chkExp + hdr.savedPhase + hdr.savedPlyr
+chkExp := chkExp + hdr.gameStage  + hdr.bnkrFlgs
+chkExp := LAND(chkExp, 255)
+IF chkExp <> hdr.checksum THEN
+  PRINT "loadMktState: save file is corrupt: "; savePath
+  END
+ENDIF
+
+iMaxYr := hdr.maxYears
+iDeckCnt := iMaxYr + 1
+IF iDeckCnt > 36 THEN
+  iDeckCnt := 36
+ENDIF
+FOR i := 1 TO iDeckCnt
+  GET #path, deckOrd(i)
+NEXT i
+seekPos := SIZE(hdr) + iDeckCnt + (SIZE(skipPlyr) * 6)
+SEEK #path, seekPos
+GET #path, mkt
+
+CLOSE #path
+pathOpen := FALSE
+loadOK := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "loadMktState error ("; ERR; ") reading: "; savePath
+    loadOK := FALSE
+END
+
+PROCEDURE saveHdrMktState
+(* ============================================================ *)
+(* PROCEDURE : saveHdrMktState                                  *)
+(* PURPOSE   : Rewrite only the header and market state in an   *)
+(*             existing save file. Deck and player records are  *)
+(*             left unchanged on disk.                          *)
+(* PARAMS    : savePath - target filename                       *)
+(*             hdr      - current SaveHdr; checksum updated     *)
+(*             mkt      - current market state                  *)
+(*             saveOK   - TRUE on success                       *)
+(* ============================================================ *)
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+! Line exceeds 79 chars; TYPE statement requires single line.
+TYPE PlyrRec = plyrName:STRING[20];plyrType:BYTE;cashBal,obligation:INTEGER;isBankrupt,hadCashPur:BOOLEAN;aiTier:BYTE;stckShrs(9):INTEGER;mgnBal(9):INTEGER;bondUnts(3):INTEGER
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+PARAM savePath : STRING[20]
+PARAM hdr      : SaveHdr
+PARAM mkt      : MktState
+PARAM saveOK   : BOOLEAN
+DIM path       : BYTE
+DIM pathOpen   : BOOLEAN
+DIM chkSum     : INTEGER
+DIM iMaxYr     : INTEGER
+DIM iDeckCnt   : INTEGER
+DIM seekPos    : INTEGER
+DIM skipPlyr   : PlyrRec
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+saveOK   := FALSE
+
+chkSum := hdr.magic      + hdr.fmtVersion + hdr.maxYears
+chkSum := chkSum + hdr.plyrCount  + hdr.rollMode
+chkSum := chkSum + hdr.mgnRule    + hdr.currYear
+chkSum := chkSum + hdr.savedPhase + hdr.savedPlyr
+chkSum := chkSum + hdr.gameStage  + hdr.bnkrFlgs
+hdr.checksum := LAND(chkSum, 255)
+
+OPEN #path, savePath:UPDATE
+pathOpen := TRUE
+SEEK #path, 0
+PUT #path, hdr
+
+iMaxYr := hdr.maxYears
+iDeckCnt := iMaxYr + 1
+IF iDeckCnt > 36 THEN
+  iDeckCnt := 36
+ENDIF
+seekPos := SIZE(hdr) + iDeckCnt + (SIZE(skipPlyr) * 6)
+SEEK #path, seekPos
+PUT #path, mkt
+
+CLOSE #path
+pathOpen := FALSE
+saveOK := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "saveHdrMktState error ("; ERR; ") writing: "; savePath
+    saveOK := FALSE
+END
+
+PROCEDURE quitMktToMenu
+(* ============================================================ *)
+(* PROCEDURE : quitMktToMenu                                    *)
+(* PURPOSE   : Save current market/header state to SNBSTATE and *)
+(*             signal the coordinator to return to the menu.    *)
+(* PARAMS    : hdr    - current SaveHdr                         *)
+(*             mkt    - current market state                    *)
+(*             saveOK - TRUE on success                         *)
+(* ============================================================ *)
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+PARAM hdr      : SaveHdr
+PARAM mkt      : MktState
+PARAM saveOK   : BOOLEAN
+
+hdr.savedPhase := 9
+hdr.savedPlyr  := 0
+RUN saveHdrMktState("SNBSTATE", hdr, mkt, saveOK)
+END
+
+PROCEDURE saveMktToMenu
+(* ============================================================ *)
+(* PROCEDURE : saveMktToMenu                                    *)
+(* PURPOSE   : Save a resumable market checkpoint to SNBGAME,   *)
+(*             then signal the coordinator through SNBSTATE to  *)
+(*             stop and return to the menu.                     *)
+(* PARAMS    : savePhase - checkpoint phase                     *)
+(*             savePlyr  - checkpoint player                    *)
+(*             hdr       - current SaveHdr                      *)
+(*             mkt       - current market state                 *)
+(*             saveOK    - TRUE on success                      *)
+(* ============================================================ *)
+TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+PARAM savePhase : INTEGER
+PARAM savePlyr  : INTEGER
+PARAM hdr       : SaveHdr
+PARAM mkt       : MktState
+PARAM saveOK    : BOOLEAN
+
+hdr.savedPhase := savePhase
+hdr.savedPlyr  := savePlyr
+RUN saveHdrMktState("SNBSTATE", hdr, mkt, saveOK)
+IF NOT saveOK THEN
+  END
+ENDIF
+RUN copySaveFile("SNBSTATE", "SNBGAME", saveOK)
+IF NOT saveOK THEN
+  END
+ENDIF
+RUN quitMktToMenu(hdr, mkt, saveOK)
+END
+
+PROCEDURE copySaveFile
+(* ============================================================ *)
+(* PROCEDURE : copySaveFile                                     *)
+(* PURPOSE   : Copy one complete save file to another path      *)
+(*             without loading the full file into memory.       *)
+(* PARAMS    : srcPath - source filename                        *)
+(*             dstPath - destination filename                   *)
+(*             copyOK  - TRUE on success                        *)
+(* ============================================================ *)
+PARAM srcPath : STRING[20]
+PARAM dstPath : STRING[20]
+PARAM copyOK  : BOOLEAN
+DIM srcPathNo : BYTE
+DIM dstPathNo : BYTE
+DIM srcOpen   : BOOLEAN
+DIM dstOpen   : BOOLEAN
+DIM byt       : BYTE
+
+ON ERROR GOTO 900
+
+srcOpen := FALSE
+dstOpen := FALSE
+copyOK  := FALSE
+
+ON ERROR GOTO 100
+DELETE dstPath
+
+100 ON ERROR GOTO 900
+
+OPEN #srcPathNo, srcPath:READ
+srcOpen := TRUE
+CREATE #dstPathNo, dstPath:WRITE
+dstOpen := TRUE
+
+LOOP
+  EXITIF EOF(#srcPathNo) THEN
+  ENDEXIT
+  GET #srcPathNo, byt
+  PUT #dstPathNo, byt
+ENDLOOP
+
+CLOSE #srcPathNo
+srcOpen := FALSE
+CLOSE #dstPathNo
+dstOpen := FALSE
+copyOK := TRUE
+END
+
+900 IF srcOpen THEN
+      CLOSE #srcPathNo
+    ENDIF
+    IF dstOpen THEN
+      CLOSE #dstPathNo
+    ENDIF
+    PRINT "copySaveFile error ("; ERR; ")"
+    copyOK := FALSE
+END
+
+PROCEDURE getMktStockName
+(* ============================================================ *)
+(* PROCEDURE : getMktStockName                                  *)
+(* PURPOSE   : Return the display name for stock 1..9 from the  *)
+(*             local market stock-name table.                   *)
+(* PARAMS    : stkId   - stock id 1..9                          *)
+(*             stkName - receives display name                  *)
+(* SIDE EFX  : Repositions local DATA pointer.                  *)
+(* ============================================================ *)
+PARAM stkId   : INTEGER
+PARAM stkName : STRING[12]
+DIM s         : INTEGER
+
+stkName := ""
+IF stkId < 1 OR stkId > 9 THEN
+  END
+ENDIF
+
+RESTORE 100
+FOR s := 1 TO stkId
+  READ stkName
+NEXT s
+END
+
+! Stock names 1..9 for market displays.
+100 DATA "Growth Corp","Metro Props","Pioneer Mut"
+101 DATA "Shady Brooks","Stryker Drlg","Tri-City Trn"
+102 DATA "United Auto","Uranium Ent","Valley Power"
+
+PROCEDURE resolvePrice
+(* ============================================================ *)
+(* PROCEDURE : resolvePrice                                     *)
+(* PURPOSE   : Resolve the new price and share count for one   *)
+(*             stock after market table and card deltas are     *)
+(*             applied (spec Section 7).                        *)
+(* ============================================================ *)
+PARAM curPrice   : INTEGER
+PARAM mktDelta   : INTEGER
+PARAM cardDelta  : INTEGER
+PARAM sharesOwnd : INTEGER
+PARAM newPrice   : INTEGER
+PARAM newShares  : INTEGER
+PARAM splitOccrd : BOOLEAN
+PARAM divSuspNow : BOOLEAN
+PARAM divSuspPrv : BOOLEAN
+DIM rawPrice : INTEGER
+
+rawPrice := curPrice + mktDelta + cardDelta
+IF rawPrice < 0 THEN
+  rawPrice := 0
+ENDIF
+divSuspPrv := (curPrice < 50)
+divSuspNow := (rawPrice < 50)
+IF rawPrice >= 150 THEN
+  newPrice   := (rawPrice + 1) / 2
+  newShares  := sharesOwnd * 2
+  splitOccrd := TRUE
+ELSE
+  newPrice   := rawPrice
+  newShares  := sharesOwnd
+  splitOccrd := FALSE
+ENDIF
+END
+
+PROCEDURE applyMktDeltaYear
+(* ============================================================ *)
+(* PROCEDURE : applyMktDeltaYear                                *)
+(* PURPOSE   : Apply precomputed market and card deltas to all  *)
+(*             nine stocks, then update market prices and       *)
+(*             dividend-status flags in place.                  *)
+(* ============================================================ *)
+TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
+PARAM mkt          : MktState
+PARAM mktDlta(9)   : INTEGER
+PARAM crdDlta(9)   : INTEGER
+PARAM prcBefCrd(9) : INTEGER
+PARAM splitOcc(9)  : BOOLEAN
+PARAM divSuspd(9)  : BOOLEAN
+PARAM divRnstd(9)  : BOOLEAN
+DIM s      : INTEGER
+DIM curPrc : INTEGER
+DIM basePrc: INTEGER
+DIM tmpPrc : INTEGER
+DIM tmpShr : INTEGER
+DIM splt   : BOOLEAN
+DIM dNow   : BOOLEAN
+DIM dPrv   : BOOLEAN
+
+FOR s := 1 TO 9
+  curPrc := mkt.stckPrice(s)
+  IF curPrc = 0 THEN
+    basePrc := 100
+  ELSE
+    basePrc := curPrc
+  ENDIF
+  prcBefCrd(s) := basePrc
+  RUN resolvePrice(basePrc, mktDlta(s), crdDlta(s), 0, tmpPrc, tmpShr, splt, dNow, dPrv)
+  splitOcc(s) := splt
+  IF NOT dPrv AND dNow THEN
+    divSuspd(s) := TRUE
+  ELSE
+    divSuspd(s) := FALSE
+  ENDIF
+  IF dPrv AND NOT dNow THEN
+    divRnstd(s) := TRUE
+  ELSE
+    divRnstd(s) := FALSE
+  ENDIF
+  mkt.stckPrice(s) := tmpPrc
+  mkt.divSuspnd(s) := dNow
+NEXT s
+END
+
+PROCEDURE scrMktBoard
+(* ============================================================ *)
+(* PROCEDURE : scrMktBoard                                      *)
+(* PURPOSE   : Display the market results board (S13).          *)
+(* ============================================================ *)
+PARAM prcBefCrd(9) : INTEGER
+PARAM mktDlta(9)   : INTEGER
+PARAM crdDlta(9)   : INTEGER
+PARAM newPrc(9)    : INTEGER
+PARAM splitOcc(9)  : BOOLEAN
+PARAM divSuspd(9)  : BOOLEAN
+PARAM divRnstd(9)  : BOOLEAN
+PARAM action       : BYTE
+DIM sName : STRING[12]
+DIM flg   : STRING[4]
+DIM s     : INTEGER
+
+ON ERROR GOTO 900
+
+RUN clrScr
+PRINT "=== MARKET RESULTS BOARD ==="
+PRINT
+  PRINT "  STOCK          PREV   MKT   CRD   NEW NOTE"
+PRINT "  ------------   ----  ----  ----  ---- ----"
+
+FOR s := 1 TO 9
+  RUN getMktStockName(s, sName)
+  IF newPrc(s) = 0 THEN
+    flg := "BKRT"
+  ELSE
+    IF splitOcc(s) THEN
+      flg := "SPLT"
+    ELSE
+      IF divSuspd(s) THEN
+        flg := "SUSP"
+      ELSE
+        IF divRnstd(s) THEN
+          flg := "RSTD"
+        ELSE
+          flg := "    "
+        ENDIF
+      ENDIF
+    ENDIF
+  ENDIF
+  PRINT USING "'  ',S12<,X3,I4>,X2,I4>,X2,I4>,X2,I4>,X1,S4<", sName, prcBefCrd(s), mktDlta(s), crdDlta(s), newPrc(s), flg
+NEXT s
+
+PRINT
+RUN getPhaseNav(action)
+END
+
+900 PRINT "scrMktBoard error ("; ERR; ")"
+END
+
+PROCEDURE scrDivFlag
+(* ============================================================ *)
+(* PROCEDURE : scrDivFlag                                       *)
+(* PURPOSE   : Display the dividend suspension or reinstatement *)
+(*             notice (S15) for one threshold-crossing event.   *)
+(* ============================================================ *)
+PARAM stkName : STRING[12]
+PARAM evtType : INTEGER
+PARAM newPrc  : INTEGER
+PARAM cutPrc  : INTEGER
+PARAM action  : BYTE
+
+RUN clrScr
+IF evtType = 1 THEN
+  PRINT "=== DIVIDEND SUSPENDED ==="
+ELSE
+  PRINT "=== DIVIDEND REINSTATED ==="
+ENDIF
+PRINT
+PRINT "  "; stkName
+PRINT
+PRINT USING "'  Current price:  $',I4>", newPrc
+PRINT USING "'  Cutoff price:   $',I4>", cutPrc
+PRINT
+IF evtType = 1 THEN
+  PRINT "  Dividends suspended until price recovers."
+ELSE
+  PRINT "  Dividends reinstated."
+ENDIF
+PRINT
+RUN getPhaseNav(action)
+END

@@ -1,21 +1,17 @@
 PROCEDURE snbMarket
 (* ============================================================ *)
 (* PROCEDURE : snbMarket                                        *)
-(* PURPOSE   : Market calculation phase child. Draws the       *)
-(*             situation card, generates dice rolls, resolves  *)
-(*             all stock prices, and returns the derived       *)
-(*             market-display arrays to the coordinator.       *)
-(*             S11 and S12 remain here. S13-S15 now run after  *)
-(*             the coordinator-owned player split-update loop. *)
+(* PURPOSE   : Market intro phase child. Draws the situation   *)
+(*             card, generates dice rolls, and returns the     *)
+(*             precomputed market and card deltas needed by    *)
+(*             the follow-on market-table module.              *)
+(*             Displays S11 and S12 only.                      *)
 (* PARAMS    : action  - OUT 1=continue 2=save+exit 3=quit     *)
-(*             prcBef  - OUT pre-card price per stock          *)
 (*             mktDlt  - OUT market-table delta per stock      *)
 (*             crdDlt  - OUT situation-card delta per stock    *)
-(*             spOcc   - OUT TRUE per stock when split hit     *)
-(*             dvSusp  - OUT TRUE per stock when div suspended *)
-(*             dvRnst  - OUT TRUE per stock when div restored  *)
 (* SIDE EFX  : Reads and writes SNBSTATE header, deck, and     *)
-(*             market state. Player records are not modified.  *)
+(*             market state. Player records and stock prices   *)
+(*             are not modified here.                          *)
 (* ============================================================ *)
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
@@ -23,12 +19,8 @@ TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
 ! Line exceeds 79 chars; TYPE statement requires single line.
 TYPE CardRec = crdType:INTEGER;efxCnt:INTEGER;efxStk(4):INTEGER;efxDlt(4):INTEGER;divBonus:INTEGER
 PARAM action     : INTEGER
-PARAM prcBef(9)  : INTEGER
 PARAM mktDlt(9)  : INTEGER
 PARAM crdDlt(9)  : INTEGER
-PARAM spOcc(9)   : BOOLEAN
-PARAM dvSusp(9)  : BOOLEAN
-PARAM dvRnst(9)  : BOOLEAN
 DIM hdr        : SaveHdr
 DIM deckOrd(36): BYTE
 DIM mkt        : MktState
@@ -105,12 +97,19 @@ RUN doRolls(iRMode, iCYr, dOne, dTwo, rTot, rCnt, oAct)
 ! Copy BYTE roll totals to INTEGER array for applyMktYear.
 FOR s := 1 TO 9
   rolls(s) := rTot(s)
+  crdDlt(s) := 0
 NEXT s
 
 ! Precompute market-table deltas for S12 display.
 FOR s := 1 TO 9
   RUN getMktDelta(s, crd.crdType, rolls(s), mktDlt(s))
 NEXT s
+FOR tInt := 1 TO crd.efxCnt
+  s := crd.efxStk(tInt)
+  IF s >= 1 AND s <= 9 THEN
+    crdDlt(s) := crd.efxDlt(tInt)
+  ENDIF
+NEXT tInt
 
 ! Display S12 dice roll results.
 RUN scrDice(crd.crdType, rCnt, dOne, dTwo, rTot, mktDlt, actByt)
@@ -124,114 +123,9 @@ ELSE IF actByt = 3 THEN
   END
 ENDIF \ENDIF
 
-! Resolve all stock prices for this year.
-! Line exceeds 79 chars; RUN statement cannot be split.
-RUN applyMktYear(cardId, rolls, mkt, prcBef, mktDlt, crdDlt, spOcc, dvSusp, dvRnst)
-
-! Write the market result and expose an internal coordinator
-! checkpoint for the split-update player loop.
-hdr.gameStage := 2  \ ! GS_YEAR
-hdr.savedPhase := 10
-hdr.savedPlyr  := 1
-
-RUN saveHdrMktState("SNBSTATE", hdr, mkt, saveOK)
-IF NOT saveOK THEN
-  PRINT "snbMarket: saveHdrMktState failed"
-ENDIF
 END
 
 900 PRINT "snbMarket error ("; ERR; ")"
-END
-
-PROCEDURE snbMarketPost
-(* ============================================================ *)
-(* PROCEDURE : snbMarketPost                                    *)
-(* PURPOSE   : Post-update market display phase. Displays       *)
-(*             S13 and S15 after the coordinator-owned player   *)
-(*             split-update loop has written player records.    *)
-(* PARAMS    : prcBef  - pre-card price per stock               *)
-(*             mktDlt  - market-table delta per stock           *)
-(*             crdDlt  - situation-card delta per stock         *)
-(*             spOcc   - TRUE per stock when split hit          *)
-(*             dvSusp  - TRUE per stock when div suspended      *)
-(*             dvRnst  - TRUE per stock when div restored       *)
-(*             action  - OUT 1=continue 2=save+exit 3=quit      *)
-(* SIDE EFX  : Reads SNBSTATE header and market. May write      *)
-(*             save/quit checkpoints.                           *)
-(* ============================================================ *)
-! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE SaveHdr = magic,fmtVersion,maxYears,plyrCount,rollMode,mgnRule,currYear,savedPhase,savedPlyr,gameStage,bnkrFlgs,checksum:BYTE
-TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
-PARAM prcBef(9)   : INTEGER
-PARAM mktDlt(9)   : INTEGER
-PARAM crdDlt(9)   : INTEGER
-PARAM spOcc(9)    : BOOLEAN
-PARAM dvSusp(9)   : BOOLEAN
-PARAM dvRnst(9)   : BOOLEAN
-PARAM action      : INTEGER
-DIM hdr           : SaveHdr
-DIM mkt           : MktState
-DIM loadOK        : BOOLEAN
-DIM saveOK        : BOOLEAN
-DIM sNam          : STRING[12]
-DIM evTyp         : INTEGER
-DIM actByt        : BYTE
-DIM s             : INTEGER
-
-ON ERROR GOTO 900
-
-action := 1
-RUN loadHdrMkt("SNBSTATE", hdr, mkt, loadOK)
-IF NOT loadOK THEN
-  PRINT "snbMarketPost: loadHdrMkt failed"
-  END
-ENDIF
-
-! Display S13 market results board.
-! Line exceeds 79 chars; RUN statement cannot be split.
-RUN scrMktBoard(prcBef, mktDlt, crdDlt, mkt.stckPrice, spOcc, dvSusp, dvRnst, actByt)
-IF actByt = 2 THEN
-  RUN saveMktToMenu(1, 1, hdr, mkt, saveOK)
-  action := 2
-  END
-ELSE IF actByt = 3 THEN
-  RUN quitMktToMenu(hdr, mkt, saveOK)
-  action := 3
-  END
-ENDIF \ENDIF
-
-! Display S15 per stock where a dividend-status event occurred.
-FOR s := 1 TO 9
-  IF dvSusp(s) OR dvRnst(s) THEN
-    RUN getMktStockName(s, sNam)
-    IF dvSusp(s) THEN
-      evTyp := 1
-    ELSE
-      evTyp := 2
-    ENDIF
-    RUN scrDivFlag(sNam, evTyp, mkt.stckPrice(s), 50, actByt)
-    IF actByt = 2 THEN
-      RUN saveMktToMenu(1, 1, hdr, mkt, saveOK)
-      action := 2
-      END
-    ELSE IF actByt = 3 THEN
-      RUN quitMktToMenu(hdr, mkt, saveOK)
-      action := 3
-      END
-    ENDIF \ENDIF
-  ENDIF
-NEXT s
-
-hdr.gameStage := 2
-hdr.savedPhase := 1
-hdr.savedPlyr  := 1
-RUN saveHdrMktState("SNBSTATE", hdr, mkt, saveOK)
-IF NOT saveOK THEN
-  PRINT "snbMarketPost: saveHdrMktState failed"
-ENDIF
-END
-
-900 PRINT "snbMarketPost error ("; ERR; ")"
 END
 
 PROCEDURE loadMktState
@@ -435,6 +329,64 @@ IF NOT saveOK THEN
   END
 ENDIF
 RUN quitMktToMenu(hdr, mkt, saveOK)
+END
+
+PROCEDURE copySaveFile
+(* ============================================================ *)
+(* PROCEDURE : copySaveFile                                     *)
+(* PURPOSE   : Copy one complete save file to another path      *)
+(*             without loading the full file into memory.       *)
+(* PARAMS    : srcPath - source filename                        *)
+(*             dstPath - destination filename                   *)
+(*             copyOK  - TRUE on success                        *)
+(* ============================================================ *)
+PARAM srcPath : STRING[20]
+PARAM dstPath : STRING[20]
+PARAM copyOK  : BOOLEAN
+DIM srcPathNo : BYTE
+DIM dstPathNo : BYTE
+DIM srcOpen   : BOOLEAN
+DIM dstOpen   : BOOLEAN
+DIM byt       : BYTE
+
+ON ERROR GOTO 900
+
+srcOpen := FALSE
+dstOpen := FALSE
+copyOK  := FALSE
+
+ON ERROR GOTO 100
+DELETE dstPath
+
+100 ON ERROR GOTO 900
+
+OPEN #srcPathNo, srcPath:READ
+srcOpen := TRUE
+CREATE #dstPathNo, dstPath:WRITE
+dstOpen := TRUE
+
+LOOP
+  EXITIF EOF(#srcPathNo) THEN
+  ENDEXIT
+  GET #srcPathNo, byt
+  PUT #dstPathNo, byt
+ENDLOOP
+
+CLOSE #srcPathNo
+srcOpen := FALSE
+CLOSE #dstPathNo
+dstOpen := FALSE
+copyOK := TRUE
+END
+
+900 IF srcOpen THEN
+      CLOSE #srcPathNo
+    ENDIF
+    IF dstOpen THEN
+      CLOSE #dstPathNo
+    ENDIF
+    PRINT "copySaveFile error ("; ERR; ")"
+    copyOK := FALSE
 END
 
 PROCEDURE doRolls
@@ -752,167 +704,6 @@ DATA     2, 3,  1,  -8,  2,  -5,  7,  -7,  0,   0,  0
 900 PRINT "getCard error ("; ERR; ")"
 END
 
-PROCEDURE resolvePrice
-(* ============================================================ *)
-(* PROCEDURE : resolvePrice                                     *)
-(* PURPOSE   : Resolve the new price and share count for one   *)
-(*             stock after market table and card deltas are     *)
-(*             applied (spec Section 7).                        *)
-(*             Execution order per spec:                        *)
-(*               1. Sum deltas.                                 *)
-(*               2. Clamp at 0 (BankruptcyPrice).              *)
-(*               3. Set divSuspndNow (DividendCutoff = 50).    *)
-(*               4. Apply split if >= 150 (round price up).    *)
-(* PARAMS    : curPrice   - stock price before this year        *)
-(*             mktDelta   - market table delta for this roll    *)
-(*             cardDelta  - situation card delta (0 if none)    *)
-(*             sharesOwnd - shares held by this player          *)
-(*             newPrice   - resolved price after all steps      *)
-(*             newShares  - shares after possible split         *)
-(*             splitOccrd - TRUE if a 2-for-1 split triggered  *)
-(*             divSuspNow - TRUE if dividends suspended at      *)
-(*                          newPrice                           *)
-(*             divSuspPrv - TRUE if dividends were suspended at *)
-(*                          curPrice; for transition detection  *)
-(* SIDE EFX  : None. All outputs are via PARAM.                *)
-(* ============================================================ *)
-PARAM curPrice   : INTEGER
-PARAM mktDelta   : INTEGER
-PARAM cardDelta  : INTEGER
-PARAM sharesOwnd : INTEGER
-PARAM newPrice   : INTEGER
-PARAM newShares  : INTEGER
-PARAM splitOccrd : BOOLEAN
-PARAM divSuspNow : BOOLEAN
-PARAM divSuspPrv : BOOLEAN
-DIM rawPrice : INTEGER
-
-! Step 1: sum deltas.
-rawPrice := curPrice + mktDelta + cardDelta
-
-! Step 2: clamp at BankruptcyPrice (0).
-IF rawPrice < 0 THEN
-  rawPrice := 0
-ENDIF
-
-! Derive previous suspension state from entry price.
-divSuspPrv := (curPrice < 50)
-
-! Step 3: set dividend suspension from clamped pre-split price.
-divSuspNow := (rawPrice < 50)
-
-! Step 4: apply split or pass through.
-IF rawPrice >= 150 THEN
-  ! Round halved price up: (rawPrice + 1) / 2 handles odd prices.
-  newPrice   := (rawPrice + 1) / 2
-  newShares  := sharesOwnd * 2
-  splitOccrd := TRUE
-ELSE
-  newPrice   := rawPrice
-  newShares  := sharesOwnd
-  splitOccrd := FALSE
-ENDIF
-
-END
-
-PROCEDURE applyMktYear
-(* ============================================================ *)
-(* PROCEDURE : applyMktYear                                     *)
-(* PURPOSE   : Apply full market price resolution for all 9    *)
-(*             stocks for one year (spec Sections 5-7).        *)
-(*             For each stock: looks up market table delta,    *)
-(*             looks up card delta, resolves price/split/flags, *)
-(*             and updates mkt.                                *)
-(*             Populates per-stock output arrays for S13-S15.  *)
-(* PARAMS    : cardId    - drawn card number (1..36)            *)
-(*             rolls     - per-stock 2d6 result (2..12);        *)
-(*                         all 9 slots populated by caller.    *)
-(*             mkt       - market state; stckPrice and          *)
-(*                         divSuspnd updated in place           *)
-(*             prcBefCrd - prior-year price before this year's  *)
-(*                         market/card changes; for S13 display *)
-(*             mktDlta   - market table delta per stock         *)
-(*             crdDlta   - card delta per stock (0 if none)     *)
-(*             splitOcc  - TRUE per stock if split triggered    *)
-(*             divSuspd  - TRUE per stock if newly suspended    *)
-(*             divRnstd  - TRUE per stock if reinstated         *)
-(* SIDE EFX  : Repositions DATA pointer (via getMktDelta and   *)
-(*             getCard). Card divBonus NOT applied here.        *)
-(* ============================================================ *)
-TYPE MktState = stckPrice(9):INTEGER;divSuspnd(9):BOOLEAN
-! Line exceeds 79 chars; TYPE statement requires single line.
-TYPE CardRec = crdType:INTEGER;efxCnt:INTEGER;efxStk(4):INTEGER;efxDlt(4):INTEGER;divBonus:INTEGER
-PARAM cardId       : INTEGER
-PARAM rolls(9)     : INTEGER
-PARAM mkt          : MktState
-PARAM prcBefCrd(9) : INTEGER
-PARAM mktDlta(9)   : INTEGER
-PARAM crdDlta(9)   : INTEGER
-PARAM splitOcc(9)  : BOOLEAN
-PARAM divSuspd(9)  : BOOLEAN
-PARAM divRnstd(9)  : BOOLEAN
-DIM card   : CardRec
-DIM s      : INTEGER
-DIM e      : INTEGER
-DIM curPrc : INTEGER
-DIM basePrc: INTEGER
-DIM delta  : INTEGER
-DIM cDelta : INTEGER
-DIM tmpPrc : INTEGER
-DIM tmpShr : INTEGER
-DIM splt   : BOOLEAN
-DIM dNow   : BOOLEAN
-DIM dPrv   : BOOLEAN
-
-RUN getCard(cardId, card)
-
-FOR s := 1 TO 9
-
-  ! Market table delta for this stock using its assigned roll.
-  RUN getMktDelta(s, card.crdType, rolls(s), delta)
-  mktDlta(s) := delta
-
-  ! Card delta: scan effects for this stock; default 0.
-  cDelta := 0
-  FOR e := 1 TO card.efxCnt
-    IF card.efxStk(e) = s THEN
-      cDelta := card.efxDlt(e)
-    ENDIF
-  NEXT e
-  crdDlta(s) := cDelta
-
-  ! Resolve price, split, and dividend suspension flags.
-  curPrc := mkt.stckPrice(s)
-  IF curPrc = 0 THEN
-    ! Worthless stock is re-established like Year 1.
-    basePrc := 100
-  ELSE
-    basePrc := curPrc
-  ENDIF
-  prcBefCrd(s) := basePrc
-  RUN resolvePrice(basePrc, delta, cDelta, 0, tmpPrc, tmpShr, splt, dNow, dPrv)
-
-  ! Record display flags for S13/S14/S15.
-  splitOcc(s) := splt
-  IF NOT dPrv AND dNow THEN
-    divSuspd(s) := TRUE
-  ELSE
-    divSuspd(s) := FALSE
-  ENDIF
-  IF dPrv AND NOT dNow THEN
-    divRnstd(s) := TRUE
-  ELSE
-    divRnstd(s) := FALSE
-  ENDIF
-
-  ! Update market state in place.
-  mkt.stckPrice(s) := tmpPrc
-  mkt.divSuspnd(s) := dNow
-
-NEXT s
-
-END
-
 PROCEDURE drawCard
 (* ============================================================ *)
 (* PROCEDURE : drawCard                                         *)
@@ -1069,122 +860,3 @@ END
 900 PRINT "scrDice error ("; ERR; ")"
 END
 
-PROCEDURE scrMktBoard
-(* ============================================================ *)
-(* PROCEDURE : scrMktBoard                                      *)
-(* PURPOSE   : Display the market results board (S13). Shows   *)
-(*             one row per stock: price before card delta,      *)
-(*             market table delta, card delta, resolved price,  *)
-(*             and a status flag where applicable.             *)
-(*             Flag column (priority order):                    *)
-(*               BKRT  price resolved to 0 (bankruptcy floor)  *)
-(*               SPLT  2-for-1 split triggered this year        *)
-(*               SUSP  dividends newly suspended this year      *)
-(*               RSTD  dividends reinstated this year           *)
-(*               (blank) no notable event                       *)
-(*             Blocks until any key is pressed.                *)
-(* PARAMS    : prcBefCrd - price after mkt table, before card  *)
-(*                         delta; per stock 1..9               *)
-(*             mktDlta   - market table delta per stock 1..9   *)
-(*             crdDlta   - card delta per stock 1..9           *)
-(*             newPrc    - resolved price per stock 1..9        *)
-(*             splitOcc  - TRUE if split triggered per stock   *)
-(*             divSuspd  - TRUE if dividends newly suspended   *)
-(*             divRnstd  - TRUE if dividends reinstated        *)
-(*             action    - returns 1=CONTINUE 2=SAVE 3=QUIT    *)
-(* SIDE EFX  : Clears screen. Blocks on keypress via waitKey. *)
-(*             Repositions DATA pointer (RESTORE used).        *)
-(* ============================================================ *)
-PARAM prcBefCrd(9) : INTEGER
-PARAM mktDlta(9)   : INTEGER
-PARAM crdDlta(9)   : INTEGER
-PARAM newPrc(9)    : INTEGER
-PARAM splitOcc(9)  : BOOLEAN
-PARAM divSuspd(9)  : BOOLEAN
-PARAM divRnstd(9)  : BOOLEAN
-PARAM action       : BYTE
-DIM sName : STRING[12]
-DIM flg   : STRING[4]
-DIM s     : INTEGER
-
-ON ERROR GOTO 900
-
-RUN clrScr
-PRINT "=== MARKET RESULTS BOARD ==="
-PRINT
-  PRINT "  STOCK          PREV   MKT   CRD   NEW NOTE"
-PRINT "  ------------   ----  ----  ----  ---- ----"
-
-FOR s := 1 TO 9
-  RUN getMktStockName(s, sName)
-
-  ! Derive status flag; BKRT takes priority over all others.
-  IF newPrc(s) = 0 THEN
-    flg := "BKRT"
-  ELSE
-    IF splitOcc(s) THEN
-      flg := "SPLT"
-    ELSE
-      IF divSuspd(s) THEN
-        flg := "SUSP"
-      ELSE
-        IF divRnstd(s) THEN
-          flg := "RSTD"
-        ELSE
-          flg := "    "
-        ENDIF
-      ENDIF
-    ENDIF
-  ENDIF
-
-  PRINT USING "'  ',S12<,X3,I4>,X2,I4>,X2,I4>,X2,I4>,X1,S4<", sName, prcBefCrd(s), mktDlta(s), crdDlta(s), newPrc(s), flg
-NEXT s
-
-PRINT
-RUN getPhaseNav(action)
-END
-
-900 PRINT "scrMktBoard error ("; ERR; ")"
-END
-
-PROCEDURE scrDivFlag
-(* ============================================================ *)
-(* PROCEDURE : scrDivFlag                                       *)
-(* PURPOSE   : Display the dividend suspension or reinstatement*)
-(*             notice (S15) for one threshold-crossing event.  *)
-(*             Shows event type (SUSPENDED / REINSTATED), stock *)
-(*             name, resolved price, and dividend cutoff price. *)
-(*             Blocks until any key is pressed.                *)
-(* PARAMS    : stkName - stock name for display                *)
-(*             evtType - 1 = SUSPENDED   2 = REINSTATED        *)
-(*             newPrc  - resolved stock price this year        *)
-(*             cutPrc  - dividend cutoff price (always 50)     *)
-(*             action  - returns 1=CONTINUE 2=SAVE 3=QUIT      *)
-(* SIDE EFX  : Clears screen. Blocks on keypress via waitKey. *)
-(* ============================================================ *)
-PARAM stkName : STRING[12]
-PARAM evtType : INTEGER
-PARAM newPrc  : INTEGER
-PARAM cutPrc  : INTEGER
-PARAM action  : BYTE
-
-RUN clrScr
-IF evtType = 1 THEN
-  PRINT "=== DIVIDEND SUSPENDED ==="
-ELSE
-  PRINT "=== DIVIDEND REINSTATED ==="
-ENDIF
-PRINT
-PRINT "  "; stkName
-PRINT
-PRINT USING "'  Current price:  $',I4>", newPrc
-PRINT USING "'  Cutoff price:   $',I4>", cutPrc
-PRINT
-IF evtType = 1 THEN
-  PRINT "  Dividends suspended until price recovers."
-ELSE
-  PRINT "  Dividends reinstated."
-ENDIF
-PRINT
-RUN getPhaseNav(action)
-END

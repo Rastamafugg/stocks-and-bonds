@@ -23,7 +23,8 @@ PROCEDURE snb
 (*              snbDividend                          *)
 (*              snbMgnInt when required             *)
 (*              snbMarket                            *)
-(*              snbMarketPlayer / snbMarketPost     *)
+(*              snbMarketTable / snbMarketPlayer    *)
+(*              snbMarketPost                       *)
 (*              snbSellHumanStub or snbSellAI       *)
 (*              snbYear10Clear when required        *)
 (*              snbBuy or snbBuyAI                  *)
@@ -183,13 +184,26 @@ LOOP
           ELSE
             marketAct := 1
             ! Line exceeds 79 chars; RUN statement cannot be split.
-            RUN snbMarket(marketAct, mkPrcBef, mkMktDlt, mkCrdDlt, mkSpOcc, mkDvSusp, mkDvRnst)
+            RUN snbMarket(marketAct, mkMktDlt, mkCrdDlt)
             RUN unloadModuleList(modList, hdrList, modCnt, ok)
             IF NOT ok THEN
               END
             ENDIF
             IF marketAct = 1 THEN
-              GOSUB 100
+              modCnt := 1
+              modList(1) := "snbMarketTable"
+              RUN loadModuleList(modList, hdrList, modCnt, ok)
+              IF NOT ok THEN
+                gameOver := TRUE
+              ELSE
+                ! Line exceeds 79 chars; RUN statement cannot be split.
+                RUN snbMarketTable(mkMktDlt, mkCrdDlt, mkPrcBef, mkSpOcc, mkDvSusp, mkDvRnst)
+                RUN unloadModuleList(modList, hdrList, modCnt, ok)
+                IF NOT ok THEN
+                  END
+                ENDIF
+                GOSUB 100
+              ENDIF
             ELSE
               gameOver := TRUE
               runEndGame := FALSE
@@ -202,7 +216,7 @@ LOOP
         ! savedPhase 11 is the post-update market display pass.
         IF iSavPh = 11 THEN
           modCnt := 1
-          modList(1) := "snbMarket"
+          modList(1) := "snbMarketTable"
           RUN loadModuleList(modList, hdrList, modCnt, ok)
           IF NOT ok THEN
             gameOver := TRUE
@@ -290,12 +304,24 @@ LOOP
       ENDIF
       marketAct := 1
       ! Line exceeds 79 chars; RUN statement cannot be split.
-      RUN snbMarket(marketAct, mkPrcBef, mkMktDlt, mkCrdDlt, mkSpOcc, mkDvSusp, mkDvRnst)
+      RUN snbMarket(marketAct, mkMktDlt, mkCrdDlt)
       RUN unloadModuleList(modList, hdrList, modCnt, ok)
       IF NOT ok THEN
         END
       ENDIF
       IF marketAct <> 1 THEN
+        END
+      ENDIF
+      modCnt := 1
+      modList(1) := "snbMarketTable"
+      RUN loadModuleList(modList, hdrList, modCnt, ok)
+      IF NOT ok THEN
+        END
+      ENDIF
+      ! Line exceeds 79 chars; RUN statement cannot be split.
+      RUN snbMarketTable(mkMktDlt, mkCrdDlt, mkPrcBef, mkSpOcc, mkDvSusp, mkDvRnst)
+      RUN unloadModuleList(modList, hdrList, modCnt, ok)
+      IF NOT ok THEN
         END
       ENDIF
       GOSUB 100
@@ -307,7 +333,7 @@ LOOP
       ENDIF
       IF iSavPh = 11 THEN
         modCnt := 1
-        modList(1) := "snbMarket"
+        modList(1) := "snbMarketTable"
         RUN loadModuleList(modList, hdrList, modCnt, ok)
         IF NOT ok THEN
           END
