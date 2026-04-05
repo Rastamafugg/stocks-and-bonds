@@ -1,0 +1,783 @@
+PROCEDURE TSTSIGIPC3
+(* ============================================================ *)
+(* PROCEDURE : TSTSIGIPC3                                       *)
+(* PURPOSE   : Parent/child signal harness for testing what     *)
+(*             happens after the parent directly calls both     *)
+(*             procedures from a child-loaded merged module,    *)
+(*             then F$UnLoads the merged module name, and only  *)
+(*             later the child unlinks the module.              *)
+(* ============================================================ *)
+TYPE SigState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,statusCode,errCode:BYTE
+DIM state       : SigState
+DIM ok          : BOOLEAN
+DIM fileOK      : BOOLEAN
+DIM pidOK       : BOOLEAN
+DIM waitOK      : BOOLEAN
+DIM callAOK     : BOOLEAN
+DIM callBOK     : BOOLEAN
+DIM childOK     : BOOLEAN
+DIM unloadOK    : BOOLEAN
+DIM iParentPID  : INTEGER
+DIM iChildPID   : INTEGER
+DIM hdrAddr     : INTEGER
+DIM iErrCode    : INTEGER
+DIM callAErr    : INTEGER
+DIM callBErr    : INTEGER
+DIM unloadErr   : INTEGER
+DIM exitStat    : INTEGER
+
+ON ERROR GOTO 900
+
+PRINT "=== TSTSIGIPC3 ==="
+PRINT
+PRINT "Child loads TSTSIGMOD2."
+PRINT "Parent calls A only."
+PRINT "Parent F$UnLoads TSTSIGMOD2 by name."
+PRINT "Child then unlinks TSTSIGMOD2."
+PRINT "Parent repeats A and then calls B."
+PRINT
+
+RUN drop3LocalModule("TSTSIGMOD2")
+
+RUN ipc3GetProcID(iParentPID, pidOK)
+IF NOT pidOK THEN
+  PRINT "TSTSIGIPC3: ipc3GetProcID failed"
+  END
+ENDIF
+
+RUN init3SigState(iParentPID, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTSIGIPC3: init3SigState failed"
+  END
+ENDIF
+
+RUN fork3SigChild(childOK, iErrCode)
+IF NOT childOK THEN
+  PRINT "TSTSIGIPC3: fork3SigChild failed err "; iErrCode
+  END
+ENDIF
+
+RUN wait3ForReady(state, waitOK)
+IF NOT waitOK THEN
+  PRINT "TSTSIGIPC3: child ready wait failed"
+  END
+ENDIF
+iChildPID := state.childPid
+PRINT "Child PID = "; iChildPID; " status = "; state.statusCode
+PRINT
+
+PRINT "Baseline direct probe A before child load:"
+RUN probe3DirectA(callAOK, callAErr)
+IF callAOK THEN
+  PRINT "FAIL: tstSig2PingA already callable in parent"
+ELSE
+  PRINT "Observed direct-call A failure err = "; callAErr
+ENDIF
+PRINT
+
+PRINT "Baseline direct probe B before child load:"
+RUN probe3DirectB(callBOK, callBErr)
+IF callBOK THEN
+  PRINT "FAIL: tstSig2PingB already callable in parent"
+ELSE
+  PRINT "Observed direct-call B failure err = "; callBErr
+ENDIF
+PRINT
+
+state.reqSeq  := 1
+state.cmdCode := 1
+state.errCode := 0
+PRINT "Parent: write load request seq "; state.reqSeq
+RUN ipc3WriteState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTSIGIPC3: write load request failed"
+  END
+ENDIF
+PRINT "Parent: send load wake to "; iChildPID
+RUN ipc3SendWake(iChildPID, childOK, iErrCode)
+IF NOT childOK THEN
+  PRINT "TSTSIGIPC3: send load wake failed err "; iErrCode
+  END
+ENDIF
+RUN wait3ForResponse(1, state, waitOK)
+IF NOT waitOK THEN
+  PRINT "TSTSIGIPC3: load response wait failed"
+  END
+ENDIF
+PRINT "Child load status = "; state.statusCode; " err = "; state.errCode
+PRINT
+
+PRINT "Direct probe A after child load:"
+RUN probe3DirectA(callAOK, callAErr)
+IF callAOK THEN
+  PRINT "PASS: tstSig2PingA callable without local link"
+ELSE
+  PRINT "FAIL: tstSig2PingA direct call err = "; callAErr
+ENDIF
+PRINT
+
+PRINT "Parent F$UnLoad by merged module name:"
+RUN unload3ByName("TSTSIGMOD2", unloadOK, unloadErr)
+IF unloadOK THEN
+  PRINT "Parent F$UnLoad succeeded"
+ELSE
+  PRINT "Parent F$UnLoad failed err = "; unloadErr
+ENDIF
+PRINT
+
+state.reqSeq  := 2
+state.cmdCode := 2
+state.errCode := 0
+PRINT "Parent: write child unload request seq "; state.reqSeq
+RUN ipc3WriteState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTSIGIPC3: write unload request failed"
+  END
+ENDIF
+PRINT "Parent: send unload wake to "; iChildPID
+RUN ipc3SendWake(iChildPID, childOK, iErrCode)
+IF NOT childOK THEN
+  PRINT "TSTSIGIPC3: send unload wake failed err "; iErrCode
+  END
+ENDIF
+RUN wait3ForResponse(2, state, waitOK)
+IF NOT waitOK THEN
+  PRINT "TSTSIGIPC3: unload response wait failed"
+  END
+ENDIF
+PRINT "Child unload status = "; state.statusCode; " err = "; state.errCode
+PRINT
+
+PRINT "Repeat direct probe A after parent unload and child unload:"
+RUN probe3DirectA(callAOK, callAErr)
+IF callAOK THEN
+  PRINT "PASS: tstSig2PingA still callable"
+ELSE
+  PRINT "FAIL: tstSig2PingA after unloads err = "; callAErr
+ENDIF
+PRINT
+
+PRINT "First direct probe B after parent unload and child unload:"
+RUN probe3DirectB(callBOK, callBErr)
+IF callBOK THEN
+  PRINT "PASS: tstSig2PingB still callable"
+ELSE
+  PRINT "FAIL: tstSig2PingB after unloads err = "; callBErr
+ENDIF
+PRINT
+
+PRINT "Parent F$Link probe after both unloads:"
+RUN link3LocalModule("TSTSIGMOD2", hdrAddr, ok, iErrCode)
+IF ok THEN
+  PRINT "Parent F$Link succeeded hdr = "; hdrAddr
+  RUN unlink3LocalModule("TSTSIGMOD2", hdrAddr, ok, iErrCode)
+  IF NOT ok THEN
+    PRINT "Parent unlink failed err = "; iErrCode
+  ENDIF
+ELSE
+  PRINT "Parent F$Link failed err = "; iErrCode
+ENDIF
+PRINT
+
+state.reqSeq  := 3
+state.cmdCode := 3
+state.errCode := 0
+PRINT "Parent: write quit request seq "; state.reqSeq
+RUN ipc3WriteState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTSIGIPC3: write quit request failed"
+  END
+ENDIF
+PRINT "Parent: send quit wake to "; iChildPID
+RUN ipc3SendWake(iChildPID, childOK, iErrCode)
+IF NOT childOK THEN
+  PRINT "TSTSIGIPC3: send quit wake failed err "; iErrCode
+  END
+ENDIF
+RUN wait3ForResponse(3, state, waitOK)
+IF NOT waitOK THEN
+  PRINT "TSTSIGIPC3: quit response wait failed"
+  END
+ENDIF
+RUN wait3ChildExit(exitStat, ok, iErrCode)
+IF ok THEN
+  PRINT "Child exit status = "; exitStat
+ELSE
+  PRINT "Child wait failed err = "; iErrCode
+ENDIF
+END
+
+900 PRINT "TSTSIGIPC3 error ("; ERR; ")"
+END
+
+PROCEDURE init3SigState
+(* ============================================================ *)
+(* PROCEDURE : init3SigState                                    *)
+(* PURPOSE   : Create the shared TSTSIGS2 state file for        *)
+(*             TSTSIGSRV2 with parent PID and zeroed bytes.     *)
+(* ============================================================ *)
+TYPE SigState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,statusCode,errCode:BYTE
+PARAM iParentPID : INTEGER
+PARAM ok         : BOOLEAN
+DIM state        : SigState
+DIM path         : BYTE
+DIM pathOpen     : BOOLEAN
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+ok       := FALSE
+
+ON ERROR GOTO 100
+DELETE "TSTSIGS2"
+
+100 ON ERROR GOTO 900
+
+state.magic      := $53
+state.parentPid  := iParentPID
+state.childPid   := 0
+state.reqSeq     := 0
+state.rspSeq     := 0
+state.cmdCode    := 0
+state.statusCode := 0
+state.errCode    := 0
+
+CREATE #path, "TSTSIGS2":UPDATE
+pathOpen := TRUE
+PUT #path, state
+
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "init3SigState error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE ipc3ReadState
+(* ============================================================ *)
+(* PROCEDURE : ipc3ReadState                                    *)
+(* PURPOSE   : Read the shared TSTSIGS2 state record.           *)
+(* ============================================================ *)
+TYPE SigState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,statusCode,errCode:BYTE
+PARAM state : SigState
+PARAM ok    : BOOLEAN
+DIM path    : BYTE
+DIM pathOpen: BOOLEAN
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+ok       := FALSE
+
+OPEN #path, "TSTSIGS2":READ
+pathOpen := TRUE
+GET #path, state
+IF state.magic <> $53 THEN
+  PRINT "ipc3ReadState: invalid magic"
+  END
+ENDIF
+
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "ipc3ReadState error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE ipc3WriteState
+(* ============================================================ *)
+(* PROCEDURE : ipc3WriteState                                   *)
+(* PURPOSE   : Rewrite the shared TSTSIGS2 state record.        *)
+(* ============================================================ *)
+TYPE SigState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,statusCode,errCode:BYTE
+PARAM state : SigState
+PARAM ok    : BOOLEAN
+DIM path    : BYTE
+DIM pathOpen: BOOLEAN
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+ok       := FALSE
+
+OPEN #path, "TSTSIGS2":UPDATE
+pathOpen := TRUE
+PUT #path, state
+
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "ipc3WriteState error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE ipc3GetProcID
+(* ============================================================ *)
+(* PROCEDURE : ipc3GetProcID                                    *)
+(* PURPOSE   : Return the current process ID via F$ID.          *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM procID : INTEGER
+PARAM ok     : BOOLEAN
+DIM regs     : Register
+DIM callCode : BYTE
+DIM iCC      : INTEGER
+
+ON ERROR GOTO 900
+
+procID   := 0
+ok       := FALSE
+callCode := $0C
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  END
+ENDIF
+
+procID := regs.a
+ok := TRUE
+END
+
+900 PRINT "ipc3GetProcID error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE fork3SigChild
+(* ============================================================ *)
+(* PROCEDURE : fork3SigChild                                    *)
+(* PURPOSE   : Fork the TSTSIGSRV2 child process.               *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM ok      : BOOLEAN
+PARAM errCode : INTEGER
+DIM regs       : Register
+DIM callCode   : BYTE
+DIM runbBuf(6) : BYTE
+DIM paramBuf(24): BYTE
+DIM iCC        : INTEGER
+DIM nameLen    : INTEGER
+DIM i          : INTEGER
+DIM childName  : STRING[10]
+
+ON ERROR GOTO 900
+
+ok        := FALSE
+errCode   := 0
+childName := "TSTSIGSRV2"
+
+runbBuf(1) := ASC("R")
+runbBuf(2) := ASC("u")
+runbBuf(3) := ASC("n")
+runbBuf(4) := LOR(ASC("B"), $80)
+
+nameLen := LEN(childName)
+FOR i := 1 TO 24
+  paramBuf(i) := 0
+NEXT i
+FOR i := 1 TO nameLen
+  paramBuf(i) := ASC(MID$(childName, i, 1))
+NEXT i
+paramBuf(nameLen + 1) := $0D
+
+callCode := $03
+regs.a   := 0
+regs.b   := 4
+regs.x   := ADDR(runbBuf)
+regs.y   := nameLen + 1
+regs.u   := ADDR(paramBuf)
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errCode := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "fork3SigChild error ("; ERR; ")"
+    ok := FALSE
+    errCode := ERR
+END
+
+PROCEDURE ipc3SendWake
+(* ============================================================ *)
+(* PROCEDURE : ipc3SendWake                                     *)
+(* PURPOSE   : Send the wake signal to another process.         *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM procID  : INTEGER
+PARAM ok      : BOOLEAN
+PARAM errCode : INTEGER
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errCode  := 0
+callCode := $08
+regs.a   := procID
+regs.b   := 1
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errCode := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "ipc3SendWake error ("; ERR; ")"
+    ok := FALSE
+    errCode := ERR
+END
+
+PROCEDURE ipc3Sleep
+(* ============================================================ *)
+(* PROCEDURE : ipc3Sleep                                        *)
+(* PURPOSE   : Sleep briefly so a missed wake does not block    *)
+(*             the parent forever.                              *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM ok      : BOOLEAN
+PARAM errCode : INTEGER
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errCode  := 0
+callCode := $0A
+regs.x   := 2
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errCode := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "ipc3Sleep error ("; ERR; ")"
+    ok := FALSE
+    errCode := ERR
+END
+
+PROCEDURE wait3ForResponse
+(* ============================================================ *)
+(* PROCEDURE : wait3ForResponse                                 *)
+(* PURPOSE   : Wait until rspSeq reaches the requested value.   *)
+(* ============================================================ *)
+TYPE SigState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,statusCode,errCode:BYTE
+PARAM wantRsp : INTEGER
+PARAM state   : SigState
+PARAM ok      : BOOLEAN
+DIM slpOK     : BOOLEAN
+DIM sleepErr  : INTEGER
+DIM tries     : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+FOR tries := 1 TO 20
+  PRINT "wait3ForResponse: poll "; tries; " want "; wantRsp
+  RUN ipc3ReadState(state, ok)
+  IF NOT ok THEN
+    END
+  ENDIF
+  PRINT "wait3ForResponse: got rsp "; state.rspSeq; " cmd "; state.cmdCode; " stat "; state.statusCode; " err "; state.errCode
+  IF state.rspSeq = wantRsp THEN
+    ok := TRUE
+    END
+  ENDIF
+  RUN ipc3Sleep(slpOK, sleepErr)
+  IF NOT slpOK THEN
+    PRINT "wait3ForResponse: sleep failed err "; sleepErr
+    END
+  ENDIF
+NEXT tries
+
+ok := FALSE
+PRINT "wait3ForResponse: timed out waiting for "; wantRsp
+END
+
+900 PRINT "wait3ForResponse error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE wait3ForReady
+(* ============================================================ *)
+(* PROCEDURE : wait3ForReady                                    *)
+(* PURPOSE   : Wait until the child publishes its PID and ready *)
+(*             status in TSTSIGS2.                              *)
+(* ============================================================ *)
+TYPE SigState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,statusCode,errCode:BYTE
+PARAM state : SigState
+PARAM ok    : BOOLEAN
+DIM slpOK   : BOOLEAN
+DIM sleepErr: INTEGER
+DIM tries   : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+FOR tries := 1 TO 20
+  PRINT "wait3ForReady: poll "; tries
+  RUN ipc3ReadState(state, ok)
+  IF NOT ok THEN
+    END
+  ENDIF
+  PRINT "wait3ForReady: child "; state.childPid; " stat "; state.statusCode
+  IF state.childPid <> 0 THEN
+    IF state.statusCode = 10 THEN
+      ok := TRUE
+      END
+    ENDIF
+  ENDIF
+  RUN ipc3Sleep(slpOK, sleepErr)
+  IF NOT slpOK THEN
+    PRINT "wait3ForReady: sleep failed err "; sleepErr
+    END
+  ENDIF
+NEXT tries
+
+ok := FALSE
+PRINT "wait3ForReady: timed out"
+END
+
+900 PRINT "wait3ForReady error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE probe3DirectA
+(* ============================================================ *)
+(* PROCEDURE : probe3DirectA                                    *)
+(* PURPOSE   : Attempt to RUN tstSig2PingA without local link.  *)
+(* ============================================================ *)
+PARAM ok      : BOOLEAN
+PARAM errCode : INTEGER
+
+ON ERROR GOTO 900
+
+ok      := FALSE
+errCode := 0
+RUN tstSig2PingA(ok)
+END
+
+900 errCode := ERR
+    ok := FALSE
+END
+
+PROCEDURE probe3DirectB
+(* ============================================================ *)
+(* PROCEDURE : probe3DirectB                                    *)
+(* PURPOSE   : Attempt to RUN tstSig2PingB without local link.  *)
+(* ============================================================ *)
+PARAM ok      : BOOLEAN
+PARAM errCode : INTEGER
+
+ON ERROR GOTO 900
+
+ok      := FALSE
+errCode := 0
+RUN tstSig2PingB(ok)
+END
+
+900 errCode := ERR
+    ok := FALSE
+END
+
+PROCEDURE link3LocalModule
+(* ============================================================ *)
+(* PROCEDURE : link3LocalModule                                 *)
+(* PURPOSE   : Probe parent visibility of TSTSIGMOD2 via        *)
+(*             F$Link.                                          *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM modName : STRING[20]
+PARAM hdrAddr : INTEGER
+PARAM ok      : BOOLEAN
+PARAM errCode : INTEGER
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+
+ON ERROR GOTO 900
+
+hdrAddr  := 0
+ok       := FALSE
+errCode  := 0
+callCode := $00
+regs.a   := 0
+regs.x   := ADDR(modName)
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errCode := regs.b
+  END
+ENDIF
+
+hdrAddr := regs.u
+ok := TRUE
+END
+
+900 PRINT "link3LocalModule error ("; ERR; ")"
+    ok := FALSE
+    errCode := ERR
+END
+
+PROCEDURE unlink3LocalModule
+(* ============================================================ *)
+(* PROCEDURE : unlink3LocalModule                               *)
+(* PURPOSE   : Unlink a locally linked module by header addr.   *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM modName : STRING[20]
+PARAM hdrAddr : INTEGER
+PARAM ok      : BOOLEAN
+PARAM errCode : INTEGER
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+
+ON ERROR GOTO 900
+
+ok      := FALSE
+errCode := 0
+IF hdrAddr = 0 THEN
+  ok := TRUE
+  END
+ENDIF
+
+callCode := $02
+regs.u   := hdrAddr
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errCode := regs.b
+  PRINT "unlink3LocalModule: unlink failed "; modName; " err "; errCode
+  END
+ENDIF
+
+hdrAddr := 0
+ok := TRUE
+END
+
+900 PRINT "unlink3LocalModule error ("; ERR; ")"
+    ok := FALSE
+    errCode := ERR
+END
+
+PROCEDURE unload3ByName
+(* ============================================================ *)
+(* PROCEDURE : unload3ByName                                    *)
+(* PURPOSE   : Issue F$UnLoad by merged module name.            *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM modName  : STRING[20]
+PARAM ok       : BOOLEAN
+PARAM errCode  : INTEGER
+DIM regs       : Register
+DIM callCode   : BYTE
+DIM iCC        : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errCode  := 0
+callCode := $1D
+regs.a   := 0
+regs.x   := ADDR(modName)
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errCode := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "unload3ByName error ("; ERR; ")"
+    ok := FALSE
+    errCode := ERR
+END
+
+PROCEDURE drop3LocalModule
+(* ============================================================ *)
+(* PROCEDURE : drop3LocalModule                                 *)
+(* PURPOSE   : Best-effort release of a locally visible module  *)
+(*             by name and header probe.                        *)
+(* ============================================================ *)
+PARAM modName : STRING[20]
+DIM hdrAddr   : INTEGER
+DIM ok        : BOOLEAN
+DIM errCode   : INTEGER
+
+ON ERROR GOTO 900
+
+RUN unload3ByName(modName, ok, errCode)
+RUN link3LocalModule(modName, hdrAddr, ok, errCode)
+IF ok THEN
+  RUN unlink3LocalModule(modName, hdrAddr, ok, errCode)
+ENDIF
+END
+
+900 PRINT "drop3LocalModule error ("; ERR; ")"
+END
+
+PROCEDURE wait3ChildExit
+(* ============================================================ *)
+(* PROCEDURE : wait3ChildExit                                   *)
+(* PURPOSE   : Wait for the TSTSIGSRV2 child to exit.           *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM exitStat : INTEGER
+PARAM ok       : BOOLEAN
+PARAM errCode  : INTEGER
+DIM regs       : Register
+DIM callCode   : BYTE
+DIM iCC        : INTEGER
+
+ON ERROR GOTO 900
+
+exitStat := 0
+ok       := FALSE
+errCode  := 0
+callCode := $04
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errCode := regs.b
+  END
+ENDIF
+
+exitStat := regs.b
+ok := TRUE
+END
+
+900 PRINT "wait3ChildExit error ("; ERR; ")"
+    ok := FALSE
+    errCode := ERR
+END
