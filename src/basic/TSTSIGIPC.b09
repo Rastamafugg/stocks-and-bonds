@@ -121,6 +121,7 @@ ELSE
   PRINT "Parent MODULELIST unload failed err = "; unloadErr
 ENDIF
 PRINT
+RUN pauseForKey
 
 state.reqSeq  := 2
 state.cmdCode := 2
@@ -147,7 +148,7 @@ PRINT
 
 PRINT "-- mdir before post-unload direct probes --"
 SHELL "mdir"
-RUN pauseMdir
+RUN pauseForKey
 
 PRINT "Repeat direct probe A after parent unload and child unload:"
 RUN probeDirectA(callAOK, callAErr)
@@ -823,9 +824,9 @@ END
     errCode := ERR
 END
 
-PROCEDURE pauseMdir
+PROCEDURE pauseForKey
 (* ============================================================ *)
-(* PROCEDURE : pauseMdir                                       *)
+(* PROCEDURE : pauseForKey                                       *)
 (* PURPOSE   : Pause after mdir output so the module listing    *)
 (*             can be reviewed before the post-unload probes.   *)
 (* ============================================================ *)
@@ -838,5 +839,5 @@ GET #0, k
 PRINT
 END
 
-900 PRINT "pauseMdir error ("; ERR; ")"
+900 PRINT "pauseForKey error ("; ERR; ")"
 END
