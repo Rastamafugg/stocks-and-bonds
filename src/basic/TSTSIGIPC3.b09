@@ -32,7 +32,7 @@ PRINT "=== TSTSIGIPC3 ==="
 PRINT
 PRINT "Child loads TSTSIGMOD2."
 PRINT "Parent calls A only."
-PRINT "Parent F$UnLoads TSTSIGMOD2 by name."
+PRINT "Parent unloads names from MODULELIST."
 PRINT "Child then unlinks TSTSIGMOD2."
 PRINT "Parent repeats A and then calls B."
 PRINT
@@ -116,12 +116,12 @@ ELSE
 ENDIF
 PRINT
 
-PRINT "Parent F$UnLoad by merged module name:"
-RUN unload3ByName("TSTSIGMOD2", unloadOK, unloadErr)
+PRINT "Parent unloads names listed in MODULELIST:"
+RUN unload3ModuleList(unloadOK, unloadErr)
 IF unloadOK THEN
-  PRINT "Parent F$UnLoad succeeded"
+  PRINT "Parent MODULELIST unload pass succeeded"
 ELSE
-  PRINT "Parent F$UnLoad failed err = "; unloadErr
+  PRINT "Parent MODULELIST unload failed err = "; unloadErr
 ENDIF
 PRINT
 
@@ -720,6 +720,59 @@ ok := TRUE
 END
 
 900 PRINT "unload3ByName error ("; ERR; ")"
+    ok := FALSE
+    errCode := ERR
+END
+
+PROCEDURE unload3ModuleList
+(* ============================================================ *)
+(* PROCEDURE : unload3ModuleList                                *)
+(* PURPOSE   : Read MODULELIST and issue F$UnLoad for each      *)
+(*             listed module name.                              *)
+(* ============================================================ *)
+PARAM ok      : BOOLEAN
+PARAM errCode : INTEGER
+DIM path      : BYTE
+DIM pathOpen  : BOOLEAN
+DIM cnt       : BYTE
+DIM modCnt    : INTEGER
+DIM idx       : INTEGER
+DIM modName   : STRING[20]
+DIM oneOK     : BOOLEAN
+DIM oneErr    : INTEGER
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+ok       := FALSE
+errCode  := 0
+
+OPEN #path, "MODULELIST":READ
+pathOpen := TRUE
+GET #path, cnt
+modCnt := cnt
+PRINT "unload3ModuleList: count "; modCnt
+
+FOR idx := 1 TO modCnt
+  GET #path, modName
+  PRINT "unload3ModuleList: "; idx; " "; modName
+  RUN unload3ByName(modName, oneOK, oneErr)
+  IF NOT oneOK THEN
+    errCode := oneErr
+    PRINT "unload3ModuleList: unload failed "; modName; " err "; oneErr
+    END
+  ENDIF
+NEXT idx
+
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "unload3ModuleList error ("; ERR; ")"
     ok := FALSE
     errCode := ERR
 END

@@ -328,6 +328,7 @@ PARAM errCode  : INTEGER
 DIM regs       : Register
 DIM callCode   : BYTE
 DIM iCC        : INTEGER
+DIM listOK     : BOOLEAN
 
 ON ERROR GOTO 900
 
@@ -337,6 +338,11 @@ statCode := 255
 PRINT "srv2LoadModule: begin "; modName; " hdr "; hdrAddr
 
 IF hdrAddr <> 0 THEN
+  RUN srv2WriteModuleList(hdrAddr, listOK)
+  IF NOT listOK THEN
+    PRINT "srv2LoadModule: write list failed"
+    END
+  ENDIF
   ok       := TRUE
   statCode := 21
   PRINT "srv2LoadModule: already linked"
@@ -350,6 +356,11 @@ RUN SysCall(callCode, regs)
 iCC := regs.cc
 IF LAND(iCC, 1) = 0 THEN
   hdrAddr  := regs.u
+  RUN srv2WriteModuleList(hdrAddr, listOK)
+  IF NOT listOK THEN
+    PRINT "srv2LoadModule: write list failed"
+    END
+  ENDIF
   ok       := TRUE
   statCode := 21
   PRINT "srv2LoadModule: linked hdr "; hdrAddr
@@ -368,6 +379,11 @@ IF LAND(iCC, 1) <> 0 THEN
 ENDIF
 
 hdrAddr  := regs.u
+RUN srv2WriteModuleList(hdrAddr, listOK)
+IF NOT listOK THEN
+  PRINT "srv2LoadModule: write list failed"
+  END
+ENDIF
 ok       := TRUE
 statCode := 22
 PRINT "srv2LoadModule: loaded hdr "; hdrAddr
@@ -377,6 +393,92 @@ END
     ok := FALSE
     errCode := ERR
     statCode := 255
+END
+
+PROCEDURE srv2WriteModuleList
+(* ============================================================ *)
+(* PROCEDURE : srv2WriteModuleList                              *)
+(* PURPOSE   : Walk the loaded merged module at hdrAddr and     *)
+(*             write each constituent module name to            *)
+(*             MODULELIST for parent-side unload tests.         *)
+(* ============================================================ *)
+PARAM hdrAddr : INTEGER
+PARAM ok      : BOOLEAN
+DIM path      : BYTE
+DIM pathOpen  : BOOLEAN
+DIM curAddr   : INTEGER
+DIM sync1     : INTEGER
+DIM sync2     : INTEGER
+DIM modSzHi   : INTEGER
+DIM modSzLo   : INTEGER
+DIM modSz     : INTEGER
+DIM nmOfsHi   : INTEGER
+DIM nmOfsLo   : INTEGER
+DIM nmOfs     : INTEGER
+DIM nmAddr    : INTEGER
+DIM nmChar    : INTEGER
+DIM nmIdx     : INTEGER
+DIM modCnt    : INTEGER
+DIM modName   : STRING[20]
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+ok       := FALSE
+modCnt   := 0
+
+ON ERROR GOTO 100
+DELETE "MODULELIST"
+
+100 ON ERROR GOTO 900
+
+CREATE #path, "MODULELIST":UPDATE
+pathOpen := TRUE
+PUT #path, modCnt
+
+curAddr := hdrAddr
+LOOP
+  sync1 := PEEK(curAddr)
+  sync2 := PEEK(curAddr + 1)
+  EXITIF sync1 <> $87 OR sync2 <> $CD THEN
+  ENDEXIT
+  modSzHi := PEEK(curAddr + 2)
+  modSzLo := PEEK(curAddr + 3)
+  modSz   := modSzHi * 256 + modSzLo
+  EXITIF modSz <= 0 THEN
+  ENDEXIT
+  nmOfsHi := PEEK(curAddr + 4)
+  nmOfsLo := PEEK(curAddr + 5)
+  nmOfs   := nmOfsHi * 256 + nmOfsLo
+  nmAddr  := curAddr + nmOfs
+  modName := ""
+  nmIdx   := 0
+  LOOP
+    nmChar  := PEEK(nmAddr + nmIdx)
+    modName := modName + CHR$(LAND(nmChar, $7F))
+    nmIdx   := nmIdx + 1
+    EXITIF nmChar >= 128 OR nmIdx >= 20 THEN
+    ENDEXIT
+  ENDLOOP
+  modCnt := modCnt + 1
+  PUT #path, modName
+  curAddr := curAddr + modSz
+ENDLOOP
+
+SEEK #path, 0
+PUT #path, modCnt
+
+CLOSE #path
+pathOpen := FALSE
+PRINT "srv2WriteModuleList: wrote "; modCnt; " names"
+ok := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "srv2WriteModuleList error ("; ERR; ")"
+    ok := FALSE
 END
 
 PROCEDURE srv2UnloadModule
