@@ -349,8 +349,8 @@ LOOP
                       ENDIF
                     ENDIF
                   ENDIF
+                ENDLOOP
               ENDIF
-              ENDLOOP
               IF stateHdrAdr <> 0 THEN
                 RUN unloadOneModule("snbStateHdrPlyr", stateHdrAdr, ok)
                 IF NOT ok THEN
