@@ -61,6 +61,24 @@ iChildPID := state.childPid
 PRINT "Child PID = "; iChildPID; " status = "; state.statusCode
 PRINT
 
+PRINT "Baseline direct probe A before child load:"
+RUN probeDirectA(callAOK, callAErr)
+IF callAOK THEN
+  PRINT "FAIL: tstSig2PingA already callable in parent"
+ELSE
+  PRINT "Observed direct-call A failure err = "; callAErr
+ENDIF
+PRINT
+
+PRINT "Baseline direct probe B before child load:"
+RUN probeDirectB(callBOK, callBErr)
+IF callBOK THEN
+  PRINT "FAIL: tstSig2PingB already callable in parent"
+ELSE
+  PRINT "Observed direct-call B failure err = "; callBErr
+ENDIF
+PRINT
+
 state.reqSeq  := 1
 state.cmdCode := 1
 state.errCode := 0
@@ -82,6 +100,24 @@ IF NOT waitOK THEN
   END
 ENDIF
 PRINT "Child load status = "; state.statusCode; " err = "; state.errCode
+PRINT
+
+PRINT "Direct probe A after child load:"
+RUN probeDirectA(callAOK, callAErr)
+IF callAOK THEN
+  PRINT "PASS: tstSig2PingA callable without local link"
+ELSE
+  PRINT "FAIL: tstSig2PingA direct call err = "; callAErr
+ENDIF
+PRINT
+
+PRINT "Parent unloads names listed in MODULELIST:"
+RUN unloadModuleList(unloadOK, unloadErr)
+IF unloadOK THEN
+  PRINT "Parent MODULELIST unload pass succeeded"
+ELSE
+  PRINT "Parent MODULELIST unload failed err = "; unloadErr
+ENDIF
 PRINT
 
 state.reqSeq  := 2
@@ -109,7 +145,25 @@ PRINT
 
 PRINT "-- mdir before post-unload direct probes --"
 SHELL "mdir"
-RUN pauseMdir
+RUN pause3Mdir
+
+PRINT "Repeat direct probe A after parent unload and child unload:"
+RUN probe3DirectA(callAOK, callAErr)
+IF callAOK THEN
+  PRINT "PASS: tstSig2PingA still callable"
+ELSE
+  PRINT "FAIL: tstSig2PingA after unloads err = "; callAErr
+ENDIF
+PRINT
+
+PRINT "First direct probe B after parent unload and child unload:"
+RUN probe3DirectB(callBOK, callBErr)
+IF callBOK THEN
+  PRINT "PASS: tstSig2PingB still callable"
+ELSE
+  PRINT "FAIL: tstSig2PingB after unloads err = "; callBErr
+ENDIF
+PRINT
 
 state.reqSeq  := 3
 state.cmdCode := 3

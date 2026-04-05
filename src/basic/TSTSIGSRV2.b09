@@ -21,7 +21,7 @@ DIM iErrCode   : INTEGER
 
 ON ERROR GOTO 900
 
-logVerbose := TRUE
+logVerbose := FALSE
 lastReq    := 0
 targetHdr  := 0
 
