@@ -1,6 +1,5 @@
 del -x snb
 del -x snbMarket
-del -x snbMarketTable
 basic09 #40k
 load /d1/snb.b09
 pack*
