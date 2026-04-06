@@ -1,25 +1,10 @@
 del -x snb
-del -x snbMarket
+del -x snbModMemCtl
 basic09 #40k
 load /d1/snb.b09
 pack*
 kill*
-load /d1/snbModCtlBoot.b09
-pack*
-kill*
 load /d1/snbModMemCtl.b09
-pack*
-kill*
-load /d1/snbMarket.b09
-load /d1/snbStateNav.b09
-load /d1/snbScreenBase.b09
-load /d1/snbGameStocks.b09
-pack*
-kill*
-load /d1/snbMarketTable.b09
-load /d1/snbStateNav.b09
-load /d1/snbScreenBase.b09
-load /d1/snbGameStocks.b09
 pack*
 kill*
 bye

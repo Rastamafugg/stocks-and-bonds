@@ -99,6 +99,7 @@ LOOP
       GOSUB 50
       END
     ENDIF
+    RUN probeModuleListOpen
     RUN snbSetup
     RUN releasePhaseLib(ctlStarted, ok)
     IF NOT ok THEN
@@ -836,6 +837,40 @@ END
       CLOSE #path
     ENDIF
     hasState := FALSE
+END
+
+
+PROCEDURE probeModuleListOpen
+(* ============================================================ *)
+(* PROCEDURE : probeModuleListOpen                              *)
+(* PURPOSE   : Diagnostic probe. Verify that the parent can     *)
+(*             open MODULELIST immediately after requestPhaseLib *)
+(*             succeeds and report the module count byte.       *)
+(* ============================================================ *)
+DIM path    : BYTE
+DIM isOpen  : BOOLEAN
+DIM cnt     : BYTE
+DIM modCnt  : INTEGER
+
+ON ERROR GOTO 900
+
+isOpen := FALSE
+modCnt := 0
+
+OPEN #path, "MODULELIST":READ
+isOpen := TRUE
+GET #path, cnt
+modCnt := cnt
+CLOSE #path
+isOpen := FALSE
+
+PRINT "snb: pre-setup MODULELIST open ok count "; modCnt
+END
+
+900 IF isOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "snb: pre-setup MODULELIST open failed err "; ERR
 END
 
 PROCEDURE startCtlSession

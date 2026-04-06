@@ -499,6 +499,7 @@ PUT #path, modCnt
 
 CLOSE #path
 isOpen := FALSE
+PRINT "mmcWriteModuleList: wrote MODULELIST count "; modCnt
 ok := TRUE
 END
 
