@@ -30,6 +30,25 @@ These instructions apply to all work in this repository.
   1. confirmed
   2. still a hypothesis
   3. disproved
+- If the assistant acts, or proposes to act, in a way that appears to conflict
+  with the user's intended workflow, the assistant must disclose that conflict
+  explicitly.
+- That disclosure must state:
+  1. the action taken or proposed
+  2. the user intent or repository workflow it may conflict with
+  3. the default or higher-priority behavior pattern that likely caused the
+     conflict, paraphrased when necessary
+- After that disclosure, the assistant must ask whether the user wants that
+  behavior overridden for this repository.
+- If the user says yes, the assistant must draft and apply the corresponding
+  `AGENTS.md` rule in the same task unless the user explicitly says not to.
+- Do not present the conflict as resolved merely by explaining it. If the user
+  wants durable prevention, encode that prevention in `AGENTS.md`.
+- If the conflict affected a completed or attempted code change, also state
+  whether the conflicting behavior changed code, analysis scope, review scope,
+  or communication style.
+- If the user invokes this protocol, follow it before making further
+  speculative changes related to that conflict.
 - When a task changes any Basic09 source module that is intended to be packed
   onto the CoCo 3 workflow disk, update `src/script/packSnb` in the same task
   unless the user explicitly says not to.
