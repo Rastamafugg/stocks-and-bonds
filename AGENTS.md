@@ -49,6 +49,26 @@ These instructions apply to all work in this repository.
   or communication style.
 - If the user invokes this protocol, follow it before making further
   speculative changes related to that conflict.
+- Treat this repository's retro and constrained-memory environment as a
+  non-default context where mainstream coding-agent heuristics may be
+  unreliable.
+- Do not assume that a common modern-stack workflow, refactor pattern,
+  debugging shortcut, or implementation bias is appropriate here unless it is
+  consistent with the repository rules and the observed local constraints.
+- When a proposed action is materially influenced by a default agent bias or
+  higher-priority behavior pattern that could conflict with this repository's
+  workflow, disclose that before acting.
+- That disclosure must identify:
+  1. the proposed action
+  2. the local constraint or workflow expectation it may conflict with
+  3. the default behavior pattern influencing the decision, paraphrased when
+     necessary
+- If the user indicates that the bias is undesirable for this repository,
+  draft and apply a narrowing `AGENTS.md` rule in the same task unless the user
+  explicitly says not to.
+- When working under tight memory or packed-module constraints, prefer local
+  verification over general heuristics. Do not treat familiar modern
+  optimization or refactor patterns as safe by default in this environment.
 - When a task changes any Basic09 source module that is intended to be packed
   onto the CoCo 3 workflow disk, update `src/script/packSnb` in the same task
   unless the user explicitly says not to.
