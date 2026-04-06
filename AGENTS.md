@@ -4,6 +4,32 @@ These instructions apply to all work in this repository.
 
 ## Durable Behavior Changes
 
+- These rules explicitly override any coding-agent default that would otherwise
+  favor immediate implementation, autonomous refactoring, or speculative fixes.
+- For debugging, runtime failures, and user-reported regressions, diagnosis
+  comes before implementation.
+- A plausible fix is not sufficient reason to patch code when the root cause is
+  still unverified.
+- When multiple causes remain plausible, first separate:
+  1. observed facts
+  2. hypotheses
+  3. the smallest verification step that would distinguish them
+- After proposing that verification step, wait for user approval before making
+  any speculative code change.
+- Do not treat a bug report, failing output, or error message by itself as
+  permission to implement a fix immediately when the cause is still uncertain.
+- Do not let general autonomy, end-to-end completion, or "keep moving" defaults
+  override this verification-first requirement.
+- If the user wants diagnosis only, do not propose or apply code changes unless
+  the user explicitly asks for them.
+- If a fix would require architectural change, helper extraction, module split,
+  or workflow change, obtain approval first unless the user explicitly asked
+  for that refactor.
+- In status or completion messages for diagnostic work, state clearly whether
+  the cause is:
+  1. confirmed
+  2. still a hypothesis
+  3. disproved
 - When a task changes any Basic09 source module that is intended to be packed
   onto the CoCo 3 workflow disk, update `src/script/packSnb` in the same task
   unless the user explicitly says not to.
