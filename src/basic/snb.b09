@@ -851,6 +851,7 @@ DIM path    : BYTE
 DIM isOpen  : BOOLEAN
 DIM cnt     : BYTE
 DIM modCnt  : INTEGER
+DIM k       : STRING[1]
 
 ON ERROR GOTO 900
 
@@ -871,6 +872,9 @@ END
       CLOSE #path
     ENDIF
     PRINT "snb: pre-setup MODULELIST open failed err "; ERR
+    PRINT "Press any key to continue...";
+    GET #0, k
+    PRINT
 END
 
 PROCEDURE startCtlSession
