@@ -56,9 +56,6 @@ DIM iMgnRule   : INTEGER
 DIM iSavPh     : INTEGER
 DIM bankrCnt   : INTEGER
 DIM activePlrs : INTEGER
-DIM modList(12): STRING[20]
-DIM hdrList(12): INTEGER
-DIM modCnt     : INTEGER
 DIM gameOver   : BOOLEAN
 DIM runEndGame : BOOLEAN
 DIM doClsgMkt  : BOOLEAN
@@ -78,6 +75,8 @@ DIM mkSpOcc(9) : BOOLEAN
 DIM mkDvSusp(9): BOOLEAN
 DIM mkDvRnst(9): BOOLEAN
 DIM stateHdrAdr: INTEGER
+DIM ctlStarted : BOOLEAN
+DIM phaseSig   : INTEGER
 DIM i          : INTEGER
 
 ON ERROR GOTO 900
@@ -86,6 +85,7 @@ ON ERROR GOTO 900
 ! crashed run before entering the menu/setup flow.
 RUN chkStale(wasStale)
 needSetup := TRUE
+ctlStarted := FALSE
 
 LOOP
 
@@ -93,25 +93,28 @@ LOOP
     ! setup writes a fresh SNBSTATE for a new game or
     ! loads SNBGAME into SNBSTATE for resume flow.
     RUN chkStale(wasStale)
-    modCnt := 1
-    modList(1) := "snbSetup"
-    RUN loadModuleList(modList, hdrList, modCnt, ok)
+    phaseSig := 128
+    RUN requestPhaseLib(phaseSig, ctlStarted, ok)
     IF NOT ok THEN
+      GOSUB 50
       END
     ENDIF
     RUN snbSetup
-    RUN unloadModuleList(modList, hdrList, modCnt, ok)
+    RUN releasePhaseLib(ctlStarted, ok)
     IF NOT ok THEN
+      GOSUB 50
       END
     ENDIF
   ENDIF
 
   RUN stateExists(hasState)
   IF NOT hasState THEN
+    GOSUB 50
     END
   ENDIF
   RUN readHdr(hdr, loadOK)
   IF NOT loadOK THEN
+    GOSUB 50
     END
   ENDIF
 
@@ -129,6 +132,7 @@ LOOP
   IF NOT needSetup THEN
     IF iGSt < 1 OR iGSt > 3 THEN
       PRINT "SNB: unexpected gameStage after setup/load: "; iGSt
+      GOSUB 50
       END
     ENDIF
 
@@ -149,15 +153,15 @@ LOOP
       ! savedPhase 0 and 4 route back into the
       ! dividend module's resume points.
       IF iSavPh = 0 OR iSavPh = 4 THEN
-        modCnt := 1
-        modList(1) := "snbDividend"
-        RUN loadModuleList(modList, hdrList, modCnt, ok)
+        phaseSig := 129
+        RUN requestPhaseLib(phaseSig, ctlStarted, ok)
         IF NOT ok THEN
           gameOver := TRUE
         ELSE
           RUN snbDividend
-          RUN unloadModuleList(modList, hdrList, modCnt, ok)
+          RUN releasePhaseLib(ctlStarted, ok)
           IF NOT ok THEN
+            GOSUB 50
             END
           ENDIF
           GOSUB 100
@@ -176,30 +180,30 @@ LOOP
       IF NOT gameOver THEN
         ! savedPhase 7 is market resume after save+exit.
         IF iSavPh = 0 OR iSavPh = 7 THEN
-          modCnt := 1
-          modList(1) := "snbMarket"
-          RUN loadModuleList(modList, hdrList, modCnt, ok)
+          phaseSig := 131
+          RUN requestPhaseLib(phaseSig, ctlStarted, ok)
           IF NOT ok THEN
             gameOver := TRUE
           ELSE
             marketAct := 1
             ! Line exceeds 79 chars; RUN statement cannot be split.
             RUN snbMarket(marketAct, mkMktDlt, mkCrdDlt)
-            RUN unloadModuleList(modList, hdrList, modCnt, ok)
+            RUN releasePhaseLib(ctlStarted, ok)
             IF NOT ok THEN
+              GOSUB 50
               END
             ENDIF
             IF marketAct = 1 THEN
-              modCnt := 1
-              modList(1) := "snbMarketTable"
-              RUN loadModuleList(modList, hdrList, modCnt, ok)
+              phaseSig := 132
+              RUN requestPhaseLib(phaseSig, ctlStarted, ok)
               IF NOT ok THEN
                 gameOver := TRUE
               ELSE
                 ! Line exceeds 79 chars; RUN statement cannot be split.
                 RUN snbMarketTable(mkMktDlt, mkCrdDlt, mkPrcBef, mkSpOcc, mkDvSusp, mkDvRnst)
-                RUN unloadModuleList(modList, hdrList, modCnt, ok)
+                RUN releasePhaseLib(ctlStarted, ok)
                 IF NOT ok THEN
+                  GOSUB 50
                   END
                 ENDIF
                 GOSUB 100
@@ -215,17 +219,17 @@ LOOP
       IF NOT gameOver THEN
         ! savedPhase 11 is the post-update market display pass.
         IF iSavPh = 11 THEN
-          modCnt := 1
-          modList(1) := "snbMarketTable"
-          RUN loadModuleList(modList, hdrList, modCnt, ok)
+          phaseSig := 132
+          RUN requestPhaseLib(phaseSig, ctlStarted, ok)
           IF NOT ok THEN
             gameOver := TRUE
           ELSE
             marketAct := 1
             ! Line exceeds 79 chars; RUN statement cannot be split.
             RUN snbMarketPost(mkPrcBef, mkMktDlt, mkCrdDlt, mkSpOcc, mkDvSusp, mkDvRnst, marketAct)
-            RUN unloadModuleList(modList, hdrList, modCnt, ok)
+            RUN releasePhaseLib(ctlStarted, ok)
             IF NOT ok THEN
+              GOSUB 50
               END
             ENDIF
             IF marketAct = 1 THEN
@@ -241,15 +245,15 @@ LOOP
       IF NOT gameOver THEN
         ! savedPhase 3 is year-10 clearance before buy.
         IF iSavPh = 3 THEN
-          modCnt := 1
-          modList(1) := "snbYear10Clear"
-          RUN loadModuleList(modList, hdrList, modCnt, ok)
+          phaseSig := 139
+          RUN requestPhaseLib(phaseSig, ctlStarted, ok)
           IF NOT ok THEN
             gameOver := TRUE
           ELSE
             RUN snbYear10Clear
-            RUN unloadModuleList(modList, hdrList, modCnt, ok)
+            RUN releasePhaseLib(ctlStarted, ok)
             IF NOT ok THEN
+              GOSUB 50
               END
             ENDIF
             GOSUB 100
@@ -286,6 +290,7 @@ LOOP
     ENDLOOP
 
     IF NOT runEndGame THEN
+      GOSUB 50
       END
     ENDIF
 
@@ -296,32 +301,35 @@ LOOP
     IF doClsgMkt THEN
       ! Closing market pass uses the final-year state
       ! already written by the buy/margin path.
-      modCnt := 1
-      modList(1) := "snbMarket"
-      RUN loadModuleList(modList, hdrList, modCnt, ok)
+      phaseSig := 131
+      RUN requestPhaseLib(phaseSig, ctlStarted, ok)
       IF NOT ok THEN
+        GOSUB 50
         END
       ENDIF
       marketAct := 1
       ! Line exceeds 79 chars; RUN statement cannot be split.
       RUN snbMarket(marketAct, mkMktDlt, mkCrdDlt)
-      RUN unloadModuleList(modList, hdrList, modCnt, ok)
+      RUN releasePhaseLib(ctlStarted, ok)
       IF NOT ok THEN
+        GOSUB 50
         END
       ENDIF
       IF marketAct <> 1 THEN
+        GOSUB 50
         END
       ENDIF
-      modCnt := 1
-      modList(1) := "snbMarketTable"
-      RUN loadModuleList(modList, hdrList, modCnt, ok)
+      phaseSig := 132
+      RUN requestPhaseLib(phaseSig, ctlStarted, ok)
       IF NOT ok THEN
+        GOSUB 50
         END
       ENDIF
       ! Line exceeds 79 chars; RUN statement cannot be split.
       RUN snbMarketTable(mkMktDlt, mkCrdDlt, mkPrcBef, mkSpOcc, mkDvSusp, mkDvRnst)
-      RUN unloadModuleList(modList, hdrList, modCnt, ok)
+      RUN releasePhaseLib(ctlStarted, ok)
       IF NOT ok THEN
+        GOSUB 50
         END
       ENDIF
       GOSUB 100
@@ -329,23 +337,26 @@ LOOP
         GOSUB 200
       ENDIF
       IF gameOver AND NOT runEndGame THEN
+        GOSUB 50
         END
       ENDIF
       IF iSavPh = 11 THEN
-        modCnt := 1
-        modList(1) := "snbMarketTable"
-        RUN loadModuleList(modList, hdrList, modCnt, ok)
+        phaseSig := 132
+        RUN requestPhaseLib(phaseSig, ctlStarted, ok)
         IF NOT ok THEN
+          GOSUB 50
           END
         ENDIF
         marketAct := 1
         ! Line exceeds 79 chars; RUN statement cannot be split.
         RUN snbMarketPost(mkPrcBef, mkMktDlt, mkCrdDlt, mkSpOcc, mkDvSusp, mkDvRnst, marketAct)
-        RUN unloadModuleList(modList, hdrList, modCnt, ok)
+        RUN releasePhaseLib(ctlStarted, ok)
         IF NOT ok THEN
+          GOSUB 50
           END
         ENDIF
         IF marketAct <> 1 THEN
+          GOSUB 50
           END
         ENDIF
         GOSUB 100
@@ -354,20 +365,22 @@ LOOP
 
     ! Endgame may write RETURN_TO_SETUP (8) or
     ! QUIT_TO_MENU (9) back into SNBSTATE.
-    modCnt := 1
-    modList(1) := "snbEndGame"
-    RUN loadModuleList(modList, hdrList, modCnt, ok)
+    phaseSig := 140
+    RUN requestPhaseLib(phaseSig, ctlStarted, ok)
     IF NOT ok THEN
+      GOSUB 50
       END
     ENDIF
     RUN snbEndGame
-    RUN unloadModuleList(modList, hdrList, modCnt, ok)
+    RUN releasePhaseLib(ctlStarted, ok)
     IF NOT ok THEN
+      GOSUB 50
       END
     ENDIF
 
     RUN readHdr(hdr, loadOK)
     IF NOT loadOK THEN
+      GOSUB 50
       END
     ENDIF
     iSavPh := hdr.savedPhase
@@ -375,14 +388,21 @@ LOOP
     IF iSavPh = 8 THEN
       needSetup := TRUE
     ELSE IF iSavPh = 9 THEN
+      GOSUB 50
       END
     ELSE IF iGSt <> 3 THEN
       needSetup := FALSE
     ELSE
+      GOSUB 50
       END
     ENDIF \ENDIF \ENDIF
   ENDIF
 ENDLOOP
+
+50 IF ctlStarted THEN
+      RUN stopCtlSession(ctlStarted, ok)
+    ENDIF
+    RETURN
 
 ! Post-phase refresh. Reads the current header from
 ! SNBSTATE and updates the staged coordinator fields.
@@ -450,9 +470,8 @@ ENDLOOP
         savePlyrVal := phasePlyr
 
         IF iSavPh = 6 THEN
-          modCnt := 1
-          modList(1) := "snbMgnInt"
-          RUN loadModuleList(modList, hdrList, modCnt, ok)
+          phaseSig := 130
+          RUN requestPhaseLib(phaseSig, ctlStarted, ok)
           IF NOT ok THEN
             gameOver := TRUE
           ELSE
@@ -460,10 +479,9 @@ ENDLOOP
             RUN snbMgnInt(iCYr, iMaxYr, iMgnRule, phasePlyr, iPlyrCnt, plyr, mkt, phaseAct, savePhVal, savePlyrVal)
           ENDIF
         ELSE IF iSavPh = 1 THEN
-          modCnt := 1
           IF plyr.plyrType = 2 THEN
-            modList(1) := "snbSellAI"
-            RUN loadModuleList(modList, hdrList, modCnt, ok)
+            phaseSig := 134
+            RUN requestPhaseLib(phaseSig, ctlStarted, ok)
             IF NOT ok THEN
               gameOver := TRUE
             ELSE
@@ -471,8 +489,8 @@ ENDLOOP
               RUN snbSellAI(iCYr, iMgnRule, phasePlyr, iPlyrCnt, plyr, mkt, phaseAct, savePhVal, savePlyrVal)
             ENDIF
           ELSE
-            modList(1) := "snbSellHumanStub"
-            RUN loadModuleList(modList, hdrList, modCnt, ok)
+            phaseSig := 133
+            RUN requestPhaseLib(phaseSig, ctlStarted, ok)
             IF NOT ok THEN
               gameOver := TRUE
             ELSE
@@ -481,10 +499,9 @@ ENDLOOP
             ENDIF
           ENDIF
         ELSE IF iSavPh = 2 THEN
-          modCnt := 1
           IF plyr.plyrType = 2 THEN
-            modList(1) := "snbBuyAI"
-            RUN loadModuleList(modList, hdrList, modCnt, ok)
+            phaseSig := 136
+            RUN requestPhaseLib(phaseSig, ctlStarted, ok)
             IF NOT ok THEN
               gameOver := TRUE
             ELSE
@@ -492,8 +509,8 @@ ENDLOOP
               RUN snbBuyAI(iCYr, iMgnRule, phasePlyr, iPlyrCnt, plyr, mkt, phaseAct, savePhVal, savePlyrVal)
             ENDIF
           ELSE
-            modList(1) := "snbBuy"
-            RUN loadModuleList(modList, hdrList, modCnt, ok)
+            phaseSig := 135
+            RUN requestPhaseLib(phaseSig, ctlStarted, ok)
             IF NOT ok THEN
               gameOver := TRUE
             ELSE
@@ -502,9 +519,8 @@ ENDLOOP
             ENDIF
           ENDIF
         ELSE IF iSavPh = 10 THEN
-          modCnt := 1
-          modList(1) := "snbMarketPlayer"
-          RUN loadModuleList(modList, hdrList, modCnt, ok)
+          phaseSig := 137
+          RUN requestPhaseLib(phaseSig, ctlStarted, ok)
           IF NOT ok THEN
             gameOver := TRUE
           ELSE
@@ -512,9 +528,8 @@ ENDLOOP
             RUN snbMarketPlayer(phasePlyr, iPlyrCnt, plyr, mkSpOcc, phaseAct, savePhVal, savePlyrVal)
           ENDIF
         ELSE
-          modCnt := 1
-          modList(1) := "snbMarginPay"
-          RUN loadModuleList(modList, hdrList, modCnt, ok)
+          phaseSig := 138
+          RUN requestPhaseLib(phaseSig, ctlStarted, ok)
           IF NOT ok THEN
             gameOver := TRUE
           ELSE
@@ -524,7 +539,7 @@ ENDLOOP
         ENDIF \ENDIF \ENDIF \ENDIF
 
         IF NOT gameOver THEN
-          RUN unloadModuleList(modList, hdrList, modCnt, ok)
+          RUN releasePhaseLib(ctlStarted, ok)
           IF NOT ok THEN
             END
           ENDIF
@@ -823,84 +838,267 @@ END
     hasState := FALSE
 END
 
-PROCEDURE loadModuleList
+PROCEDURE startCtlSession
 (* ============================================================ *)
-(* PROCEDURE : loadModuleList                                   *)
-(* PURPOSE   : Load or link a list of modules into the current  *)
-(*             process.                                         *)
-(*             On the first failure, unloads any modules        *)
-(*             already loaded in this batch before returning.   *)
-(* PARAMS    : modList - module names                           *)
-(*             hdrList - OUT header addresses                   *)
-(*             modCnt  - active entries in modList              *)
-(*             ok      - TRUE on success                        *)
+(* PROCEDURE : startCtlSession                                  *)
+(* PURPOSE   : Load the transient bootstrap helper, start the   *)
+(*             persistent controller child, then unload the     *)
+(*             helper so it does not stay resident in snb.      *)
 (* ============================================================ *)
-PARAM modList(12): STRING[20]
-PARAM hdrList(12): INTEGER
-PARAM modCnt    : INTEGER
-PARAM ok        : BOOLEAN
-DIM i           : INTEGER
+PARAM ctlStarted : BOOLEAN
+PARAM ok         : BOOLEAN
+DIM bootHdrAdr   : INTEGER
+DIM dropOK       : BOOLEAN
 
 ON ERROR GOTO 900
 
 ok := FALSE
-FOR i := 1 TO 12
-  hdrList(i) := 0
-NEXT i
+IF ctlStarted THEN
+  ok := TRUE
+  END
+ENDIF
 
-FOR i := 1 TO modCnt
-  RUN loadOneModule(modList(i), hdrList(i), ok)
-  IF NOT ok THEN
-    IF i > 1 THEN
-      RUN unloadModuleList(modList, hdrList, i - 1, ok)
-    ENDIF
-    PRINT "SNB: failed to load "; modList(i)
-    END
-  ENDIF
-NEXT i
-
+bootHdrAdr := 0
+RUN loadOneModule("snbModCtlBoot", bootHdrAdr, ok)
+IF NOT ok THEN
+  PRINT "startCtlSession: loadOneModule failed"
+  END
+ENDIF
+RUN startModCtl(ok)
+IF NOT ok THEN
+  RUN unloadOneModule("snbModCtlBoot", bootHdrAdr, dropOK)
+  END
+ENDIF
+RUN unloadOneModule("snbModCtlBoot", bootHdrAdr, ok)
+IF NOT ok THEN
+  PRINT "startCtlSession: unloadOneModule failed"
+  END
+ENDIF
+ctlStarted := TRUE
 ok := TRUE
 END
 
-900 PRINT "loadModuleList error ("; ERR; ")"
+900 PRINT "startCtlSession error ("; ERR; ")"
     ok := FALSE
 END
 
-PROCEDURE unloadModuleList
+PROCEDURE stopCtlSession
 (* ============================================================ *)
-(* PROCEDURE : unloadModuleList                                 *)
-(* PURPOSE   : Unlink loaded modules in reverse order.          *)
-(*             This preserves the intended stack discipline so  *)
-(*             phase modules are removed from the top of the    *)
-(*             current process memory map, never from the       *)
-(*             middle.                                          *)
-(* PARAMS    : modList - module names                           *)
-(*             hdrList - header addresses                       *)
-(*             modCnt  - active entries in modList              *)
-(*             ok      - TRUE on success                        *)
+(* PROCEDURE : stopCtlSession                                   *)
+(* PURPOSE   : Load the transient bootstrap helper, stop the    *)
+(*             persistent controller child, then unload the     *)
+(*             helper.                                          *)
 (* ============================================================ *)
-PARAM modList(12): STRING[20]
-PARAM hdrList(12): INTEGER
-PARAM modCnt    : INTEGER
-PARAM ok        : BOOLEAN
-DIM i           : INTEGER
+PARAM ctlStarted : BOOLEAN
+PARAM ok         : BOOLEAN
+DIM bootHdrAdr   : INTEGER
+DIM dropOK       : BOOLEAN
 
 ON ERROR GOTO 900
 
 ok := TRUE
-FOR i := modCnt TO 1 STEP -1
-  IF hdrList(i) <> 0 THEN
-    RUN unloadOneModule(modList(i), hdrList(i), ok)
-    IF NOT ok THEN
-      PRINT "SNB: failed to unload "; modList(i)
+IF NOT ctlStarted THEN
+  END
+ENDIF
+
+bootHdrAdr := 0
+RUN loadOneModule("snbModCtlBoot", bootHdrAdr, ok)
+IF NOT ok THEN
+  PRINT "stopCtlSession: loadOneModule failed"
+  END
+ENDIF
+RUN stopModCtl(ok)
+IF NOT ok THEN
+  RUN unloadOneModule("snbModCtlBoot", bootHdrAdr, dropOK)
+  END
+ENDIF
+RUN unloadOneModule("snbModCtlBoot", bootHdrAdr, ok)
+IF NOT ok THEN
+  PRINT "stopCtlSession: unloadOneModule failed"
+  END
+ENDIF
+ctlStarted := FALSE
+ok := TRUE
+END
+
+900 PRINT "stopCtlSession error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE requestPhaseLib
+(* ============================================================ *)
+(* PROCEDURE : requestPhaseLib                                  *)
+(* PURPOSE   : Ensure the controller session is started, then   *)
+(*             load the transient bootstrap helper only long    *)
+(*             enough to send one phase-library request.        *)
+(* ============================================================ *)
+PARAM sigVal     : INTEGER
+PARAM ctlStarted : BOOLEAN
+PARAM ok         : BOOLEAN
+DIM bootHdrAdr   : INTEGER
+DIM dropOK       : BOOLEAN
+
+ON ERROR GOTO 900
+
+ok := FALSE
+IF NOT ctlStarted THEN
+  RUN startCtlSession(ctlStarted, ok)
+  IF NOT ok THEN
+    END
+  ENDIF
+ENDIF
+
+bootHdrAdr := 0
+RUN loadOneModule("snbModCtlBoot", bootHdrAdr, ok)
+IF NOT ok THEN
+  PRINT "requestPhaseLib: loadOneModule failed"
+  END
+ENDIF
+RUN bootLoadPhase(sigVal, ok)
+IF NOT ok THEN
+  RUN unloadOneModule("snbModCtlBoot", bootHdrAdr, dropOK)
+  END
+ENDIF
+RUN unloadOneModule("snbModCtlBoot", bootHdrAdr, ok)
+IF NOT ok THEN
+  PRINT "requestPhaseLib: unloadOneModule failed"
+  END
+ENDIF
+END
+
+900 PRINT "requestPhaseLib error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE releasePhaseLib
+(* ============================================================ *)
+(* PROCEDURE : releasePhaseLib                                  *)
+(* PURPOSE   : Unload MODULELIST locally in snb, ignoring only  *)
+(*             error 221, then load the transient bootstrap     *)
+(*             helper long enough to issue the child unload.    *)
+(* ============================================================ *)
+PARAM ctlStarted : BOOLEAN
+PARAM ok         : BOOLEAN
+DIM bootHdrAdr   : INTEGER
+DIM dropOK       : BOOLEAN
+
+ON ERROR GOTO 900
+
+ok := FALSE
+RUN unloadPhaseModuleList(ok)
+IF NOT ok THEN
+  END
+ENDIF
+IF NOT ctlStarted THEN
+  PRINT "releasePhaseLib: controller not started"
+  END
+ENDIF
+
+bootHdrAdr := 0
+RUN loadOneModule("snbModCtlBoot", bootHdrAdr, ok)
+IF NOT ok THEN
+  PRINT "releasePhaseLib: loadOneModule failed"
+  END
+ENDIF
+RUN bootUnloadPhase(ok)
+IF NOT ok THEN
+  RUN unloadOneModule("snbModCtlBoot", bootHdrAdr, dropOK)
+  END
+ENDIF
+RUN unloadOneModule("snbModCtlBoot", bootHdrAdr, ok)
+IF NOT ok THEN
+  PRINT "releasePhaseLib: unloadOneModule failed"
+  END
+ENDIF
+END
+
+900 PRINT "releasePhaseLib error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE unloadPhaseModuleList
+(* ============================================================ *)
+(* PROCEDURE : unloadPhaseModuleList                            *)
+(* PURPOSE   : Read MODULELIST and issue F$UnLoad for each      *)
+(*             listed name. Error 221 is ignored as the known   *)
+(*             unused-link miss case.                           *)
+(* ============================================================ *)
+PARAM ok      : BOOLEAN
+DIM path      : BYTE
+DIM isOpen    : BOOLEAN
+DIM cnt       : BYTE
+DIM modCnt    : INTEGER
+DIM idx       : INTEGER
+DIM modName   : STRING[20]
+DIM oneOK     : BOOLEAN
+DIM oneErr    : INTEGER
+
+ON ERROR GOTO 900
+
+isOpen := FALSE
+ok     := FALSE
+
+OPEN #path, "MODULELIST":READ
+isOpen := TRUE
+GET #path, cnt
+modCnt := cnt
+
+FOR idx := 1 TO modCnt
+  GET #path, modName
+  RUN unloadPhaseModuleByName(modName, oneOK, oneErr)
+  IF NOT oneOK THEN
+    IF oneErr <> 221 THEN
+      PRINT "unloadPhaseModuleList: unload failed "; modName; " err "; oneErr
       END
     ENDIF
   ENDIF
-NEXT i
+NEXT idx
+
+CLOSE #path
+isOpen := FALSE
+ok := TRUE
 END
 
-900 PRINT "unloadModuleList error ("; ERR; ")"
+900 IF isOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "unloadPhaseModuleList error ("; ERR; ")"
     ok := FALSE
+END
+
+PROCEDURE unloadPhaseModuleByName
+(* ============================================================ *)
+(* PROCEDURE : unloadPhaseModuleByName                          *)
+(* PURPOSE   : Issue F$UnLoad by module name in the snb process.*)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM modName : STRING[20]
+PARAM ok      : BOOLEAN
+PARAM errVal  : INTEGER
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errVal   := 0
+callCode := $1D
+regs.a   := 0
+regs.x   := ADDR(modName)
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "unloadPhaseModuleByName error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
 END
 
 PROCEDURE loadOneModule

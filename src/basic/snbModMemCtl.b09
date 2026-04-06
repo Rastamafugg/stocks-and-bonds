@@ -1,0 +1,643 @@
+PROCEDURE snbModMemCtl
+(* ============================================================ *)
+(* PROCEDURE : snbModMemCtl                                     *)
+(* PURPOSE   : Persistent module memory controller child.       *)
+(*             Waits for signal-driven requests, loads the      *)
+(*             requested packed library into the module         *)
+(*             directory, writes MODULELIST, and unloads the    *)
+(*             full listed set on demand.                       *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+DIM state      : CtlState
+DIM ok         : BOOLEAN
+DIM fileOK     : BOOLEAN
+DIM sigOK      : BOOLEAN
+DIM pidOK      : BOOLEAN
+DIM iChildID   : INTEGER
+DIM lastSeq    : INTEGER
+DIM hdrAddr    : INTEGER
+DIM currSigVal : INTEGER
+DIM currName   : STRING[20]
+DIM respStat   : INTEGER
+DIM errVal     : INTEGER
+
+ON ERROR GOTO 900
+
+lastSeq    := 0
+hdrAddr    := 0
+currSigVal := 0
+currName   := ""
+
+RUN mmcGetProcID(iChildID, pidOK)
+IF NOT pidOK THEN
+  PRINT "snbModMemCtl: mmcGetProcID failed"
+  END
+ENDIF
+
+RUN mmcReadState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "snbModMemCtl: initial state read failed"
+  END
+ENDIF
+
+state.childPid   := iChildID
+state.statusCode := 10
+state.errCode    := 0
+RUN mmcWriteState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "snbModMemCtl: initial state write failed"
+  END
+ENDIF
+
+RUN mmcSendSignal(state.parentPid, 1, sigOK, errVal)
+IF NOT sigOK THEN
+  PRINT "snbModMemCtl: ready wake failed err "; errVal
+  END
+ENDIF
+
+LOOP
+  RUN mmcReadState(state, fileOK)
+  IF NOT fileOK THEN
+    PRINT "snbModMemCtl: loop state read failed"
+    END
+  ENDIF
+
+  IF state.reqSeq = lastSeq THEN
+    RUN mmcSleep(sigOK, errVal)
+    IF NOT sigOK THEN
+      PRINT "snbModMemCtl: sleep failed err "; errVal
+      END
+    ENDIF
+  ELSE
+    lastSeq  := state.reqSeq
+    respStat := 255
+    errVal   := 0
+
+    IF state.reqSig = 254 THEN
+      RUN mmcUnloadCurrent(hdrAddr, currSigVal, currName, respStat, ok, errVal)
+    ELSE IF state.reqSig = 255 THEN
+      RUN mmcUnloadCurrent(hdrAddr, currSigVal, currName, respStat, ok, errVal)
+      IF ok THEN
+        respStat := 40
+      ENDIF
+    ELSE
+      RUN mmcLoadSignal(state.reqSig, hdrAddr, currSigVal, currName, respStat, ok, errVal)
+    ENDIF \ENDIF
+
+    state.statusCode := respStat
+    state.errCode    := errVal
+    state.rspSeq     := state.reqSeq
+    RUN mmcWriteState(state, fileOK)
+    IF NOT fileOK THEN
+      PRINT "snbModMemCtl: loop state write failed"
+      END
+    ENDIF
+
+    RUN mmcSendSignal(state.parentPid, 1, sigOK, errVal)
+    IF NOT sigOK THEN
+      PRINT "snbModMemCtl: response wake failed err "; errVal
+      END
+    ENDIF
+
+    IF state.reqSig = 255 THEN
+      END
+    ENDIF
+  ENDIF
+ENDLOOP
+END
+
+900 PRINT "snbModMemCtl error ("; ERR; ")"
+END
+
+PROCEDURE mmcReadState
+(* ============================================================ *)
+(* PROCEDURE : mmcReadState                                     *)
+(* PURPOSE   : Read the shared module-controller state record.  *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+PARAM state : CtlState
+PARAM ok    : BOOLEAN
+DIM path    : BYTE
+DIM isOpen  : BOOLEAN
+
+ON ERROR GOTO 900
+
+isOpen := FALSE
+ok     := FALSE
+
+OPEN #path, "SNBMODCS":READ
+isOpen := TRUE
+GET #path, state
+IF state.magic <> $53 THEN
+  PRINT "mmcReadState: invalid magic"
+  END
+ENDIF
+
+CLOSE #path
+isOpen := FALSE
+ok := TRUE
+END
+
+900 IF isOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "mmcReadState error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE mmcWriteState
+(* ============================================================ *)
+(* PROCEDURE : mmcWriteState                                    *)
+(* PURPOSE   : Rewrite the shared module-controller state.      *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+PARAM state : CtlState
+PARAM ok    : BOOLEAN
+DIM path    : BYTE
+DIM isOpen  : BOOLEAN
+
+ON ERROR GOTO 900
+
+isOpen := FALSE
+ok     := FALSE
+
+OPEN #path, "SNBMODCS":UPDATE
+isOpen := TRUE
+PUT #path, state
+
+CLOSE #path
+isOpen := FALSE
+ok := TRUE
+END
+
+900 IF isOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "mmcWriteState error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE mmcGetProcID
+(* ============================================================ *)
+(* PROCEDURE : mmcGetProcID                                     *)
+(* PURPOSE   : Return the current process ID via F$ID.          *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM procID : INTEGER
+PARAM ok     : BOOLEAN
+DIM regs     : Register
+DIM callCode : BYTE
+DIM iCC      : INTEGER
+
+ON ERROR GOTO 900
+
+procID   := 0
+ok       := FALSE
+callCode := $0C
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  END
+ENDIF
+
+procID := regs.a
+ok := TRUE
+END
+
+900 PRINT "mmcGetProcID error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE mmcSendSignal
+(* ============================================================ *)
+(* PROCEDURE : mmcSendSignal                                    *)
+(* PURPOSE   : Send a wake signal to another process.           *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM procID  : INTEGER
+PARAM sigVal  : INTEGER
+PARAM ok      : BOOLEAN
+PARAM errVal  : INTEGER
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errVal   := 0
+callCode := $08
+regs.a   := procID
+regs.b   := sigVal
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "mmcSendSignal error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
+
+PROCEDURE mmcSleep
+(* ============================================================ *)
+(* PROCEDURE : mmcSleep                                         *)
+(* PURPOSE   : Sleep briefly while waiting for the next wake.   *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM ok      : BOOLEAN
+PARAM errVal  : INTEGER
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errVal   := 0
+callCode := $0A
+regs.x   := 2
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "mmcSleep error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
+
+PROCEDURE mmcLoadSignal
+(* ============================================================ *)
+(* PROCEDURE : mmcLoadSignal                                    *)
+(* PURPOSE   : Map one request signal to one packed library and *)
+(*             ensure that library is loaded in the child.      *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM sigVal     : INTEGER
+PARAM hdrAddr    : INTEGER
+PARAM currSigVal : INTEGER
+PARAM currName   : STRING[20]
+PARAM respStat   : INTEGER
+PARAM ok         : BOOLEAN
+PARAM errVal     : INTEGER
+DIM regs         : Register
+DIM modName      : STRING[20]
+DIM mapOK        : BOOLEAN
+DIM listOK       : BOOLEAN
+DIM callCode     : BYTE
+DIM iCC          : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errVal   := 0
+respStat := 255
+
+RUN mmcMapSignal(sigVal, modName, mapOK)
+IF NOT mapOK THEN
+  errVal := sigVal
+  respStat := 254
+  END
+ENDIF
+
+IF hdrAddr <> 0 THEN
+  IF currSigVal = sigVal THEN
+    RUN mmcWriteModuleList(hdrAddr, listOK)
+    IF NOT listOK THEN
+      PRINT "mmcLoadSignal: MODULELIST write failed"
+      END
+    ENDIF
+    ok       := TRUE
+    respStat := 20
+    END
+  ENDIF
+  RUN mmcUnloadCurrent(hdrAddr, currSigVal, currName, respStat, ok, errVal)
+  IF NOT ok THEN
+    END
+  ENDIF
+ENDIF
+
+callCode := $00
+regs.a   := 0
+regs.x   := ADDR(modName)
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) = 0 THEN
+  hdrAddr    := regs.u
+  currSigVal := sigVal
+  currName   := modName
+  RUN mmcWriteModuleList(hdrAddr, listOK)
+  IF NOT listOK THEN
+    PRINT "mmcLoadSignal: MODULELIST write failed"
+    END
+  ENDIF
+  ok       := TRUE
+  respStat := 20
+  END
+ENDIF
+
+callCode := $01
+regs.a   := 0
+regs.x   := ADDR(modName)
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  PRINT "mmcLoadSignal: load failed "; modName; " err "; errVal
+  END
+ENDIF
+
+hdrAddr    := regs.u
+currSigVal := sigVal
+currName   := modName
+RUN mmcWriteModuleList(hdrAddr, listOK)
+IF NOT listOK THEN
+  PRINT "mmcLoadSignal: MODULELIST write failed"
+  END
+ENDIF
+ok       := TRUE
+respStat := 20
+END
+
+900 PRINT "mmcLoadSignal error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+    respStat := 255
+END
+
+PROCEDURE mmcMapSignal
+(* ============================================================ *)
+(* PROCEDURE : mmcMapSignal                                     *)
+(* PURPOSE   : Map one controller request signal to one module. *)
+(* ============================================================ *)
+PARAM sigVal  : INTEGER
+PARAM modName : STRING[20]
+PARAM ok      : BOOLEAN
+
+ON ERROR GOTO 900
+
+ok := TRUE
+
+IF sigVal = 128 THEN
+  modName := "snbSetup"
+ELSE IF sigVal = 129 THEN
+  modName := "snbDividend"
+ELSE IF sigVal = 130 THEN
+  modName := "snbMgnInt"
+ELSE IF sigVal = 131 THEN
+  modName := "snbMarket"
+ELSE IF sigVal = 132 THEN
+  modName := "snbMarketTable"
+ELSE IF sigVal = 133 THEN
+  modName := "snbSellHumanStub"
+ELSE IF sigVal = 134 THEN
+  modName := "snbSellAI"
+ELSE IF sigVal = 135 THEN
+  modName := "snbBuy"
+ELSE IF sigVal = 136 THEN
+  modName := "snbBuyAI"
+ELSE IF sigVal = 137 THEN
+  modName := "snbMarketPlayer"
+ELSE IF sigVal = 138 THEN
+  modName := "snbMarginPay"
+ELSE IF sigVal = 139 THEN
+  modName := "snbYear10Clear"
+ELSE IF sigVal = 140 THEN
+  modName := "snbEndGame"
+ELSE
+  modName := ""
+  ok := FALSE
+ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF
+END
+
+900 PRINT "mmcMapSignal error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE mmcWriteModuleList
+(* ============================================================ *)
+(* PROCEDURE : mmcWriteModuleList                               *)
+(* PURPOSE   : Walk the merged module at hdrAddr and rewrite    *)
+(*             MODULELIST with all constituent names.           *)
+(* ============================================================ *)
+PARAM hdrAddr : INTEGER
+PARAM ok      : BOOLEAN
+DIM path      : BYTE
+DIM isOpen    : BOOLEAN
+DIM curAddr   : INTEGER
+DIM sync1     : INTEGER
+DIM sync2     : INTEGER
+DIM modSzHi   : INTEGER
+DIM modSzLo   : INTEGER
+DIM modSz     : INTEGER
+DIM nmOfsHi   : INTEGER
+DIM nmOfsLo   : INTEGER
+DIM nmOfs     : INTEGER
+DIM nmAddr    : INTEGER
+DIM nmChar    : INTEGER
+DIM nmIdx     : INTEGER
+DIM modCnt    : BYTE
+DIM modName   : STRING[20]
+
+ON ERROR GOTO 900
+
+isOpen := FALSE
+ok     := FALSE
+modCnt := 0
+
+ON ERROR GOTO 100
+DELETE "MODULELIST"
+
+100 ON ERROR GOTO 900
+
+CREATE #path, "MODULELIST":UPDATE
+isOpen := TRUE
+PUT #path, modCnt
+
+curAddr := hdrAddr
+LOOP
+  sync1 := PEEK(curAddr)
+  sync2 := PEEK(curAddr + 1)
+  EXITIF sync1 <> $87 OR sync2 <> $CD THEN
+  ENDEXIT
+  modSzHi := PEEK(curAddr + 2)
+  modSzLo := PEEK(curAddr + 3)
+  modSz   := modSzHi * 256 + modSzLo
+  EXITIF modSz <= 0 THEN
+  ENDEXIT
+  nmOfsHi := PEEK(curAddr + 4)
+  nmOfsLo := PEEK(curAddr + 5)
+  nmOfs   := nmOfsHi * 256 + nmOfsLo
+  nmAddr  := curAddr + nmOfs
+  modName := ""
+  nmIdx   := 0
+  LOOP
+    nmChar  := PEEK(nmAddr + nmIdx)
+    modName := modName + CHR$(LAND(nmChar, $7F))
+    nmIdx   := nmIdx + 1
+    EXITIF nmChar >= 128 OR nmIdx >= 20 THEN
+    ENDEXIT
+  ENDLOOP
+  modCnt := modCnt + 1
+  PUT #path, modName
+  curAddr := curAddr + modSz
+ENDLOOP
+
+SEEK #path, 0
+PUT #path, modCnt
+
+CLOSE #path
+isOpen := FALSE
+ok := TRUE
+END
+
+900 IF isOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "mmcWriteModuleList error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE mmcUnloadCurrent
+(* ============================================================ *)
+(* PROCEDURE : mmcUnloadCurrent                                 *)
+(* PURPOSE   : Unload the full current MODULELIST in the child. *)
+(* ============================================================ *)
+PARAM hdrAddr    : INTEGER
+PARAM currSigVal : INTEGER
+PARAM currName   : STRING[20]
+PARAM respStat   : INTEGER
+PARAM ok         : BOOLEAN
+PARAM errVal     : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errVal   := 0
+respStat := 255
+
+IF hdrAddr = 0 THEN
+  currSigVal := 0
+  currName   := ""
+  ok       := TRUE
+  respStat := 30
+  END
+ENDIF
+
+RUN mmcUnloadModuleList(ok, errVal)
+IF NOT ok THEN
+  END
+ENDIF
+
+hdrAddr    := 0
+currSigVal := 0
+currName   := ""
+ok       := TRUE
+respStat := 30
+END
+
+900 PRINT "mmcUnloadCurrent error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+    respStat := 255
+END
+
+PROCEDURE mmcUnloadModuleList
+(* ============================================================ *)
+(* PROCEDURE : mmcUnloadModuleList                              *)
+(* PURPOSE   : Read MODULELIST and F$UnLoad each listed name.   *)
+(*             Error 221 is ignored as the known unused-link    *)
+(*             miss case.                                       *)
+(* ============================================================ *)
+PARAM ok     : BOOLEAN
+PARAM errVal : INTEGER
+DIM path     : BYTE
+DIM isOpen   : BOOLEAN
+DIM cnt      : BYTE
+DIM modCnt   : INTEGER
+DIM idx      : INTEGER
+DIM modName  : STRING[20]
+DIM oneOK    : BOOLEAN
+DIM oneErr   : INTEGER
+
+ON ERROR GOTO 900
+
+isOpen := FALSE
+ok     := FALSE
+errVal := 0
+
+OPEN #path, "MODULELIST":READ
+isOpen := TRUE
+GET #path, cnt
+modCnt := cnt
+
+FOR idx := 1 TO modCnt
+  GET #path, modName
+  RUN mmcUnloadByName(modName, oneOK, oneErr)
+  IF NOT oneOK THEN
+    IF oneErr <> 221 THEN
+      errVal := oneErr
+      PRINT "mmcUnloadModuleList: unload failed "; modName; " err "; oneErr
+      END
+    ENDIF
+  ENDIF
+NEXT idx
+
+CLOSE #path
+isOpen := FALSE
+ok := TRUE
+END
+
+900 IF isOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "mmcUnloadModuleList error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
+
+PROCEDURE mmcUnloadByName
+(* ============================================================ *)
+(* PROCEDURE : mmcUnloadByName                                  *)
+(* PURPOSE   : Issue F$UnLoad by module name.                   *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM modName : STRING[20]
+PARAM ok      : BOOLEAN
+PARAM errVal  : INTEGER
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errVal   := 0
+callCode := $1D
+regs.a   := 0
+regs.x   := ADDR(modName)
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "mmcUnloadByName error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
