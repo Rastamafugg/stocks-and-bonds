@@ -106,6 +106,13 @@ These instructions apply to all work in this repository.
 - When a task changes any Basic09 source module that is intended to be packed
   onto the CoCo 3 workflow disk, update `src/script/packSnb` in the same task
   unless the user explicitly says not to.
+- Restrict `src/script/packSnb` to only the modules whose source files were
+  changed in the current task.
+- Remove all `packSnb` entries that are not relevant to the current task before
+  completion so stale pack commands are not re-run unnecessarily.
+- Do not keep, add, reorder, or otherwise alter `packSnb` entries for
+  unchanged modules unless the user explicitly requests a broader packing
+  workflow update.
 - Treat `src/script/packSnb` as the canonical packing workflow script for this
   repository.
 - Start that script with `basic09 #40k` so Basic09 runs with maximum memory for
