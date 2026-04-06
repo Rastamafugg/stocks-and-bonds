@@ -73,6 +73,14 @@ These instructions apply to all work in this repository.
 - If a procedure is moved between files or rewritten with copied `TYPE`
   declarations, treat that move as requiring a fresh collision audit even if
   the logic itself is unchanged.
+- For user-reported Basic09 runtime failures where the root cause is still
+  unverified and multiple causes remain plausible, do not implement a
+  speculative fix immediately.
+- In that situation, first state the observed facts, separate any hypotheses,
+  propose the smallest verification step that would distinguish them, and wait
+  for user approval before changing the implementation.
+- Do not treat the general autonomy instruction to keep moving as permission to
+  bypass this verification-first requirement for diagnostic runtime failures.
 
 ## Exact Line Citations
 
