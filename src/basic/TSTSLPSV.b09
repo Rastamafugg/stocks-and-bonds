@@ -39,7 +39,7 @@ ENDIF
 
 actionVal := 1
 RUN SLPICPT(icptMem, actionVal, iSeenSignal, iSeenCount, icptOK)
-IF NOT icptOK THEN
+IF icptOK = 0 THEN
   PRINT "TSTSLPSV: SLPICPT install failed"
   END
 ENDIF
@@ -96,7 +96,7 @@ LOOP
     ELSE IF state.cmdCode = 1 THEN
       actionVal := 2
       RUN SLPICPT(icptMem, actionVal, iSeenSignal, iSeenCount, icptOK)
-      IF NOT icptOK THEN
+      IF icptOK = 0 THEN
         PRINT "TSTSLPSV: SLPICPT read failed"
         END
       ENDIF
