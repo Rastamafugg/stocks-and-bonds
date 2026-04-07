@@ -579,8 +579,6 @@ FOR tries := 1 TO 20
     END
   ENDIF
   IF state.rspSeq = wantSeq THEN
-    PRINT "bootWaitResponse: rsp "; state.rspSeq; " req "; state.reqSeq
-    PRINT "  sig "; state.reqSig; " stat "; state.statusCode; " err "; state.errCode
     IF state.errCode = 0 THEN
       ok := TRUE
       END
