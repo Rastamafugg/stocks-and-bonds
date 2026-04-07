@@ -313,6 +313,7 @@ errVal   := 0
 respStat := 255
 
 RUN mmcMapSignal(sigVal, modName, mapOK)
+PRINT "mmcLoadSignal: map mod "; modName; " ok "; mapOK
 IF NOT mapOK THEN
   errVal := sigVal
   respStat := 254
@@ -321,7 +322,9 @@ ENDIF
 
 IF hdrAddr <> 0 THEN
   IF currSigVal = sigVal THEN
+    PRINT "mmcLoadSignal: before write reused list"
     RUN mmcWriteModuleList(hdrAddr, listOK)
+    PRINT "mmcLoadSignal: after write reused ok "; listOK
     IF NOT listOK THEN
       PRINT "mmcLoadSignal: MODULELIST write failed"
       END
@@ -330,7 +333,9 @@ IF hdrAddr <> 0 THEN
     respStat := 20
     END
   ENDIF
+  PRINT "mmcLoadSignal: before unload curr "; currName; " sig "; currSigVal
   RUN mmcUnloadCurrent(hdrAddr, currSigVal, currName, respStat, ok, errVal)
+  PRINT "mmcLoadSignal: after unload ok "; ok; " stat "; respStat; " err "; errVal
   IF NOT ok THEN
     END
   ENDIF
@@ -341,11 +346,14 @@ regs.a   := 0
 regs.x   := ADDR(modName)
 RUN SysCall(callCode, regs)
 iCC := regs.cc
+PRINT "mmcLoadSignal: link cc "; iCC; " b "; regs.b
 IF LAND(iCC, 1) = 0 THEN
   hdrAddr    := regs.u
   currSigVal := sigVal
   currName   := modName
+  PRINT "mmcLoadSignal: before write linked list"
   RUN mmcWriteModuleList(hdrAddr, listOK)
+  PRINT "mmcLoadSignal: after write linked ok "; listOK
   IF NOT listOK THEN
     PRINT "mmcLoadSignal: MODULELIST write failed"
     END
@@ -360,6 +368,7 @@ regs.a   := 0
 regs.x   := ADDR(modName)
 RUN SysCall(callCode, regs)
 iCC := regs.cc
+PRINT "mmcLoadSignal: load cc "; iCC; " b "; regs.b
 IF LAND(iCC, 1) <> 0 THEN
   errVal := regs.b
   PRINT "mmcLoadSignal: load failed "; modName; " err "; errVal
