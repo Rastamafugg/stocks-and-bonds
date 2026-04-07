@@ -67,13 +67,17 @@ LOOP
     PRINT "snbModMemCtl: pre-sleep write failed"
     END
   ENDIF
+  PRINT "snbModMemCtl: after pre-sleep write"
 
+  PRINT "snbModMemCtl: before mmcSleep"
   RUN mmcSleep(sigOK, errVal)
   IF NOT sigOK THEN
     PRINT "snbModMemCtl: sleep failed err "; errVal
     END
   ENDIF
+  PRINT "snbModMemCtl: after mmcSleep"
 
+  PRINT "snbModMemCtl: before mmcReadState"
   RUN mmcReadState(state, fileOK)
   IF NOT fileOK THEN
     PRINT "snbModMemCtl: loop state read failed"
