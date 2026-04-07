@@ -20,6 +20,7 @@ DIM currSigVal : INTEGER
 DIM currName   : STRING[20]
 DIM respStat   : INTEGER
 DIM errVal     : INTEGER
+DIM reqSigVal  : INTEGER
 
 ON ERROR GOTO 900
 
@@ -81,7 +82,8 @@ LOOP
         respStat := 40
       ENDIF
     ELSE
-      RUN mmcLoadSignal(state.reqSig, hdrAddr, currSigVal, currName, respStat, ok, errVal)
+      reqSigVal := state.reqSig
+      RUN mmcLoadSignal(reqSigVal, hdrAddr, currSigVal, currName, respStat, ok, errVal)
     ENDIF \ENDIF
 
     PRINT "snbModMemCtl: req "; state.reqSig; " stat "; respStat
