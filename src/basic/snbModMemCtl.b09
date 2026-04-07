@@ -60,6 +60,7 @@ ENDIF
 
 LOOP
   RUN mmcReadState(state, fileOK)
+  PRINT "snbModMemCtl: after mmcReadState ok "; fileOK
   IF NOT fileOK THEN
     PRINT "snbModMemCtl: loop state read failed"
     END
@@ -129,6 +130,7 @@ OPEN #path, "SNBMODCS":READ
 PRINT "mmcReadState: after open"
 isOpen := TRUE
 GET #path, state
+PRINT "mmcReadState: after get req "; state.reqSeq; " rsp "; state.rspSeq; " sig "; state.reqSig
 IF state.magic <> $53 THEN
   PRINT "mmcReadState: invalid magic"
   END

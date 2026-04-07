@@ -1,6 +1,6 @@
-del -x snbModCtlBoot
+del -x snbModMemCtl
 basic09 #40k
-load /d1/snbModCtlBoot.b09
+load /d1/snbModMemCtl.b09
 pack*
 kill*
 bye
