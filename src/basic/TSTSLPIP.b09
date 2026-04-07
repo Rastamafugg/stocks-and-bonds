@@ -1,0 +1,548 @@
+PROCEDURE TSTSLPIP
+(* ============================================================ *)
+(* PROCEDURE : TSTSLPIP                                         *)
+(* PURPOSE   : Parent driver for the pure sleep-plus-signal     *)
+(*             proof harness. Writes one shared state record,   *)
+(*             wakes the child, and polls for responses.        *)
+(* ============================================================ *)
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,sleeping,statusCode,errCode:BYTE
+DIM state      : SlpState
+DIM ok         : BOOLEAN
+DIM fileOK     : BOOLEAN
+DIM pidOK      : BOOLEAN
+DIM childOK    : BOOLEAN
+DIM waitOK     : BOOLEAN
+DIM sigOK      : BOOLEAN
+DIM exitOK     : BOOLEAN
+DIM iParentPID : INTEGER
+DIM iChildPID  : INTEGER
+DIM errVal     : INTEGER
+DIM exitStat   : INTEGER
+DIM idx        : INTEGER
+
+ON ERROR GOTO 900
+
+PRINT "=== TSTSLPIP ==="
+PRINT "Pure F$Sleep plus signal proof"
+PRINT
+
+RUN slpGetProcID(iParentPID, pidOK)
+IF NOT pidOK THEN
+  PRINT "TSTSLPIP: slpGetProcID failed"
+  END
+ENDIF
+
+RUN slpInitState(iParentPID, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTSLPIP: slpInitState failed"
+  END
+ENDIF
+
+RUN slpForkChild(childOK, errVal)
+IF NOT childOK THEN
+  PRINT "TSTSLPIP: slpForkChild failed err "; errVal
+  END
+ENDIF
+
+RUN slpWaitReady(state, waitOK)
+IF NOT waitOK THEN
+  PRINT "TSTSLPIP: slpWaitReady failed"
+  END
+ENDIF
+iChildPID := state.childPid
+PRINT "Ready child "; iChildPID; " stat "; state.statusCode
+PRINT
+
+FOR idx := 1 TO 5
+  RUN slpWaitSleeping(state, waitOK)
+  IF NOT waitOK THEN
+    PRINT "TSTSLPIP: slpWaitSleeping failed"
+    END
+  ENDIF
+  PRINT "Cycle "; idx; " child sleeping"
+
+  state.reqSeq  := idx
+  state.cmdCode := 1
+  state.errCode := 0
+  RUN slpWriteState(state, fileOK)
+  IF NOT fileOK THEN
+    PRINT "TSTSLPIP: slpWriteState failed"
+    END
+  ENDIF
+
+  RUN slpSendWake(iChildPID, sigOK, errVal)
+  IF NOT sigOK THEN
+    PRINT "TSTSLPIP: slpSendWake failed err "; errVal
+    END
+  ENDIF
+
+  RUN slpWaitResponse(idx, state, waitOK)
+  IF NOT waitOK THEN
+    PRINT "TSTSLPIP: slpWaitResponse failed"
+    END
+  ENDIF
+  PRINT "Cycle "; idx; " rsp "; state.rspSeq; " stat "; state.statusCode
+  PRINT "  err "; state.errCode; " sleeping "; state.sleeping
+NEXT idx
+PRINT
+
+RUN slpWaitSleeping(state, waitOK)
+IF NOT waitOK THEN
+  PRINT "TSTSLPIP: slpWaitSleeping before quit failed"
+  END
+ENDIF
+state.reqSeq  := 6
+state.cmdCode := 9
+state.errCode := 0
+RUN slpWriteState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTSLPIP: quit write failed"
+  END
+ENDIF
+RUN slpSendWake(iChildPID, sigOK, errVal)
+IF NOT sigOK THEN
+  PRINT "TSTSLPIP: quit wake failed err "; errVal
+  END
+ENDIF
+RUN slpWaitResponse(6, state, waitOK)
+IF NOT waitOK THEN
+  PRINT "TSTSLPIP: quit response wait failed"
+  END
+ENDIF
+PRINT "Quit rsp "; state.rspSeq; " stat "; state.statusCode
+PRINT "  err "; state.errCode
+RUN slpWaitChildExit(exitStat, exitOK, errVal)
+IF NOT exitOK THEN
+  PRINT "TSTSLPIP: slpWaitChildExit failed err "; errVal
+  END
+ENDIF
+PRINT "Child exit status "; exitStat
+END
+
+900 PRINT "TSTSLPIP error ("; ERR; ")"
+END
+
+PROCEDURE slpInitState
+(* ============================================================ *)
+(* PROCEDURE : slpInitState                                     *)
+(* PURPOSE   : Create or replace the shared sleep-test state.   *)
+(* ============================================================ *)
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,sleeping,statusCode,errCode:BYTE
+PARAM iParentPID : INTEGER
+PARAM ok         : BOOLEAN
+DIM state        : SlpState
+DIM path         : BYTE
+DIM pathOpen     : BOOLEAN
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+ok       := FALSE
+
+ON ERROR GOTO 100
+DELETE "TSTSLPS"
+
+100 ON ERROR GOTO 900
+
+state.magic      := $53
+state.parentPid  := iParentPID
+state.childPid   := 0
+state.reqSeq     := 0
+state.rspSeq     := 0
+state.cmdCode    := 0
+state.sleeping   := 0
+state.statusCode := 0
+state.errCode    := 0
+
+CREATE #path, "TSTSLPS":UPDATE
+pathOpen := TRUE
+PUT #path, state
+
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "slpInitState error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE slpReadState
+(* ============================================================ *)
+(* PROCEDURE : slpReadState                                     *)
+(* PURPOSE   : Read the shared sleep-test state record.         *)
+(* ============================================================ *)
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,sleeping,statusCode,errCode:BYTE
+PARAM state : SlpState
+PARAM ok    : BOOLEAN
+DIM path    : BYTE
+DIM pathOpen: BOOLEAN
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+ok       := FALSE
+
+OPEN #path, "TSTSLPS":READ
+pathOpen := TRUE
+GET #path, state
+IF state.magic <> $53 THEN
+  PRINT "slpReadState: invalid magic"
+  END
+ENDIF
+
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "slpReadState error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE slpWriteState
+(* ============================================================ *)
+(* PROCEDURE : slpWriteState                                    *)
+(* PURPOSE   : Rewrite the shared sleep-test state record.      *)
+(* ============================================================ *)
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,sleeping,statusCode,errCode:BYTE
+PARAM state : SlpState
+PARAM ok    : BOOLEAN
+DIM path    : BYTE
+DIM pathOpen: BOOLEAN
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+ok       := FALSE
+
+OPEN #path, "TSTSLPS":UPDATE
+pathOpen := TRUE
+PUT #path, state
+
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "slpWriteState error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE slpGetProcID
+(* ============================================================ *)
+(* PROCEDURE : slpGetProcID                                     *)
+(* PURPOSE   : Return the current process ID via F$ID.          *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM procID : INTEGER
+PARAM ok     : BOOLEAN
+DIM regs     : Register
+DIM callCode : BYTE
+DIM iCC      : INTEGER
+
+ON ERROR GOTO 900
+
+procID   := 0
+ok       := FALSE
+callCode := $0C
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  END
+ENDIF
+
+procID := regs.a
+ok := TRUE
+END
+
+900 PRINT "slpGetProcID error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE slpForkChild
+(* ============================================================ *)
+(* PROCEDURE : slpForkChild                                     *)
+(* PURPOSE   : Fork the TSTSLPSV child process.                 *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM ok       : BOOLEAN
+PARAM errVal   : INTEGER
+DIM regs        : Register
+DIM callCode    : BYTE
+DIM runbBuf(6)  : BYTE
+DIM paramBuf(24): BYTE
+DIM iCC         : INTEGER
+DIM nameLen     : INTEGER
+DIM i           : INTEGER
+DIM childName   : STRING[10]
+
+ON ERROR GOTO 900
+
+ok        := FALSE
+errVal    := 0
+childName := "TSTSLPSV"
+
+runbBuf(1) := ASC("R")
+runbBuf(2) := ASC("u")
+runbBuf(3) := ASC("n")
+runbBuf(4) := LOR(ASC("B"), $80)
+
+nameLen := LEN(childName)
+FOR i := 1 TO 24
+  paramBuf(i) := 0
+NEXT i
+FOR i := 1 TO nameLen
+  paramBuf(i) := ASC(MID$(childName, i, 1))
+NEXT i
+paramBuf(nameLen + 1) := $0D
+
+callCode := $03
+regs.a   := 0
+regs.b   := 4
+regs.x   := ADDR(runbBuf)
+regs.y   := nameLen + 1
+regs.u   := ADDR(paramBuf)
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "slpForkChild error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
+
+PROCEDURE slpSendWake
+(* ============================================================ *)
+(* PROCEDURE : slpSendWake                                      *)
+(* PURPOSE   : Send wake signal 1 to the child process.         *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM procID : INTEGER
+PARAM ok     : BOOLEAN
+PARAM errVal : INTEGER
+DIM regs     : Register
+DIM callCode : BYTE
+DIM iCC      : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errVal   := 0
+callCode := $08
+regs.a   := procID
+regs.b   := 1
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "slpSendWake error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
+
+PROCEDURE slpSleep
+(* ============================================================ *)
+(* PROCEDURE : slpSleep                                         *)
+(* PURPOSE   : Sleep briefly while polling shared state.        *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM ok     : BOOLEAN
+PARAM errVal : INTEGER
+DIM regs     : Register
+DIM callCode : BYTE
+DIM iCC      : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errVal   := 0
+callCode := $0A
+regs.x   := 2
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "slpSleep error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
+
+PROCEDURE slpWaitReady
+(* ============================================================ *)
+(* PROCEDURE : slpWaitReady                                     *)
+(* PURPOSE   : Wait for the child PID and ready state.          *)
+(* ============================================================ *)
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,sleeping,statusCode,errCode:BYTE
+PARAM state : SlpState
+PARAM ok    : BOOLEAN
+DIM slpOK   : BOOLEAN
+DIM errVal  : INTEGER
+DIM tries   : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+FOR tries := 1 TO 30
+  RUN slpReadState(state, ok)
+  IF NOT ok THEN
+    END
+  ENDIF
+  IF state.childPid <> 0 THEN
+    IF state.statusCode = 10 THEN
+      ok := TRUE
+      END
+    ENDIF
+  ENDIF
+  RUN slpSleep(slpOK, errVal)
+  IF NOT slpOK THEN
+    PRINT "slpWaitReady: slpSleep failed err "; errVal
+    END
+  ENDIF
+NEXT tries
+
+PRINT "slpWaitReady: timed out"
+END
+
+900 PRINT "slpWaitReady error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE slpWaitSleeping
+(* ============================================================ *)
+(* PROCEDURE : slpWaitSleeping                                  *)
+(* PURPOSE   : Wait until the child advertises sleeping state.  *)
+(* ============================================================ *)
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,sleeping,statusCode,errCode:BYTE
+PARAM state : SlpState
+PARAM ok    : BOOLEAN
+DIM slpOK   : BOOLEAN
+DIM errVal  : INTEGER
+DIM tries   : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+FOR tries := 1 TO 30
+  RUN slpReadState(state, ok)
+  IF NOT ok THEN
+    END
+  ENDIF
+  IF state.sleeping <> 0 THEN
+    ok := TRUE
+    END
+  ENDIF
+  RUN slpSleep(slpOK, errVal)
+  IF NOT slpOK THEN
+    PRINT "slpWaitSleeping: slpSleep failed err "; errVal
+    END
+  ENDIF
+NEXT tries
+
+PRINT "slpWaitSleeping: timed out"
+END
+
+900 PRINT "slpWaitSleeping error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE slpWaitResponse
+(* ============================================================ *)
+(* PROCEDURE : slpWaitResponse                                  *)
+(* PURPOSE   : Wait until the child writes the matching rspSeq. *)
+(* ============================================================ *)
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,sleeping,statusCode,errCode:BYTE
+PARAM wantSeq : INTEGER
+PARAM state   : SlpState
+PARAM ok      : BOOLEAN
+DIM slpOK     : BOOLEAN
+DIM errVal    : INTEGER
+DIM tries     : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+FOR tries := 1 TO 30
+  RUN slpReadState(state, ok)
+  IF NOT ok THEN
+    END
+  ENDIF
+  IF state.rspSeq = wantSeq THEN
+    ok := TRUE
+    END
+  ENDIF
+  RUN slpSleep(slpOK, errVal)
+  IF NOT slpOK THEN
+    PRINT "slpWaitResponse: slpSleep failed err "; errVal
+    END
+  ENDIF
+NEXT tries
+
+PRINT "slpWaitResponse: timed out"
+END
+
+900 PRINT "slpWaitResponse error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE slpWaitChildExit
+(* ============================================================ *)
+(* PROCEDURE : slpWaitChildExit                                 *)
+(* PURPOSE   : Wait for the child to exit.                      *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM exitStat : INTEGER
+PARAM ok       : BOOLEAN
+PARAM errVal   : INTEGER
+DIM regs       : Register
+DIM callCode   : BYTE
+DIM iCC        : INTEGER
+
+ON ERROR GOTO 900
+
+exitStat := 0
+ok       := FALSE
+errVal   := 0
+callCode := $04
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+exitStat := regs.b
+ok := TRUE
+END
+
+900 PRINT "slpWaitChildExit error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
