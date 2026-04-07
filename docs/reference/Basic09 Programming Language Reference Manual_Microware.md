@@ -1100,7 +1100,7 @@ As you shall see, Basic09 lets you create complex arrays and even arrays that ha
 
 ### ATOMIC DATA TYPES
 
-Basic09 includes five atomic data types: BYTE, INTEGER, REAL, STRING, and BOOLEAN. The first three types are used to represent numbers. The STRING type is used to represent character data, and the BOOLEAN type is used to represent the logical values of either TROUE or FALSE. Arrays of any of these data types can be created using one, two, or three dimensions. The table below gives an overview of the characteristics of each type:
+Basic09 includes five atomic data types: BYTE, INTEGER, REAL, STRING, and BOOLEAN. The first three types are used to represent numbers. The STRING type is used to represent character data, and the BOOLEAN type is used to represent the logical values of either TRUE or FALSE. Arrays of any of these data types can be created using one, two, or three dimensions. The table below gives an overview of the characteristics of each type:
 
 *Basic09 ATOMIC DATA TYPE SUMMARY*
 
@@ -1112,7 +1112,7 @@ Basic09 includes five atomic data types: BYTE, INTEGER, REAL, STRING, and BOOLEA
 | STRING  | Letters, digits, punctuation  | One byte per char  |
 | BOOLEAN | True or False                 | One byte           |
 
-Why are there three different ways to represent numbers? Although REAL numbers appear to be the most versatile because they have the greatest range and are floating-point, arithmetic operations involving them are relatively slow (by a factor of about four) compared to the INTEGER or BYTE types. Thus using INTEGER values for loop counters,indexing arrays, etc., can significantly speed up your programs. The BYTE type is not appreciably faster than INTEGER, but it conserves memory space in some cases and is very useful as a building block for complex data types in other cases. If you neglect to specify the type of a variable, Basic09 will automatically use the REAL type.
+Why are there three different ways to represent numbers? Although REAL numbers appear to be the most versatile because they have the greatest range and are floating-point, arithmetic operations involving them are relatively slow (by a factor of about four) compared to the INTEGER or BYTE types. Thus using INTEGER values for loop counters, indexing arrays, etc., can significantly speed up your programs. The BYTE type is not appreciably faster than INTEGER, but it conserves memory space in some cases and is very useful as a building block for complex data types in other cases. If you neglect to specify the type of a variable, Basic09 will automatically use the REAL type.
 
 *Type BYTE*
 
@@ -1170,7 +1170,7 @@ byte:     +0       +1       +2       +3       +4       +5
 A BOOLEAN quantity has only two values: TRUE or FALSE. A variable may be typed BOOLEAN (e.g., DIMM done_flag:BOOLEAN ). BOOLEAN quantities are stored as single byte values, but they may not be used for numeric computation. BOOLEAN values print out as the character strings: "TRUE" and "FALSE", BOOLEAN values result from comparisons (comparing two compatible types), and are appropriate for logical flags and expressions ( result:=a AND b AND  ). Do not confuse BOOLEAN operations ANRD, OR, XOR, and NOT (which operate on the BOOLEAN values TRUE and FALSE) with the logical functions LAND, LOR, LZOR, LROT (which use integer values to produce results on a bit-by-bit basis). Attenpting to store a non-BOOLEAN value to a BOOLEAN variable (or the reverse) will cause a run-time error. .
 
 ### AUTOMATIC TYPE CONVERSION
-Expressions that mix numeric data types (BYTE, INTEGER, or REAL) are automatically and temporarily converted to the largest type necessary to retain accuracy. In addition, certain Basic09 functions also perform automatic type conversions as necessary. Thus, numeric quantities of . mixed types may be used in most cases. Type-mismatch errors happen when an expression includes types that cannot legally be mixed. These errors are reported by the second compiler pass which automatically occurs when you leave EDIT mode. Type conversions can take time so it is advisable to use expressions containing all values of a single type wherever possible.
+Expressions that mix numeric data types (BYTE, INTEGER, or REAL) are automatically and temporarily converted to the largest type necessary to retain accuracy. In addition, certain Basic09 functions also perform automatic type conversions as necessary. Thus, numeric quantities of mixed types may be used in most cases. Type-mismatch errors happen when an expression includes types that cannot legally be mixed. These errors are reported by the second compiler pass which automatically occurs when you leave EDIT mode. Type conversions can take time so it is advisable to use expressions containing all values of a single type wherever possible.
 
 ### CONSTANTS
 
@@ -1250,7 +1250,7 @@ The DIM statement can be used to create arrays of from 1 to 3 dimensions (a one~
 
 ### COMPLEX DATA TYPES
 
-The TYPE statement can be used to define a new data type as a "vector" (a one-dimensional array) of any atomic or previously-defined types. For example: '
+The TYPE statement can be used to define a new data type as a "vector" (a one-dimensional array) of any atomic or previously-defined types. For example: 
 
 ```
   TYPE employee_rec = name:STRING; number(2):INTEGER; malesex:BOOLEAN
