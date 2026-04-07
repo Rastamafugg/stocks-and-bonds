@@ -64,6 +64,7 @@ LOOP
     PRINT "snbModMemCtl: loop state read failed"
     END
   ENDIF
+  PRINT "snbModMemCtl: last "; lastSeq; " req "; state.reqSeq; " rsp "; state.rspSeq; " sig "; state.reqSig
 
   IF state.reqSeq = lastSeq THEN
     RUN mmcSleep(sigOK, errVal)
