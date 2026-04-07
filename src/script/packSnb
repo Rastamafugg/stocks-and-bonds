@@ -1,5 +1,10 @@
+del -x TSTSLPIP
+del -x TSTSLPSV
 basic09 #40k
-load /d1/TSTCI.b09
+load /d1/TSTSLPIP.b09
+pack*
+kill*
+load /d1/TSTSLPSV.b09
 pack*
 kill*
 bye

@@ -13,7 +13,7 @@ DIM fileOK      : BOOLEAN
 DIM pidOK       : BOOLEAN
 DIM slpOK       : BOOLEAN
 DIM sigOK       : BOOLEAN
-DIM icptOK      : BOOLEAN
+DIM icptOK      : INTEGER
 DIM iChildPID   : INTEGER
 DIM lastReq     : INTEGER
 DIM errVal      : INTEGER
