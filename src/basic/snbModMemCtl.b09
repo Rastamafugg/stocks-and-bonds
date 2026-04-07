@@ -65,13 +65,7 @@ LOOP
     END
   ENDIF
 
-  IF state.reqSeq = lastSeq THEN
-    RUN mmcSleep(sigOK, errVal)
-    IF NOT sigOK THEN
-      PRINT "snbModMemCtl: sleep failed err "; errVal
-      END
-    ENDIF
-  ELSE
+  IF state.reqSeq <> lastSeq THEN
     lastSeq  := state.reqSeq
     respStat := 255
     errVal   := 0
@@ -504,7 +498,6 @@ PUT #path, modCnt
 
 CLOSE #path
 isOpen := FALSE
-PRINT "mmcWriteModuleList: wrote MODULELIST count "; modCnt
 ok := TRUE
 END
 
