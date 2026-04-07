@@ -79,12 +79,14 @@ LOOP
 
   PRINT "snbModMemCtl: before mmcReadState"
   RUN mmcReadState(state, fileOK)
+  PRINT "snbModMemCtl: after mmcReadState"
   IF NOT fileOK THEN
     PRINT "snbModMemCtl: loop state read failed"
     END
   ENDIF
 
   state.childSleep := 0
+  PRINT "snbModMemCtl: after childSleep clear"
 
   IF state.reqSeq <> lastSeq THEN
     lastSeq  := state.reqSeq
@@ -162,12 +164,14 @@ IF state.magic <> $53 THEN
   END
 ENDIF
 
-PRINT "mmcReadState: after magic check"
-PRINT "mmcReadState: before close"
-PRINT "mmcReadState: about to close path"
-PRINT "mmcReadState: diagnostic skip close"
-ok := TRUE
-END
+  PRINT "mmcReadState: after magic check"
+  PRINT "mmcReadState: before close"
+  PRINT "mmcReadState: about to close path"
+  CLOSE #path
+  PRINT "mmcReadState: after close"
+  isOpen := FALSE
+  ok := TRUE
+  END
 
 900 IF isOpen THEN
       CLOSE #path
