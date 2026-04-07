@@ -319,7 +319,9 @@ ENDIF
 
 IF hdrAddr <> 0 THEN
   IF currSigVal = sigVal THEN
+    PRINT "mmcLoadSignal: before mmcWriteModuleList"
     RUN mmcWriteModuleList(hdrAddr, listOK)
+    PRINT "mmcLoadSignal: after mmcWriteModuleList ok "; listOK
     IF NOT listOK THEN
       PRINT "mmcLoadSignal: MODULELIST write failed"
       END
@@ -343,7 +345,9 @@ IF LAND(iCC, 1) = 0 THEN
   hdrAddr    := regs.u
   currSigVal := sigVal
   currName   := modName
+  PRINT "mmcLoadSignal: before mmcWriteModuleList"
   RUN mmcWriteModuleList(hdrAddr, listOK)
+  PRINT "mmcLoadSignal: after mmcWriteModuleList ok "; listOK
   IF NOT listOK THEN
     PRINT "mmcLoadSignal: MODULELIST write failed"
     END
@@ -367,7 +371,9 @@ ENDIF
 hdrAddr    := regs.u
 currSigVal := sigVal
 currName   := modName
+PRINT "mmcLoadSignal: before mmcWriteModuleList"
 RUN mmcWriteModuleList(hdrAddr, listOK)
+PRINT "mmcLoadSignal: after mmcWriteModuleList ok "; listOK
 IF NOT listOK THEN
   PRINT "mmcLoadSignal: MODULELIST write failed"
   END
