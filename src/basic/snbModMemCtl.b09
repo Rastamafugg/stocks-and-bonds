@@ -124,7 +124,9 @@ ON ERROR GOTO 900
 isOpen := FALSE
 ok     := FALSE
 
+PRINT "mmcReadState: before open"
 OPEN #path, "SNBMODCS":READ
+PRINT "mmcReadState: after open"
 isOpen := TRUE
 GET #path, state
 IF state.magic <> $53 THEN
