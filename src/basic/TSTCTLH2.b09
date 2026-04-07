@@ -1,0 +1,746 @@
+PROCEDURE TSTCTLH2
+(* ============================================================ *)
+(* PROCEDURE : TSTCTLH2                                         *)
+(* PURPOSE   : Phase 2 controller harness. Exercises reqSig 128 *)
+(*             and probes MODULELIST immediately after the      *)
+(*             response, then again after child unload.         *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+DIM state       : CtlState
+DIM ok          : BOOLEAN
+DIM fileOK      : BOOLEAN
+DIM sigOK       : BOOLEAN
+DIM waitOK      : BOOLEAN
+DIM stopOK      : BOOLEAN
+DIM probeOK     : BOOLEAN
+DIM errVal      : INTEGER
+DIM childPidVal : INTEGER
+DIM nextSeq     : INTEGER
+DIM modCnt      : INTEGER
+DIM probeErr    : INTEGER
+DIM firstName   : STRING[20]
+
+ON ERROR GOTO 900
+
+PRINT "=== TSTCTLH2 ==="
+PRINT "Phase 2: reqSig 128 plus MODULELIST"
+PRINT
+
+RUN h2StartModCtl(ok)
+IF NOT ok THEN
+  PRINT "TSTCTLH2: h2StartModCtl failed"
+  END
+ENDIF
+
+RUN h2ReadState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTCTLH2: h2ReadState failed"
+  END
+ENDIF
+PRINT "Ready child "; state.childPid; " stat "; state.statusCode
+PRINT
+
+nextSeq := state.reqSeq
+IF nextSeq >= 255 THEN
+  nextSeq := 1
+ELSE
+  nextSeq := nextSeq + 1
+ENDIF
+
+state.reqSeq  := nextSeq
+state.reqSig  := 128
+state.errCode := 0
+PRINT "Write setup request seq "; nextSeq; " sig 128"
+RUN h2WriteState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTCTLH2: h2WriteState failed"
+  END
+ENDIF
+
+childPidVal := state.childPid
+RUN h2SendSignal(childPidVal, 128, sigOK, errVal)
+IF NOT sigOK THEN
+  PRINT "TSTCTLH2: h2SendSignal failed err "; errVal
+  END
+ENDIF
+
+RUN h2WaitRspSeq(nextSeq, state, waitOK)
+IF NOT waitOK THEN
+  PRINT "TSTCTLH2: wait setup response failed"
+  END
+ENDIF
+PRINT "Setup rsp "; state.rspSeq; " stat "; state.statusCode
+PRINT "  err "; state.errCode
+
+RUN h2ProbeModuleList(probeOK, modCnt, firstName, probeErr)
+IF probeOK THEN
+  PRINT "MODULELIST count "; modCnt; " first "; firstName
+ELSE
+  PRINT "MODULELIST probe err "; probeErr
+ENDIF
+PRINT
+
+nextSeq := state.reqSeq
+IF nextSeq >= 255 THEN
+  nextSeq := 1
+ELSE
+  nextSeq := nextSeq + 1
+ENDIF
+
+state.reqSeq  := nextSeq
+state.reqSig  := 254
+state.errCode := 0
+PRINT "Write unload request seq "; nextSeq; " sig 254"
+RUN h2WriteState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTCTLH2: h2WriteState unload failed"
+  END
+ENDIF
+
+childPidVal := state.childPid
+RUN h2SendSignal(childPidVal, 254, sigOK, errVal)
+IF NOT sigOK THEN
+  PRINT "TSTCTLH2: h2SendSignal unload failed err "; errVal
+  END
+ENDIF
+
+RUN h2WaitRspSeq(nextSeq, state, waitOK)
+IF NOT waitOK THEN
+  PRINT "TSTCTLH2: wait unload response failed"
+  END
+ENDIF
+PRINT "Unload rsp "; state.rspSeq; " stat "; state.statusCode
+PRINT "  err "; state.errCode
+
+RUN h2ProbeModuleList(probeOK, modCnt, firstName, probeErr)
+IF probeOK THEN
+  PRINT "Post-unload MODULELIST count "; modCnt; " first "; firstName
+ELSE
+  PRINT "Post-unload MODULELIST err "; probeErr
+ENDIF
+PRINT
+
+RUN h2StopModCtl(stopOK)
+IF NOT stopOK THEN
+  PRINT "TSTCTLH2: h2StopModCtl failed"
+  END
+ENDIF
+END
+
+900 PRINT "TSTCTLH2 error ("; ERR; ")"
+END
+
+PROCEDURE h2WaitRspSeq
+(* ============================================================ *)
+(* PROCEDURE : h2WaitRspSeq                                     *)
+(* PURPOSE   : Wait for one raw controller response sequence    *)
+(*             without treating nonzero errCode as failure.     *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+PARAM wantSeq : INTEGER
+PARAM state   : CtlState
+PARAM ok      : BOOLEAN
+DIM fileOK    : BOOLEAN
+DIM slpOK     : BOOLEAN
+DIM errVal    : INTEGER
+DIM tries     : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+FOR tries := 1 TO 20
+  RUN h2ReadState(state, fileOK)
+  IF NOT fileOK THEN
+    PRINT "h2WaitRspSeq: h2ReadState failed"
+    END
+  ENDIF
+
+  IF state.rspSeq = wantSeq THEN
+    ok := TRUE
+    END
+  ENDIF
+
+  RUN h2Sleep(slpOK, errVal)
+  IF NOT slpOK THEN
+    PRINT "h2WaitRspSeq: h2Sleep failed err "; errVal
+    END
+  ENDIF
+NEXT tries
+
+PRINT "h2WaitRspSeq: timed out"
+END
+
+900 PRINT "h2WaitRspSeq error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h2ProbeModuleList
+(* ============================================================ *)
+(* PROCEDURE : h2ProbeModuleList                                *)
+(* PURPOSE   : Probe MODULELIST count and first entry name.     *)
+(* ============================================================ *)
+PARAM ok        : BOOLEAN
+PARAM modCnt    : INTEGER
+PARAM firstName : STRING[20]
+PARAM errVal    : INTEGER
+DIM path        : BYTE
+DIM isOpen      : BOOLEAN
+DIM cnt         : BYTE
+
+ON ERROR GOTO 900
+
+isOpen    := FALSE
+ok        := FALSE
+modCnt    := 0
+firstName := ""
+errVal    := 0
+
+OPEN #path, "MODULELIST":READ
+isOpen := TRUE
+GET #path, cnt
+modCnt := cnt
+IF modCnt > 0 THEN
+  GET #path, firstName
+ENDIF
+
+CLOSE #path
+isOpen := FALSE
+ok := TRUE
+END
+
+900 IF isOpen THEN
+      CLOSE #path
+    ENDIF
+    errVal := ERR
+    ok := FALSE
+END
+
+PROCEDURE h2StartModCtl
+(* ============================================================ *)
+(* PROCEDURE : h2StartModCtl                                    *)
+(* PURPOSE   : Initialize controller state, fork the persistent *)
+(*             controller child, and wait until it is ready.    *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+PARAM ok      : BOOLEAN
+DIM state     : CtlState
+DIM fileOK    : BOOLEAN
+DIM pidOK     : BOOLEAN
+DIM childOK   : BOOLEAN
+DIM waitOK    : BOOLEAN
+DIM iParentID : INTEGER
+DIM errVal    : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+
+RUN h2GetProcID(iParentID, pidOK)
+IF NOT pidOK THEN
+  PRINT "h2StartModCtl: h2GetProcID failed"
+  END
+ENDIF
+
+RUN h2InitState(iParentID, fileOK)
+IF NOT fileOK THEN
+  PRINT "h2StartModCtl: h2InitState failed"
+  END
+ENDIF
+
+RUN h2ForkCtl(childOK, errVal)
+IF NOT childOK THEN
+  PRINT "h2StartModCtl: h2ForkCtl failed err "; errVal
+  END
+ENDIF
+
+RUN h2WaitReady(state, waitOK)
+IF NOT waitOK THEN
+  PRINT "h2StartModCtl: h2WaitReady failed"
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "h2StartModCtl error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h2StopModCtl
+(* ============================================================ *)
+(* PROCEDURE : h2StopModCtl                                     *)
+(* PURPOSE   : Send the controller quit request and wait for    *)
+(*             the child to exit cleanly.                       *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+PARAM ok       : BOOLEAN
+DIM state      : CtlState
+DIM fileOK     : BOOLEAN
+DIM waitOK     : BOOLEAN
+DIM sigOK      : BOOLEAN
+DIM exitOK     : BOOLEAN
+DIM errVal     : INTEGER
+DIM childPidVal: INTEGER
+DIM exitStat   : INTEGER
+DIM nextSeq    : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+
+RUN h2ReadState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "h2StopModCtl: h2ReadState failed"
+  END
+ENDIF
+
+IF state.childPid = 0 THEN
+  ok := TRUE
+  END
+ENDIF
+
+nextSeq := state.reqSeq
+IF nextSeq >= 255 THEN
+  nextSeq := 1
+ELSE
+  nextSeq := nextSeq + 1
+ENDIF
+
+state.reqSeq  := nextSeq
+state.reqSig  := 255
+state.errCode := 0
+RUN h2WriteState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "h2StopModCtl: h2WriteState failed"
+  END
+ENDIF
+
+childPidVal := state.childPid
+RUN h2SendSignal(childPidVal, 255, sigOK, errVal)
+IF NOT sigOK THEN
+  PRINT "h2StopModCtl: h2SendSignal failed err "; errVal
+  END
+ENDIF
+
+RUN h2WaitResponse(nextSeq, state, waitOK)
+IF NOT waitOK THEN
+  PRINT "h2StopModCtl: h2WaitResponse failed"
+  END
+ENDIF
+
+RUN h2WaitChildExit(exitStat, exitOK, errVal)
+IF NOT exitOK THEN
+  PRINT "h2StopModCtl: h2WaitChildExit failed err "; errVal
+  END
+ENDIF
+
+ON ERROR GOTO 100
+DELETE "SNBMODCS"
+
+100 ON ERROR GOTO 200
+DELETE "MODULELIST"
+
+200 ON ERROR GOTO 900
+
+ok := TRUE
+END
+
+900 PRINT "h2StopModCtl error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h2InitState
+(* ============================================================ *)
+(* PROCEDURE : h2InitState                                      *)
+(* PURPOSE   : Create or replace the shared controller state.   *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+PARAM iParentID : INTEGER
+PARAM ok        : BOOLEAN
+DIM state       : CtlState
+DIM path        : BYTE
+DIM isOpen      : BOOLEAN
+
+ON ERROR GOTO 900
+
+isOpen := FALSE
+ok     := FALSE
+
+ON ERROR GOTO 100
+DELETE "SNBMODCS"
+
+100 ON ERROR GOTO 200
+DELETE "MODULELIST"
+
+200 ON ERROR GOTO 900
+
+state.magic      := $53
+state.parentPid  := iParentID
+state.childPid   := 0
+state.reqSeq     := 0
+state.rspSeq     := 0
+state.reqSig     := 0
+state.statusCode := 0
+state.errCode    := 0
+
+CREATE #path, "SNBMODCS":UPDATE
+isOpen := TRUE
+PUT #path, state
+
+CLOSE #path
+isOpen := FALSE
+ok := TRUE
+END
+
+900 IF isOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "h2InitState error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h2ReadState
+(* ============================================================ *)
+(* PROCEDURE : h2ReadState                                      *)
+(* PURPOSE   : Read the shared controller state record.         *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+PARAM state : CtlState
+PARAM ok    : BOOLEAN
+DIM path    : BYTE
+DIM isOpen  : BOOLEAN
+
+ON ERROR GOTO 900
+
+isOpen := FALSE
+ok     := FALSE
+
+OPEN #path, "SNBMODCS":READ
+isOpen := TRUE
+GET #path, state
+IF state.magic <> $53 THEN
+  PRINT "h2ReadState: invalid magic"
+  END
+ENDIF
+
+CLOSE #path
+isOpen := FALSE
+ok := TRUE
+END
+
+900 IF isOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "h2ReadState error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h2WriteState
+(* ============================================================ *)
+(* PROCEDURE : h2WriteState                                     *)
+(* PURPOSE   : Rewrite the shared controller state record.      *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+PARAM state : CtlState
+PARAM ok    : BOOLEAN
+DIM path    : BYTE
+DIM isOpen  : BOOLEAN
+
+ON ERROR GOTO 900
+
+isOpen := FALSE
+ok     := FALSE
+
+OPEN #path, "SNBMODCS":UPDATE
+isOpen := TRUE
+PUT #path, state
+
+CLOSE #path
+isOpen := FALSE
+ok := TRUE
+END
+
+900 IF isOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "h2WriteState error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h2GetProcID
+(* ============================================================ *)
+(* PROCEDURE : h2GetProcID                                      *)
+(* PURPOSE   : Return the current process ID via F$ID.          *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM procID : INTEGER
+PARAM ok     : BOOLEAN
+DIM regs     : Register
+DIM callCode : BYTE
+DIM iCC      : INTEGER
+
+ON ERROR GOTO 900
+
+procID   := 0
+ok       := FALSE
+callCode := $0C
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  END
+ENDIF
+
+procID := regs.a
+ok := TRUE
+END
+
+900 PRINT "h2GetProcID error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h2ForkCtl
+(* ============================================================ *)
+(* PROCEDURE : h2ForkCtl                                        *)
+(* PURPOSE   : Fork the persistent snbModMemCtl child.          *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM ok       : BOOLEAN
+PARAM errVal   : INTEGER
+DIM regs        : Register
+DIM callCode    : BYTE
+DIM runbBuf(6)  : BYTE
+DIM paramBuf(24): BYTE
+DIM iCC         : INTEGER
+DIM nameLen     : INTEGER
+DIM i           : INTEGER
+DIM childName   : STRING[20]
+
+ON ERROR GOTO 900
+
+ok        := FALSE
+errVal    := 0
+childName := "snbModMemCtl"
+
+runbBuf(1) := ASC("R")
+runbBuf(2) := ASC("u")
+runbBuf(3) := ASC("n")
+runbBuf(4) := LOR(ASC("B"), $80)
+
+nameLen := LEN(childName)
+FOR i := 1 TO 24
+  paramBuf(i) := 0
+NEXT i
+FOR i := 1 TO nameLen
+  paramBuf(i) := ASC(MID$(childName, i, 1))
+NEXT i
+paramBuf(nameLen + 1) := $0D
+
+callCode := $03
+regs.a   := 0
+regs.b   := 4
+regs.x   := ADDR(runbBuf)
+regs.y   := nameLen + 1
+regs.u   := ADDR(paramBuf)
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "h2ForkCtl error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
+
+PROCEDURE h2SendSignal
+(* ============================================================ *)
+(* PROCEDURE : h2SendSignal                                     *)
+(* PURPOSE   : Send a wake signal to another process.           *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM procID : INTEGER
+PARAM sigVal : INTEGER
+PARAM ok     : BOOLEAN
+PARAM errVal : INTEGER
+DIM regs     : Register
+DIM callCode : BYTE
+DIM iCC      : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errVal   := 0
+callCode := $08
+regs.a   := procID
+regs.b   := sigVal
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "h2SendSignal error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
+
+PROCEDURE h2Sleep
+(* ============================================================ *)
+(* PROCEDURE : h2Sleep                                          *)
+(* PURPOSE   : Sleep briefly while polling controller state.    *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM ok     : BOOLEAN
+PARAM errVal : INTEGER
+DIM regs     : Register
+DIM callCode : BYTE
+DIM iCC      : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errVal   := 0
+callCode := $0A
+regs.x   := 2
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "h2Sleep error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
+
+PROCEDURE h2WaitReady
+(* ============================================================ *)
+(* PROCEDURE : h2WaitReady                                      *)
+(* PURPOSE   : Wait until the controller publishes ready state. *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+PARAM state : CtlState
+PARAM ok    : BOOLEAN
+DIM slpOK   : BOOLEAN
+DIM errVal  : INTEGER
+DIM tries   : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+FOR tries := 1 TO 20
+  RUN h2ReadState(state, ok)
+  IF NOT ok THEN
+    END
+  ENDIF
+  IF state.childPid <> 0 THEN
+    IF state.statusCode = 10 THEN
+      ok := TRUE
+      END
+    ENDIF
+  ENDIF
+  RUN h2Sleep(slpOK, errVal)
+  IF NOT slpOK THEN
+    PRINT "h2WaitReady: sleep failed err "; errVal
+    END
+  ENDIF
+NEXT tries
+
+ok := FALSE
+PRINT "h2WaitReady: timed out"
+END
+
+900 PRINT "h2WaitReady error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h2WaitResponse
+(* ============================================================ *)
+(* PROCEDURE : h2WaitResponse                                   *)
+(* PURPOSE   : Wait until rspSeq reaches the requested value.   *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+PARAM wantSeq : INTEGER
+PARAM state   : CtlState
+PARAM ok      : BOOLEAN
+DIM slpOK     : BOOLEAN
+DIM errVal    : INTEGER
+DIM tries     : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+FOR tries := 1 TO 20
+  RUN h2ReadState(state, ok)
+  IF NOT ok THEN
+    END
+  ENDIF
+  IF state.rspSeq = wantSeq THEN
+    IF state.errCode = 0 THEN
+      ok := TRUE
+      END
+    ENDIF
+    PRINT "h2WaitResponse: controller err "; state.errCode
+    END
+  ENDIF
+  RUN h2Sleep(slpOK, errVal)
+  IF NOT slpOK THEN
+    PRINT "h2WaitResponse: sleep failed err "; errVal
+    END
+  ENDIF
+NEXT tries
+
+ok := FALSE
+PRINT "h2WaitResponse: timed out"
+END
+
+900 PRINT "h2WaitResponse error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h2WaitChildExit
+(* ============================================================ *)
+(* PROCEDURE : h2WaitChildExit                                  *)
+(* PURPOSE   : Wait for the controller child to exit.           *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM exitStat : INTEGER
+PARAM ok       : BOOLEAN
+PARAM errVal   : INTEGER
+DIM regs       : Register
+DIM callCode   : BYTE
+DIM iCC        : INTEGER
+
+ON ERROR GOTO 900
+
+exitStat := 0
+ok       := FALSE
+errVal   := 0
+callCode := $04
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+exitStat := regs.b
+ok := TRUE
+END
+
+900 PRINT "h2WaitChildExit error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
