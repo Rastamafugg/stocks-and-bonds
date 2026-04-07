@@ -96,8 +96,7 @@ LOOP
       ENDIF
     ELSE
       reqSigVal := state.reqSig
-      RUN mmcLoadSignal(reqSigVal, hdrAddr, currSigVal, currName,
-     respStat, ok, errVal)
+      RUN mmcLoadSignal(reqSigVal, hdrAddr, currSigVal, currName, respStat, ok, errVal)
     ENDIF \ENDIF
 
     state.statusCode := respStat
