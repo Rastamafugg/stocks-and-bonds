@@ -60,10 +60,14 @@ FOR idx := 1 TO 5
   ENDIF
 
   childPidVal := state.childPid
-  RUN h1SendSignal(childPidVal, 200, sigOK, errVal)
-  IF NOT sigOK THEN
-    PRINT "TSTCTLH1: h1SendSignal failed err "; errVal
-    END
+  IF idx = 1 THEN
+    PRINT "Cycle 1 skips wake signal"
+  ELSE
+    RUN h1SendSignal(childPidVal, 200, sigOK, errVal)
+    IF NOT sigOK THEN
+      PRINT "TSTCTLH1: h1SendSignal failed err "; errVal
+      END
+    ENDIF
   ENDIF
 
   RUN h1WaitRspSeq(nextSeq, state, waitOK)
