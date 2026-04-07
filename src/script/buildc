@@ -1,2 +1,2 @@
-dcc SLPICPT.c -rs
-rlink SLPICPT.r -o=SLPICPT -b=slpicpt -t -l=/dd/lib/clib.l
+dcc /d1/SLPICPT.c -rs -f=/d1/SLPICPT.r
+rlink /d1/SLPICPT.r -o=/d1/SLPICPT -b=slpicpt -t -l=/dd/lib/clib.l
