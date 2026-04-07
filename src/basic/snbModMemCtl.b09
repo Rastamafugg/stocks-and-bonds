@@ -143,14 +143,22 @@ PARAM state : CtlState
 PARAM ok    : BOOLEAN
 DIM path    : BYTE
 DIM isOpen  : BOOLEAN
+DIM openTry : INTEGER
+DIM slpOK   : BOOLEAN
+DIM errVal  : INTEGER
 
 ON ERROR GOTO 900
 
 isOpen := FALSE
 ok     := FALSE
+openTry := 1
+slpOK   := FALSE
+errVal  := 0
 
 PRINT "mmcReadState: before open"
+ON ERROR GOTO 100
 OPEN #path, "SNBMODCS":READ
+ON ERROR GOTO 900
 PRINT "mmcReadState: after open"
 isOpen := TRUE
 GET #path, state
@@ -165,13 +173,46 @@ IF state.magic <> $53 THEN
 ENDIF
 
   PRINT "mmcReadState: after magic check"
-  PRINT "mmcReadState: before close"
-  PRINT "mmcReadState: about to close path"
-  CLOSE #path
-  PRINT "mmcReadState: after close"
-  isOpen := FALSE
-  ok := TRUE
-  END
+PRINT "mmcReadState: before close"
+PRINT "mmcReadState: about to close path"
+CLOSE #path
+PRINT "mmcReadState: after close"
+isOpen := FALSE
+ok := TRUE
+END
+
+100 IF openTry = 1 THEN
+      PRINT "mmcReadState: open failed ("; ERR; ") retrying"
+      openTry := 2
+      RUN mmcSleep(slpOK, errVal)
+      ON ERROR GOTO 200
+      OPEN #path, "SNBMODCS":READ
+      ON ERROR GOTO 900
+      PRINT "mmcReadState: retry open succeeded"
+      isOpen := TRUE
+      GET #path, state
+      PRINT "  magic "; state.magic; " parent "; state.parentPid; " child "; state.childPid
+      PRINT "mmcReadState: after get req "; state.reqSeq; " rsp "; state.rspSeq
+      PRINT "  sig "; state.reqSig; " pslp "; state.parentSleep; " cslp "; state.childSleep
+      PRINT "  stat "; state.statusCode; " err "; state.errCode
+      PRINT "mmcReadState: before magic check"
+      IF state.magic <> $53 THEN
+        PRINT "mmcReadState: invalid magic"
+        END
+      ENDIF
+      PRINT "mmcReadState: after magic check"
+      PRINT "mmcReadState: before close"
+      PRINT "mmcReadState: about to close path"
+      CLOSE #path
+      PRINT "mmcReadState: after close"
+      isOpen := FALSE
+      ok := TRUE
+      END
+    ENDIF
+    GOTO 900
+
+200 PRINT "mmcReadState: retry open failed ("; ERR; ")"
+    GOTO 900
 
 900 IF isOpen THEN
       CLOSE #path
