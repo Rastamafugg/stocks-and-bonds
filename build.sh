@@ -11,6 +11,7 @@ while [ -L "$SOURCE" ]; do
 done
 SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
 SOURCE_DIR="$SCRIPT_DIR/src/basic"
+CSOURCE_DIR="$SCRIPT_DIR/src/c"
 SCRIPT_SOURCE_DIR="$SCRIPT_DIR/src/script"
 DISK_DIR="$SCRIPT_DIR/disks"
 IMAGE_PATH="$DISK_DIR/$IMAGE_NAME"
@@ -22,6 +23,11 @@ fi
 
 if [ ! -d "$SOURCE_DIR" ]; then
   echo "ERROR: Source directory not found: $SOURCE_DIR"
+  exit 1
+fi
+
+if [ ! -d "$CSOURCE_DIR" ]; then
+  echo "ERROR: C source directory not found: $CSOURCE_DIR"
   exit 1
 fi
 
@@ -49,6 +55,13 @@ find "$SOURCE_DIR" -type f -name "*.b09" ! -name "global.b09" | sort | while rea
   relative_path="${file#$SOURCE_DIR/}"
   echo "  Copying $relative_path"
   os9 copy -l -r "$file" "$IMAGE_PATH,$relative_path"
+done
+
+echo "Copying DCC C sources from $CSOURCE_DIR to $IMAGE_PATH root"
+find "$CSOURCE_DIR" -type f -name "*.c" | sort | while read -r file; do
+  file_name="$(basename "$file")"
+  echo "  Copying $file_name"
+  os9 copy -l -r "$file" "$IMAGE_PATH,$file_name"
 done
 
 echo "Copying NitrOS-9 procedure files from $SCRIPT_SOURCE_DIR to $IMAGE_PATH"

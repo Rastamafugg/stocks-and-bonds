@@ -1,12 +1,12 @@
 PROCEDURE TSTSLPIP
 (* ============================================================ *)
 (* PROCEDURE : TSTSLPIP                                         *)
-(* PURPOSE   : Parent driver for the bi-directional sleep-first *)
-(*             proof harness. Publishes parent sleep state,     *)
-(*             wakes the child for requests, and sleeps while   *)
-(*             waiting for child response wake.                 *)
+(* PURPOSE   : Parent driver for the F$Icpt sleep harness.      *)
+(*             Forks the child, sends one test signal, waits    *)
+(*             for the intercept result, and verifies that      *)
+(*             signal 0 still kills the child.                  *)
 (* ============================================================ *)
-TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,parentSleep,childSleep,statusCode,errCode:BYTE
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,testSignal,parentSleep,childSleep,statusCode,errCode,seenSignal,seenCount:BYTE
 DIM state      : SlpState
 DIM ok         : BOOLEAN
 DIM fileOK     : BOOLEAN
@@ -20,12 +20,12 @@ DIM iChildPID  : INTEGER
 DIM errVal     : INTEGER
 DIM exitStat   : INTEGER
 DIM idx        : INTEGER
-DIM wakeSig    : INTEGER
+DIM testSig    : INTEGER
 
 ON ERROR GOTO 900
 
 PRINT "=== TSTSLPIP ==="
-PRINT "Bi-directional sleep-first proof"
+PRINT "F$Icpt intercept proof"
 PRINT
 
 RUN slpGetProcID(iParentPID, pidOK)
@@ -34,17 +34,19 @@ IF NOT pidOK THEN
   END
 ENDIF
 
-FOR idx := 1 TO 4
+FOR idx := 1 TO 5
   IF idx = 1 THEN
-    wakeSig := 128
+    testSig := 1
   ELSE IF idx = 2 THEN
-    wakeSig := 200
+    testSig := 128
   ELSE IF idx = 3 THEN
-    wakeSig := 255
+    testSig := 200
+  ELSE IF idx = 4 THEN
+    testSig := 255
   ELSE
-    wakeSig := 0
-  ENDIF \ENDIF \ENDIF
-  PRINT "Phase "; idx; " signal "; wakeSig
+    testSig := 0
+  ENDIF \ENDIF \ENDIF \ENDIF
+  PRINT "Phase "; idx; " signal "; testSig
 
   RUN slpInitState(iParentPID, fileOK)
   IF NOT fileOK THEN
@@ -75,7 +77,10 @@ FOR idx := 1 TO 4
 
   state.reqSeq      := 1
   state.cmdCode     := 1
+  state.testSignal  := testSig
   state.errCode     := 0
+  state.seenSignal  := 0
+  state.seenCount   := 0
   state.parentSleep := 1
   RUN slpWriteState(state, fileOK)
   IF NOT fileOK THEN
@@ -83,26 +88,13 @@ FOR idx := 1 TO 4
     END
   ENDIF
 
-  RUN slpSendWake(iChildPID, 1, sigOK, errVal)
+  RUN slpSendWake(iChildPID, testSig, sigOK, errVal)
   IF NOT sigOK THEN
-    PRINT "TSTSLPIP: wake send failed err "; errVal
+    PRINT "TSTSLPIP: test signal send failed err "; errVal
     END
   ENDIF
 
-  RUN slpSleep(waitOK, errVal)
-  IF NOT waitOK THEN
-    PRINT "TSTSLPIP: parent slpSleep failed err "; errVal
-    END
-  ENDIF
-
-  RUN slpSendWake(iChildPID, wakeSig, sigOK, errVal)
-  IF NOT sigOK THEN
-    PRINT "  extra signal send failed err "; errVal
-  ELSE
-    PRINT "  extra signal sent "; wakeSig
-  ENDIF
-
-  IF wakeSig = 0 THEN
+  IF testSig = 0 THEN
     RUN slpWaitChildExit(exitStat, exitOK, errVal)
     IF NOT exitOK THEN
       PRINT "TSTSLPIP: kill slpWaitChildExit failed err "; errVal
@@ -113,8 +105,8 @@ FOR idx := 1 TO 4
     RUN slpWaitResponse(1, state, waitOK)
     IF waitOK THEN
       PRINT "  rsp "; state.rspSeq; " stat "; state.statusCode
-      PRINT "  err "; state.errCode; " pslp "; state.parentSleep
-      PRINT "  cslp "; state.childSleep
+      PRINT "  err "; state.errCode; " seen "; state.seenSignal
+      PRINT "  hits "; state.seenCount; " cslp "; state.childSleep
 
       RUN slpWaitChildSleep(state, waitOK)
       IF NOT waitOK THEN
@@ -123,6 +115,7 @@ FOR idx := 1 TO 4
       ENDIF
       state.reqSeq      := 2
       state.cmdCode     := 9
+      state.testSignal  := 1
       state.errCode     := 0
       state.parentSleep := 1
       RUN slpWriteState(state, fileOK)
@@ -149,7 +142,7 @@ FOR idx := 1 TO 4
       ENDIF
       PRINT "  child exit status "; exitStat
     ELSE
-      PRINT "  no response after extra signal"
+      PRINT "  no response after test signal"
       RUN slpWaitChildExit(exitStat, exitOK, errVal)
       IF exitOK THEN
         PRINT "  child exit status "; exitStat
@@ -171,7 +164,7 @@ PROCEDURE slpInitState
 (* PROCEDURE : slpInitState                                     *)
 (* PURPOSE   : Create or replace the shared sleep-test state.   *)
 (* ============================================================ *)
-TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,parentSleep,childSleep,statusCode,errCode:BYTE
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,testSignal,parentSleep,childSleep,statusCode,errCode,seenSignal,seenCount:BYTE
 PARAM iParentPID : INTEGER
 PARAM ok         : BOOLEAN
 DIM state        : SlpState
@@ -194,10 +187,13 @@ state.childPid    := 0
 state.reqSeq      := 0
 state.rspSeq      := 0
 state.cmdCode     := 0
+state.testSignal  := 0
 state.parentSleep := 0
 state.childSleep  := 0
 state.statusCode  := 0
 state.errCode     := 0
+state.seenSignal  := 0
+state.seenCount   := 0
 
 CREATE #path, "TSTSLPS":UPDATE
 pathOpen := TRUE
@@ -220,7 +216,7 @@ PROCEDURE slpReadState
 (* PROCEDURE : slpReadState                                     *)
 (* PURPOSE   : Read the shared sleep-test state record.         *)
 (* ============================================================ *)
-TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,parentSleep,childSleep,statusCode,errCode:BYTE
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,testSignal,parentSleep,childSleep,statusCode,errCode,seenSignal,seenCount:BYTE
 PARAM state : SlpState
 PARAM ok    : BOOLEAN
 DIM path    : BYTE
@@ -256,7 +252,7 @@ PROCEDURE slpWriteState
 (* PROCEDURE : slpWriteState                                    *)
 (* PURPOSE   : Rewrite the shared sleep-test state record.      *)
 (* ============================================================ *)
-TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,parentSleep,childSleep,statusCode,errCode:BYTE
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,testSignal,parentSleep,childSleep,statusCode,errCode,seenSignal,seenCount:BYTE
 PARAM state : SlpState
 PARAM ok    : BOOLEAN
 DIM path    : BYTE
@@ -446,7 +442,7 @@ PROCEDURE slpWaitReady
 (* PROCEDURE : slpWaitReady                                     *)
 (* PURPOSE   : Wait for the child PID and ready state.          *)
 (* ============================================================ *)
-TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,parentSleep,childSleep,statusCode,errCode:BYTE
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,testSignal,parentSleep,childSleep,statusCode,errCode,seenSignal,seenCount:BYTE
 PARAM state : SlpState
 PARAM ok    : BOOLEAN
 DIM slpOK   : BOOLEAN
@@ -486,7 +482,7 @@ PROCEDURE slpWaitChildSleep
 (* PROCEDURE : slpWaitChildSleep                                *)
 (* PURPOSE   : Wait until the child advertises sleep state.     *)
 (* ============================================================ *)
-TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,parentSleep,childSleep,statusCode,errCode:BYTE
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,testSignal,parentSleep,childSleep,statusCode,errCode,seenSignal,seenCount:BYTE
 PARAM state : SlpState
 PARAM ok    : BOOLEAN
 DIM slpOK   : BOOLEAN
@@ -524,7 +520,7 @@ PROCEDURE slpWaitResponse
 (* PROCEDURE : slpWaitResponse                                  *)
 (* PURPOSE   : Sleep first, then read the matching rspSeq.      *)
 (* ============================================================ *)
-TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,parentSleep,childSleep,statusCode,errCode:BYTE
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,testSignal,parentSleep,childSleep,statusCode,errCode,seenSignal,seenCount:BYTE
 PARAM wantSeq : INTEGER
 PARAM state   : SlpState
 PARAM ok      : BOOLEAN

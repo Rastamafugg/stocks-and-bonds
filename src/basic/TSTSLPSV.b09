@@ -1,30 +1,46 @@
 PROCEDURE TSTSLPSV
 (* ============================================================ *)
 (* PROCEDURE : TSTSLPSV                                         *)
-(* PURPOSE   : Child service for the bi-directional sleep-first *)
-(*             proof harness. Sleeps, wakes on signal, reads    *)
-(*             the shared state file, writes one response, and  *)
-(*             wakes the sleeping parent.                       *)
+(* PURPOSE   : Child service for the F$Icpt sleep harness.      *)
+(*             Installs the intercept helper, sleeps until a    *)
+(*             signal arrives, reports the captured signal      *)
+(*             state, and wakes the sleeping parent.            *)
 (* ============================================================ *)
-TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,parentSleep,childSleep,statusCode,errCode:BYTE
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,testSignal,parentSleep,childSleep,statusCode,errCode,seenSignal,seenCount:BYTE
 DIM state       : SlpState
 DIM ok          : BOOLEAN
 DIM fileOK      : BOOLEAN
 DIM pidOK       : BOOLEAN
 DIM slpOK       : BOOLEAN
 DIM sigOK       : BOOLEAN
+DIM icptOK      : BOOLEAN
 DIM iChildPID   : INTEGER
 DIM lastReq     : INTEGER
 DIM errVal      : INTEGER
 DIM parentPidVal: INTEGER
+DIM actionVal   : INTEGER
+DIM iSeenSignal : INTEGER
+DIM iSeenCount  : INTEGER
+DIM icptMem(32) : INTEGER
+DIM memIdx      : INTEGER
 
 ON ERROR GOTO 900
 
 lastReq := 0
+FOR memIdx := 1 TO 32
+  icptMem(memIdx) := 0
+NEXT memIdx
 
 RUN ssvGetProcID(iChildPID, pidOK)
 IF NOT pidOK THEN
   PRINT "TSTSLPSV: ssvGetProcID failed"
+  END
+ENDIF
+
+actionVal := 1
+RUN SLPICPT(icptMem, actionVal, iSeenSignal, iSeenCount, icptOK)
+IF NOT icptOK THEN
+  PRINT "TSTSLPSV: SLPICPT install failed"
   END
 ENDIF
 
@@ -39,6 +55,8 @@ state.parentSleep := 0
 state.childSleep  := 0
 state.statusCode  := 10
 state.errCode     := 0
+state.seenSignal  := 0
+state.seenCount   := 0
 RUN ssvWriteState(state, fileOK)
 IF NOT fileOK THEN
   PRINT "TSTSLPSV: initial state write failed"
@@ -76,9 +94,17 @@ LOOP
       state.rspSeq := state.reqSeq
       state.statusCode := 40
     ELSE IF state.cmdCode = 1 THEN
+      actionVal := 2
+      RUN SLPICPT(icptMem, actionVal, iSeenSignal, iSeenCount, icptOK)
+      IF NOT icptOK THEN
+        PRINT "TSTSLPSV: SLPICPT read failed"
+        END
+      ENDIF
       state.rspSeq := state.reqSeq
       state.statusCode := 20
       state.errCode := 0
+      state.seenSignal := iSeenSignal
+      state.seenCount  := iSeenCount
     ELSE
       state.rspSeq := state.reqSeq
       state.statusCode := 254
@@ -117,7 +143,7 @@ PROCEDURE ssvReadState
 (* PROCEDURE : ssvReadState                                     *)
 (* PURPOSE   : Read the shared sleep-test state record.         *)
 (* ============================================================ *)
-TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,parentSleep,childSleep,statusCode,errCode:BYTE
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,testSignal,parentSleep,childSleep,statusCode,errCode,seenSignal,seenCount:BYTE
 PARAM state : SlpState
 PARAM ok    : BOOLEAN
 DIM path    : BYTE
@@ -153,7 +179,7 @@ PROCEDURE ssvWriteState
 (* PROCEDURE : ssvWriteState                                    *)
 (* PURPOSE   : Rewrite the shared sleep-test state record.      *)
 (* ============================================================ *)
-TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,parentSleep,childSleep,statusCode,errCode:BYTE
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,testSignal,parentSleep,childSleep,statusCode,errCode,seenSignal,seenCount:BYTE
 PARAM state : SlpState
 PARAM ok    : BOOLEAN
 DIM path    : BYTE
