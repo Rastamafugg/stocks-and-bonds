@@ -7,7 +7,7 @@ PROCEDURE snbModMemCtl
 (*             directory, writes MODULELIST, and unloads the    *)
 (*             full listed set on demand.                       *)
 (* ============================================================ *)
-TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,parentSleep,childSleep,statusCode,errCode:BYTE
 DIM state      : CtlState
 DIM ok         : BOOLEAN
 DIM fileOK     : BOOLEAN
@@ -42,9 +42,11 @@ IF NOT fileOK THEN
   END
 ENDIF
 
-state.childPid   := iChildID
-state.statusCode := 10
-state.errCode    := 0
+state.childPid    := iChildID
+state.parentSleep := 0
+state.childSleep  := 0
+state.statusCode  := 10
+state.errCode     := 0
 RUN mmcWriteState(state, fileOK)
 IF NOT fileOK THEN
   PRINT "snbModMemCtl: initial state write failed"
@@ -59,12 +61,26 @@ IF NOT sigOK THEN
 ENDIF
 
 LOOP
+  state.childSleep := 1
+  RUN mmcWriteState(state, fileOK)
+  IF NOT fileOK THEN
+    PRINT "snbModMemCtl: pre-sleep write failed"
+    END
+  ENDIF
+
+  RUN mmcSleep(sigOK, errVal)
+  IF NOT sigOK THEN
+    PRINT "snbModMemCtl: sleep failed err "; errVal
+    END
+  ENDIF
+
   RUN mmcReadState(state, fileOK)
-  PRINT "snbModMemCtl: after mmcReadState ok "; fileOK
   IF NOT fileOK THEN
     PRINT "snbModMemCtl: loop state read failed"
     END
   ENDIF
+
+  state.childSleep := 0
 
   IF state.reqSeq <> lastSeq THEN
     lastSeq  := state.reqSeq
@@ -80,7 +96,8 @@ LOOP
       ENDIF
     ELSE
       reqSigVal := state.reqSig
-      RUN mmcLoadSignal(reqSigVal, hdrAddr, currSigVal, currName, respStat, ok, errVal)
+      RUN mmcLoadSignal(reqSigVal, hdrAddr, currSigVal, currName,
+     respStat, ok, errVal)
     ENDIF \ENDIF
 
     state.statusCode := respStat
@@ -92,11 +109,13 @@ LOOP
       END
     ENDIF
 
-    parentPidVal := state.parentPid
-    RUN mmcSendSignal(parentPidVal, 1, sigOK, errVal)
-    IF NOT sigOK THEN
-      PRINT "snbModMemCtl: response wake failed err "; errVal
-      END
+    IF state.parentSleep <> 0 THEN
+      parentPidVal := state.parentPid
+      RUN mmcSendSignal(parentPidVal, 1, sigOK, errVal)
+      IF NOT sigOK THEN
+        PRINT "snbModMemCtl: response wake failed err "; errVal
+        END
+      ENDIF
     ENDIF
 
     IF state.reqSig = 255 THEN
@@ -114,7 +133,7 @@ PROCEDURE mmcReadState
 (* PROCEDURE : mmcReadState                                     *)
 (* PURPOSE   : Read the shared module-controller state record.  *)
 (* ============================================================ *)
-TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,parentSleep,childSleep,statusCode,errCode:BYTE
 PARAM state : CtlState
 PARAM ok    : BOOLEAN
 DIM path    : BYTE
@@ -130,7 +149,8 @@ OPEN #path, "SNBMODCS":READ
 PRINT "mmcReadState: after open"
 isOpen := TRUE
 GET #path, state
-PRINT "mmcReadState: after get req "; state.reqSeq; " rsp "; state.rspSeq; " sig "; state.reqSig
+PRINT "mmcReadState: after get req "; state.reqSeq; " rsp "; state.rspSeq
+PRINT "  sig "; state.reqSig
 PRINT "mmcReadState: before magic check"
 IF state.magic <> $53 THEN
   PRINT "mmcReadState: invalid magic"
@@ -156,7 +176,7 @@ PROCEDURE mmcWriteState
 (* PROCEDURE : mmcWriteState                                    *)
 (* PURPOSE   : Rewrite the shared module-controller state.      *)
 (* ============================================================ *)
-TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,parentSleep,childSleep,statusCode,errCode:BYTE
 PARAM state : CtlState
 PARAM ok    : BOOLEAN
 DIM path    : BYTE
@@ -653,3 +673,8 @@ END
     ok := FALSE
     errVal := ERR
 END
+
+
+
+
+

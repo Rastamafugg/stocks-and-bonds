@@ -17,7 +17,7 @@ PROCEDURE startModCtl
 (* PURPOSE   : Initialize controller state, fork the persistent *)
 (*             controller child, and wait until it is ready.    *)
 (* ============================================================ *)
-TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,parentSleep,childSleep,statusCode,errCode:BYTE
 PARAM ok      : BOOLEAN
 DIM state     : CtlState
 DIM fileOK    : BOOLEAN
@@ -68,7 +68,7 @@ PROCEDURE stopModCtl
 (* PURPOSE   : Send the controller quit request and wait for    *)
 (*             the child to exit cleanly.                       *)
 (* ============================================================ *)
-TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,parentSleep,childSleep,statusCode,errCode:BYTE
 PARAM ok      : BOOLEAN
 DIM state     : CtlState
 DIM fileOK    : BOOLEAN
@@ -102,12 +102,17 @@ ELSE
   nextSeq := nextSeq + 1
 ENDIF
 
-state.reqSeq  := nextSeq
-state.reqSig  := 255
-state.errCode := 0
-PRINT "stopModCtl: before bootWriteState seq "; nextSeq; " sig 255"
+RUN bootWaitChildSleep(state, waitOK)
+IF NOT waitOK THEN
+  PRINT "stopModCtl: bootWaitChildSleep failed"
+  END
+ENDIF
+
+state.reqSeq      := nextSeq
+state.reqSig      := 255
+state.parentSleep := 1
+state.errCode     := 0
 RUN bootWriteState(state, fileOK)
-PRINT "stopModCtl: after bootWriteState ok "; fileOK
 IF NOT fileOK THEN
   PRINT "stopModCtl: bootWriteState failed"
   END
@@ -188,7 +193,7 @@ PROCEDURE bootRunRequest
 (* PURPOSE   : Write one controller request, send the wake      *)
 (*             signal, and wait for the matching response.      *)
 (* ============================================================ *)
-TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,parentSleep,childSleep,statusCode,errCode:BYTE
 PARAM sigVal : INTEGER
 PARAM ok     : BOOLEAN
 DIM state    : CtlState
@@ -215,12 +220,17 @@ ELSE
   nextSeq := nextSeq + 1
 ENDIF
 
-state.reqSeq  := nextSeq
-state.reqSig  := sigVal
-state.errCode := 0
-PRINT "bootRunRequest: before bootWriteState seq "; nextSeq; " sig "; sigVal
+RUN bootWaitChildSleep(state, ok)
+IF NOT ok THEN
+  PRINT "bootRunRequest: bootWaitChildSleep failed"
+  END
+ENDIF
+
+state.reqSeq      := nextSeq
+state.reqSig      := sigVal
+state.parentSleep := 1
+state.errCode     := 0
 RUN bootWriteState(state, fileOK)
-PRINT "bootRunRequest: after bootWriteState ok "; fileOK
 IF NOT fileOK THEN
   PRINT "bootRunRequest: bootWriteState failed"
   END
@@ -249,7 +259,7 @@ PROCEDURE bootInitState
 (* PROCEDURE : bootInitState                                    *)
 (* PURPOSE   : Create or replace the shared controller state.   *)
 (* ============================================================ *)
-TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,parentSleep,childSleep,statusCode,errCode:BYTE
 PARAM iParentID : INTEGER
 PARAM ok        : BOOLEAN
 DIM state       : CtlState
@@ -274,9 +284,11 @@ state.parentPid  := iParentID
 state.childPid   := 0
 state.reqSeq     := 0
 state.rspSeq     := 0
-state.reqSig     := 0
-state.statusCode := 0
-state.errCode    := 0
+state.reqSig      := 0
+state.parentSleep := 0
+state.childSleep  := 0
+state.statusCode  := 0
+state.errCode     := 0
 
 CREATE #path, "SNBMODCS":UPDATE
 isOpen := TRUE
@@ -299,7 +311,7 @@ PROCEDURE bootReadState
 (* PROCEDURE : bootReadState                                    *)
 (* PURPOSE   : Read the shared controller state record.         *)
 (* ============================================================ *)
-TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,parentSleep,childSleep,statusCode,errCode:BYTE
 PARAM state : CtlState
 PARAM ok    : BOOLEAN
 DIM path    : BYTE
@@ -335,7 +347,7 @@ PROCEDURE bootWriteState
 (* PROCEDURE : bootWriteState                                   *)
 (* PURPOSE   : Rewrite the shared controller state record.      *)
 (* ============================================================ *)
-TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,parentSleep,childSleep,statusCode,errCode:BYTE
 PARAM state : CtlState
 PARAM ok    : BOOLEAN
 DIM path    : BYTE
@@ -525,7 +537,7 @@ PROCEDURE bootWaitReady
 (* PROCEDURE : bootWaitReady                                    *)
 (* PURPOSE   : Wait until the controller publishes ready state. *)
 (* ============================================================ *)
-TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,parentSleep,childSleep,statusCode,errCode:BYTE
 PARAM state : CtlState
 PARAM ok    : BOOLEAN
 DIM slpOK   : BOOLEAN
@@ -561,12 +573,50 @@ END
     ok := FALSE
 END
 
+PROCEDURE bootWaitChildSleep
+(* ============================================================ *)
+(* PROCEDURE : bootWaitChildSleep                               *)
+(* PURPOSE   : Wait until the controller child publishes its    *)
+(*             sleep-ready state.                               *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,parentSleep,childSleep,statusCode,errCode:BYTE
+PARAM state : CtlState
+PARAM ok    : BOOLEAN
+DIM slpOK   : BOOLEAN
+DIM errVal  : INTEGER
+DIM tries   : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+FOR tries := 1 TO 20
+  RUN bootReadState(state, ok)
+  IF NOT ok THEN
+    END
+  ENDIF
+  IF state.childSleep <> 0 THEN
+    ok := TRUE
+    END
+  ENDIF
+  RUN bootSleep(slpOK, errVal)
+  IF NOT slpOK THEN
+    PRINT "bootWaitChildSleep: sleep failed err "; errVal
+    END
+  ENDIF
+NEXT tries
+
+PRINT "bootWaitChildSleep: timed out"
+END
+
+900 PRINT "bootWaitChildSleep error ("; ERR; ")"
+    ok := FALSE
+END
 PROCEDURE bootWaitResponse
 (* ============================================================ *)
 (* PROCEDURE : bootWaitResponse                                 *)
 (* PURPOSE   : Wait until rspSeq reaches the requested value.   *)
 (* ============================================================ *)
-TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,parentSleep,childSleep,statusCode,errCode:BYTE
 PARAM wantSeq : INTEGER
 PARAM state   : CtlState
 PARAM ok      : BOOLEAN
@@ -578,21 +628,27 @@ ON ERROR GOTO 900
 
 ok := FALSE
 FOR tries := 1 TO 20
+  RUN bootSleep(slpOK, errVal)
+  IF NOT slpOK THEN
+    PRINT "bootWaitResponse: sleep failed err "; errVal
+    END
+  ENDIF
   RUN bootReadState(state, ok)
   IF NOT ok THEN
     END
   ENDIF
   IF state.rspSeq = wantSeq THEN
+    state.parentSleep := 0
+    RUN bootWriteState(state, slpOK)
+    IF NOT slpOK THEN
+      PRINT "bootWaitResponse: clear parentSleep failed"
+      END
+    ENDIF
     IF state.errCode = 0 THEN
       ok := TRUE
       END
     ENDIF
     PRINT "bootWaitResponse: controller err "; state.errCode
-    END
-  ENDIF
-  RUN bootSleep(slpOK, errVal)
-  IF NOT slpOK THEN
-    PRINT "bootWaitResponse: sleep failed err "; errVal
     END
   ENDIF
 NEXT tries
@@ -639,3 +695,8 @@ END
     ok := FALSE
     errVal := ERR
 END
+
+
+
+
+
