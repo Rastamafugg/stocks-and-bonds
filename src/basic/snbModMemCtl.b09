@@ -584,9 +584,12 @@ isOpen := FALSE
 ok     := FALSE
 errVal := 0
 
+PRINT "mmcUnloadModuleList: before open"
 OPEN #path, "MODULELIST":READ
+PRINT "mmcUnloadModuleList: after open"
 isOpen := TRUE
 GET #path, cnt
+PRINT "mmcUnloadModuleList: count "; cnt
 modCnt := cnt
 
 FOR idx := 1 TO modCnt
