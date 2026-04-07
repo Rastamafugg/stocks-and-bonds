@@ -1,11 +1,12 @@
 PROCEDURE TSTSLPIP
 (* ============================================================ *)
 (* PROCEDURE : TSTSLPIP                                         *)
-(* PURPOSE   : Parent driver for the pure sleep-plus-signal     *)
-(*             proof harness. Writes one shared state record,   *)
-(*             wakes the child, and polls for responses.        *)
+(* PURPOSE   : Parent driver for the bi-directional sleep-first *)
+(*             proof harness. Publishes parent sleep state,     *)
+(*             wakes the child for requests, and sleeps while   *)
+(*             waiting for child response wake.                 *)
 (* ============================================================ *)
-TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,sleeping,statusCode,errCode:BYTE
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,parentSleep,childSleep,statusCode,errCode:BYTE
 DIM state      : SlpState
 DIM ok         : BOOLEAN
 DIM fileOK     : BOOLEAN
@@ -23,7 +24,7 @@ DIM idx        : INTEGER
 ON ERROR GOTO 900
 
 PRINT "=== TSTSLPIP ==="
-PRINT "Pure F$Sleep plus signal proof"
+PRINT "Bi-directional sleep-first proof"
 PRINT
 
 RUN slpGetProcID(iParentPID, pidOK)
@@ -54,16 +55,17 @@ PRINT "Ready child "; iChildPID; " stat "; state.statusCode
 PRINT
 
 FOR idx := 1 TO 5
-  RUN slpWaitSleeping(state, waitOK)
+  RUN slpWaitChildSleep(state, waitOK)
   IF NOT waitOK THEN
-    PRINT "TSTSLPIP: slpWaitSleeping failed"
+    PRINT "TSTSLPIP: slpWaitChildSleep failed"
     END
   ENDIF
-  PRINT "Cycle "; idx; " child sleeping"
+  PRINT "Cycle "; idx; " child asleep"
 
-  state.reqSeq  := idx
-  state.cmdCode := 1
-  state.errCode := 0
+  state.reqSeq      := idx
+  state.cmdCode     := 1
+  state.errCode     := 0
+  state.parentSleep := 1
   RUN slpWriteState(state, fileOK)
   IF NOT fileOK THEN
     PRINT "TSTSLPIP: slpWriteState failed"
@@ -82,18 +84,20 @@ FOR idx := 1 TO 5
     END
   ENDIF
   PRINT "Cycle "; idx; " rsp "; state.rspSeq; " stat "; state.statusCode
-  PRINT "  err "; state.errCode; " sleeping "; state.sleeping
+  PRINT "  err "; state.errCode; " pslp "; state.parentSleep
+  PRINT "  cslp "; state.childSleep
 NEXT idx
 PRINT
 
-RUN slpWaitSleeping(state, waitOK)
+RUN slpWaitChildSleep(state, waitOK)
 IF NOT waitOK THEN
-  PRINT "TSTSLPIP: slpWaitSleeping before quit failed"
+  PRINT "TSTSLPIP: slpWaitChildSleep before quit failed"
   END
 ENDIF
-state.reqSeq  := 6
-state.cmdCode := 9
-state.errCode := 0
+state.reqSeq      := 6
+state.cmdCode     := 9
+state.errCode     := 0
+state.parentSleep := 1
 RUN slpWriteState(state, fileOK)
 IF NOT fileOK THEN
   PRINT "TSTSLPIP: quit write failed"
@@ -127,7 +131,7 @@ PROCEDURE slpInitState
 (* PROCEDURE : slpInitState                                     *)
 (* PURPOSE   : Create or replace the shared sleep-test state.   *)
 (* ============================================================ *)
-TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,sleeping,statusCode,errCode:BYTE
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,parentSleep,childSleep,statusCode,errCode:BYTE
 PARAM iParentPID : INTEGER
 PARAM ok         : BOOLEAN
 DIM state        : SlpState
@@ -144,15 +148,16 @@ DELETE "TSTSLPS"
 
 100 ON ERROR GOTO 900
 
-state.magic      := $53
-state.parentPid  := iParentPID
-state.childPid   := 0
-state.reqSeq     := 0
-state.rspSeq     := 0
-state.cmdCode    := 0
-state.sleeping   := 0
-state.statusCode := 0
-state.errCode    := 0
+state.magic       := $53
+state.parentPid   := iParentPID
+state.childPid    := 0
+state.reqSeq      := 0
+state.rspSeq      := 0
+state.cmdCode     := 0
+state.parentSleep := 0
+state.childSleep  := 0
+state.statusCode  := 0
+state.errCode     := 0
 
 CREATE #path, "TSTSLPS":UPDATE
 pathOpen := TRUE
@@ -175,7 +180,7 @@ PROCEDURE slpReadState
 (* PROCEDURE : slpReadState                                     *)
 (* PURPOSE   : Read the shared sleep-test state record.         *)
 (* ============================================================ *)
-TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,sleeping,statusCode,errCode:BYTE
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,parentSleep,childSleep,statusCode,errCode:BYTE
 PARAM state : SlpState
 PARAM ok    : BOOLEAN
 DIM path    : BYTE
@@ -211,7 +216,7 @@ PROCEDURE slpWriteState
 (* PROCEDURE : slpWriteState                                    *)
 (* PURPOSE   : Rewrite the shared sleep-test state record.      *)
 (* ============================================================ *)
-TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,sleeping,statusCode,errCode:BYTE
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,parentSleep,childSleep,statusCode,errCode:BYTE
 PARAM state : SlpState
 PARAM ok    : BOOLEAN
 DIM path    : BYTE
@@ -400,7 +405,7 @@ PROCEDURE slpWaitReady
 (* PROCEDURE : slpWaitReady                                     *)
 (* PURPOSE   : Wait for the child PID and ready state.          *)
 (* ============================================================ *)
-TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,sleeping,statusCode,errCode:BYTE
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,parentSleep,childSleep,statusCode,errCode:BYTE
 PARAM state : SlpState
 PARAM ok    : BOOLEAN
 DIM slpOK   : BOOLEAN
@@ -435,12 +440,12 @@ END
     ok := FALSE
 END
 
-PROCEDURE slpWaitSleeping
+PROCEDURE slpWaitChildSleep
 (* ============================================================ *)
-(* PROCEDURE : slpWaitSleeping                                  *)
-(* PURPOSE   : Wait until the child advertises sleeping state.  *)
+(* PROCEDURE : slpWaitChildSleep                                *)
+(* PURPOSE   : Wait until the child advertises sleep state.     *)
 (* ============================================================ *)
-TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,sleeping,statusCode,errCode:BYTE
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,parentSleep,childSleep,statusCode,errCode:BYTE
 PARAM state : SlpState
 PARAM ok    : BOOLEAN
 DIM slpOK   : BOOLEAN
@@ -455,34 +460,36 @@ FOR tries := 1 TO 30
   IF NOT ok THEN
     END
   ENDIF
-  IF state.sleeping <> 0 THEN
+  IF state.childSleep <> 0 THEN
     ok := TRUE
     END
   ENDIF
   RUN slpSleep(slpOK, errVal)
   IF NOT slpOK THEN
-    PRINT "slpWaitSleeping: slpSleep failed err "; errVal
+    PRINT "slpWaitChildSleep: slpSleep failed err "; errVal
     END
   ENDIF
 NEXT tries
 
-PRINT "slpWaitSleeping: timed out"
+PRINT "slpWaitChildSleep: timed out"
 END
 
-900 PRINT "slpWaitSleeping error ("; ERR; ")"
+900 PRINT "slpWaitChildSleep error ("; ERR; ")"
     ok := FALSE
 END
 
 PROCEDURE slpWaitResponse
 (* ============================================================ *)
 (* PROCEDURE : slpWaitResponse                                  *)
-(* PURPOSE   : Wait until the child writes the matching rspSeq. *)
+(* PURPOSE   : Sleep first, then read the matching rspSeq.      *)
 (* ============================================================ *)
-TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,sleeping,statusCode,errCode:BYTE
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,parentSleep,childSleep,statusCode,errCode:BYTE
 PARAM wantSeq : INTEGER
 PARAM state   : SlpState
 PARAM ok      : BOOLEAN
 DIM slpOK     : BOOLEAN
+DIM rdOK      : BOOLEAN
+DIM wrOK      : BOOLEAN
 DIM errVal    : INTEGER
 DIM tries     : INTEGER
 
@@ -490,17 +497,24 @@ ON ERROR GOTO 900
 
 ok := FALSE
 FOR tries := 1 TO 30
-  RUN slpReadState(state, ok)
-  IF NOT ok THEN
-    END
-  ENDIF
-  IF state.rspSeq = wantSeq THEN
-    ok := TRUE
-    END
-  ENDIF
   RUN slpSleep(slpOK, errVal)
   IF NOT slpOK THEN
     PRINT "slpWaitResponse: slpSleep failed err "; errVal
+    END
+  ENDIF
+  RUN slpReadState(state, rdOK)
+  IF NOT rdOK THEN
+    PRINT "slpWaitResponse: slpReadState failed"
+    END
+  ENDIF
+  IF state.rspSeq = wantSeq THEN
+    state.parentSleep := 0
+    RUN slpWriteState(state, wrOK)
+    IF NOT wrOK THEN
+      PRINT "slpWaitResponse: clear parentSleep failed"
+      END
+    ENDIF
+    ok := TRUE
     END
   ENDIF
 NEXT tries

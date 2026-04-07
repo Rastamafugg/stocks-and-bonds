@@ -1,20 +1,21 @@
 PROCEDURE TSTSLPSV
 (* ============================================================ *)
 (* PROCEDURE : TSTSLPSV                                         *)
-(* PURPOSE   : Child service for the pure sleep-plus-signal     *)
+(* PURPOSE   : Child service for the bi-directional sleep-first *)
 (*             proof harness. Sleeps, wakes on signal, reads    *)
-(*             the tiny shared state file, and writes exactly   *)
-(*             one response per request sequence.               *)
+(*             the shared state file, writes one response, and  *)
+(*             wakes the sleeping parent.                       *)
 (* ============================================================ *)
-TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,sleeping,statusCode,errCode:BYTE
-DIM state      : SlpState
-DIM ok         : BOOLEAN
-DIM fileOK     : BOOLEAN
-DIM pidOK      : BOOLEAN
-DIM slpOK      : BOOLEAN
-DIM iChildPID  : INTEGER
-DIM lastReq    : INTEGER
-DIM errVal     : INTEGER
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,parentSleep,childSleep,statusCode,errCode:BYTE
+DIM state       : SlpState
+DIM ok          : BOOLEAN
+DIM fileOK      : BOOLEAN
+DIM pidOK       : BOOLEAN
+DIM slpOK       : BOOLEAN
+DIM sigOK       : BOOLEAN
+DIM iChildPID   : INTEGER
+DIM lastReq     : INTEGER
+DIM errVal      : INTEGER
 DIM parentPidVal: INTEGER
 
 ON ERROR GOTO 900
@@ -33,10 +34,11 @@ IF NOT fileOK THEN
   END
 ENDIF
 
-state.childPid   := iChildPID
-state.sleeping   := 0
-state.statusCode := 10
-state.errCode    := 0
+state.childPid    := iChildPID
+state.parentSleep := 0
+state.childSleep  := 0
+state.statusCode  := 10
+state.errCode     := 0
 RUN ssvWriteState(state, fileOK)
 IF NOT fileOK THEN
   PRINT "TSTSLPSV: initial state write failed"
@@ -44,7 +46,7 @@ IF NOT fileOK THEN
 ENDIF
 
 LOOP
-  state.sleeping := 1
+  state.childSleep := 1
   state.statusCode := 10
   RUN ssvWriteState(state, fileOK)
   IF NOT fileOK THEN
@@ -64,20 +66,15 @@ LOOP
     END
   ENDIF
 
-  state.sleeping := 0
+  state.childSleep := 0
   state.statusCode := 11
-  state.errCode := 0
+  state.errCode    := 0
 
   IF state.reqSeq <> lastReq THEN
     lastReq := state.reqSeq
     IF state.cmdCode = 9 THEN
       state.rspSeq := state.reqSeq
       state.statusCode := 40
-      RUN ssvWriteState(state, fileOK)
-      IF NOT fileOK THEN
-        PRINT "TSTSLPSV: quit write failed"
-      ENDIF
-      END
     ELSE IF state.cmdCode = 1 THEN
       state.rspSeq := state.reqSeq
       state.statusCode := 20
@@ -87,15 +84,25 @@ LOOP
       state.statusCode := 254
       state.errCode := state.cmdCode
     ENDIF \ENDIF
-    RUN ssvWriteState(state, fileOK)
-    IF NOT fileOK THEN
-      PRINT "TSTSLPSV: response write failed"
+  ENDIF
+
+  RUN ssvWriteState(state, fileOK)
+  IF NOT fileOK THEN
+    PRINT "TSTSLPSV: response write failed"
+    END
+  ENDIF
+
+  IF state.parentSleep <> 0 THEN
+    parentPidVal := state.parentPid
+    RUN ssvSendWake(parentPidVal, sigOK, errVal)
+    IF NOT sigOK THEN
+      PRINT "TSTSLPSV: ssvSendWake failed err "; errVal
       END
     ENDIF
-  ELSE
-    RUN ssvWriteState(state, fileOK)
-    IF NOT fileOK THEN
-      PRINT "TSTSLPSV: idle write failed"
+  ENDIF
+
+  IF state.cmdCode = 9 THEN
+    IF state.rspSeq = lastReq THEN
       END
     ENDIF
   ENDIF
@@ -110,7 +117,7 @@ PROCEDURE ssvReadState
 (* PROCEDURE : ssvReadState                                     *)
 (* PURPOSE   : Read the shared sleep-test state record.         *)
 (* ============================================================ *)
-TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,sleeping,statusCode,errCode:BYTE
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,parentSleep,childSleep,statusCode,errCode:BYTE
 PARAM state : SlpState
 PARAM ok    : BOOLEAN
 DIM path    : BYTE
@@ -146,7 +153,7 @@ PROCEDURE ssvWriteState
 (* PROCEDURE : ssvWriteState                                    *)
 (* PURPOSE   : Rewrite the shared sleep-test state record.      *)
 (* ============================================================ *)
-TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,sleeping,statusCode,errCode:BYTE
+TYPE SlpState = magic,parentPid,childPid,reqSeq,rspSeq,cmdCode,parentSleep,childSleep,statusCode,errCode:BYTE
 PARAM state : SlpState
 PARAM ok    : BOOLEAN
 DIM path    : BYTE
@@ -202,6 +209,41 @@ END
 
 900 PRINT "ssvGetProcID error ("; ERR; ")"
     ok := FALSE
+END
+
+PROCEDURE ssvSendWake
+(* ============================================================ *)
+(* PROCEDURE : ssvSendWake                                      *)
+(* PURPOSE   : Send wake signal 1 to the parent process.        *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM procID : INTEGER
+PARAM ok     : BOOLEAN
+PARAM errVal : INTEGER
+DIM regs     : Register
+DIM callCode : BYTE
+DIM iCC      : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errVal   := 0
+callCode := $08
+regs.a   := procID
+regs.b   := 1
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "ssvSendWake error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
 END
 
 PROCEDURE ssvSleep
