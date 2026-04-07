@@ -1,0 +1,31 @@
+PROCEDURE TSTCI
+(* ============================================================ *)
+(* PROCEDURE : TSTCI                                            *)
+(* PURPOSE   : Verify that Basic09 can RUN the SLPICPT C        *)
+(*             helper and read back INTEGER-sized results       *)
+(*             without involving any signal traffic.            *)
+(* ============================================================ *)
+DIM mem(32) : INTEGER
+DIM act     : INTEGER
+DIM sig     : INTEGER
+DIM cnt     : INTEGER
+DIM ok      : INTEGER
+DIM i       : INTEGER
+
+ON ERROR GOTO 900
+
+FOR i := 1 TO 32
+  mem(i) := 0
+NEXT i
+
+act := 1
+RUN SLPICPT(mem, act, sig, cnt, ok)
+PRINT "install ok "; ok; " sig "; sig; " cnt "; cnt
+
+act := 2
+RUN SLPICPT(mem, act, sig, cnt, ok)
+PRINT "read ok "; ok; " sig "; sig; " cnt "; cnt
+END
+
+900 PRINT "TSTCI error ("; ERR; ")"
+END
