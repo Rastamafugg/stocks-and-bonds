@@ -131,12 +131,15 @@ PRINT "mmcReadState: after open"
 isOpen := TRUE
 GET #path, state
 PRINT "mmcReadState: after get req "; state.reqSeq; " rsp "; state.rspSeq; " sig "; state.reqSig
+PRINT "mmcReadState: before magic check"
 IF state.magic <> $53 THEN
   PRINT "mmcReadState: invalid magic"
   END
 ENDIF
 
+PRINT "mmcReadState: before close"
 CLOSE #path
+PRINT "mmcReadState: after close"
 isOpen := FALSE
 ok := TRUE
 END
