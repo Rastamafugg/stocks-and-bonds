@@ -593,7 +593,10 @@ PRINT "mmcUnloadModuleList: count "; cnt
 modCnt := cnt
 
 FOR idx := 1 TO modCnt
+  PRINT "mmcUnloadModuleList: before name get idx "; idx
   GET #path, modName
+  PRINT "mmcUnloadModuleList: got name "; modName
+  PRINT "mmcUnloadModuleList: before unload "; modName
   RUN mmcUnloadByName(modName, oneOK, oneErr)
   IF NOT oneOK THEN
     IF oneErr <> 221 THEN
