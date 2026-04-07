@@ -17,6 +17,7 @@ DIM iChildPID   : INTEGER
 DIM lastReq     : INTEGER
 DIM errVal      : INTEGER
 DIM parentPidVal: INTEGER
+DIM wakeSig     : INTEGER
 
 ON ERROR GOTO 900
 
@@ -94,7 +95,16 @@ LOOP
 
   IF state.parentSleep <> 0 THEN
     parentPidVal := state.parentPid
-    RUN ssvSendWake(parentPidVal, sigOK, errVal)
+    IF state.reqSeq = 1 THEN
+      wakeSig := 128
+    ELSE IF state.reqSeq = 2 THEN
+      wakeSig := 200
+    ELSE IF state.reqSeq = 3 THEN
+      wakeSig := 255
+    ELSE
+      wakeSig := 1
+    ENDIF \ENDIF \ENDIF
+    RUN ssvSendWake(parentPidVal, wakeSig, sigOK, errVal)
     IF NOT sigOK THEN
       PRINT "TSTSLPSV: ssvSendWake failed err "; errVal
       END
@@ -214,10 +224,11 @@ END
 PROCEDURE ssvSendWake
 (* ============================================================ *)
 (* PROCEDURE : ssvSendWake                                      *)
-(* PURPOSE   : Send wake signal 1 to the parent process.        *)
+(* PURPOSE   : Send the requested wake signal to the parent.    *)
 (* ============================================================ *)
 TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
 PARAM procID : INTEGER
+PARAM sigVal : INTEGER
 PARAM ok     : BOOLEAN
 PARAM errVal : INTEGER
 DIM regs     : Register
@@ -230,7 +241,7 @@ ok       := FALSE
 errVal   := 0
 callCode := $08
 regs.a   := procID
-regs.b   := 1
+regs.b   := sigVal
 RUN SysCall(callCode, regs)
 iCC := regs.cc
 IF LAND(iCC, 1) <> 0 THEN

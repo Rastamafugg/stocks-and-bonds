@@ -20,6 +20,7 @@ DIM iChildPID  : INTEGER
 DIM errVal     : INTEGER
 DIM exitStat   : INTEGER
 DIM idx        : INTEGER
+DIM wakeSig    : INTEGER
 
 ON ERROR GOTO 900
 
@@ -54,13 +55,21 @@ iChildPID := state.childPid
 PRINT "Ready child "; iChildPID; " stat "; state.statusCode
 PRINT
 
-FOR idx := 1 TO 5
+FOR idx := 1 TO 3
   RUN slpWaitChildSleep(state, waitOK)
   IF NOT waitOK THEN
     PRINT "TSTSLPIP: slpWaitChildSleep failed"
     END
   ENDIF
   PRINT "Cycle "; idx; " child asleep"
+  IF idx = 1 THEN
+    wakeSig := 128
+  ELSE IF idx = 2 THEN
+    wakeSig := 200
+  ELSE
+    wakeSig := 255
+  ENDIF \ENDIF
+  PRINT "  wake "; wakeSig
 
   state.reqSeq      := idx
   state.cmdCode     := 1
@@ -72,7 +81,7 @@ FOR idx := 1 TO 5
     END
   ENDIF
 
-  RUN slpSendWake(iChildPID, sigOK, errVal)
+  RUN slpSendWake(iChildPID, wakeSig, sigOK, errVal)
   IF NOT sigOK THEN
     PRINT "TSTSLPIP: slpSendWake failed err "; errVal
     END
@@ -94,7 +103,7 @@ IF NOT waitOK THEN
   PRINT "TSTSLPIP: slpWaitChildSleep before quit failed"
   END
 ENDIF
-state.reqSeq      := 6
+state.reqSeq      := 4
 state.cmdCode     := 9
 state.errCode     := 0
 state.parentSleep := 1
@@ -103,12 +112,13 @@ IF NOT fileOK THEN
   PRINT "TSTSLPIP: quit write failed"
   END
 ENDIF
-RUN slpSendWake(iChildPID, sigOK, errVal)
+wakeSig := 1
+RUN slpSendWake(iChildPID, wakeSig, sigOK, errVal)
 IF NOT sigOK THEN
   PRINT "TSTSLPIP: quit wake failed err "; errVal
   END
 ENDIF
-RUN slpWaitResponse(6, state, waitOK)
+RUN slpWaitResponse(4, state, waitOK)
 IF NOT waitOK THEN
   PRINT "TSTSLPIP: quit response wait failed"
   END
@@ -335,10 +345,11 @@ END
 PROCEDURE slpSendWake
 (* ============================================================ *)
 (* PROCEDURE : slpSendWake                                      *)
-(* PURPOSE   : Send wake signal 1 to the child process.         *)
+(* PURPOSE   : Send the requested wake signal to the child.     *)
 (* ============================================================ *)
 TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
 PARAM procID : INTEGER
+PARAM sigVal : INTEGER
 PARAM ok     : BOOLEAN
 PARAM errVal : INTEGER
 DIM regs     : Register
@@ -351,7 +362,7 @@ ok       := FALSE
 errVal   := 0
 callCode := $08
 regs.a   := procID
-regs.b   := 1
+regs.b   := sigVal
 RUN SysCall(callCode, regs)
 iCC := regs.cc
 IF LAND(iCC, 1) <> 0 THEN
