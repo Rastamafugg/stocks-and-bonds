@@ -21,6 +21,7 @@ DIM currName   : STRING[20]
 DIM respStat   : INTEGER
 DIM errVal     : INTEGER
 DIM reqSigVal  : INTEGER
+DIM parentPidVal: INTEGER
 
 ON ERROR GOTO 900
 
@@ -50,7 +51,8 @@ IF NOT fileOK THEN
   END
 ENDIF
 
-RUN mmcSendSignal(state.parentPid, 1, sigOK, errVal)
+parentPidVal := state.parentPid
+RUN mmcSendSignal(parentPidVal, 1, sigOK, errVal)
 IF NOT sigOK THEN
   PRINT "snbModMemCtl: ready wake failed err "; errVal
   END
@@ -97,7 +99,8 @@ LOOP
       END
     ENDIF
 
-    RUN mmcSendSignal(state.parentPid, 1, sigOK, errVal)
+    parentPidVal := state.parentPid
+    RUN mmcSendSignal(parentPidVal, 1, sigOK, errVal)
     IF NOT sigOK THEN
       PRINT "snbModMemCtl: response wake failed err "; errVal
       END

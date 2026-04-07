@@ -76,6 +76,7 @@ DIM waitOK    : BOOLEAN
 DIM sigOK     : BOOLEAN
 DIM exitOK    : BOOLEAN
 DIM errVal    : INTEGER
+DIM childPidVal: INTEGER
 DIM exitStat  : INTEGER
 DIM nextSeq   : INTEGER
 
@@ -110,7 +111,8 @@ IF NOT fileOK THEN
   END
 ENDIF
 
-RUN bootSendSignal(state.childPid, 255, sigOK, errVal)
+childPidVal := state.childPid
+RUN bootSendSignal(childPidVal, 255, sigOK, errVal)
 IF NOT sigOK THEN
   PRINT "stopModCtl: bootSendSignal failed err "; errVal
   END
@@ -191,6 +193,7 @@ DIM state    : CtlState
 DIM fileOK   : BOOLEAN
 DIM sigOK    : BOOLEAN
 DIM errVal   : INTEGER
+DIM childPidVal: INTEGER
 DIM nextSeq  : INTEGER
 
 ON ERROR GOTO 900
@@ -219,7 +222,8 @@ IF NOT fileOK THEN
   END
 ENDIF
 
-RUN bootSendSignal(state.childPid, sigVal, sigOK, errVal)
+childPidVal := state.childPid
+RUN bootSendSignal(childPidVal, sigVal, sigOK, errVal)
 IF NOT sigOK THEN
   PRINT "bootRunRequest: bootSendSignal failed err "; errVal
   END
