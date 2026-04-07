@@ -601,6 +601,7 @@ FOR idx := 1 TO modCnt
   PRINT "mmcUnloadModuleList: got name "; modName
   PRINT "mmcUnloadModuleList: before unload "; modName
   RUN mmcUnloadByName(modName, oneOK, oneErr)
+  PRINT "mmcUnloadModuleList: idx "; idx; " ok "; oneOK; " err "; oneErr
   IF NOT oneOK THEN
     IF oneErr <> 221 THEN
       errVal := oneErr
