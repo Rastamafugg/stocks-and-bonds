@@ -273,6 +273,7 @@ RUN SysCall(callCode, regs)
 iCC := regs.cc
 IF LAND(iCC, 1) <> 0 THEN
   errVal := regs.b
+  PRINT "mmcSleep: regs.b "; regs.b; " cc "; iCC
   END
 ENDIF
 
