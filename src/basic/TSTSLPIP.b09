@@ -34,44 +34,46 @@ IF NOT pidOK THEN
   END
 ENDIF
 
-RUN slpInitState(iParentPID, fileOK)
-IF NOT fileOK THEN
-  PRINT "TSTSLPIP: slpInitState failed"
-  END
-ENDIF
+FOR idx := 1 TO 4
+  IF idx = 1 THEN
+    wakeSig := 128
+  ELSE IF idx = 2 THEN
+    wakeSig := 200
+  ELSE IF idx = 3 THEN
+    wakeSig := 255
+  ELSE
+    wakeSig := 0
+  ENDIF \ENDIF \ENDIF
+  PRINT "Phase "; idx; " signal "; wakeSig
 
-RUN slpForkChild(childOK, errVal)
-IF NOT childOK THEN
-  PRINT "TSTSLPIP: slpForkChild failed err "; errVal
-  END
-ENDIF
+  RUN slpInitState(iParentPID, fileOK)
+  IF NOT fileOK THEN
+    PRINT "TSTSLPIP: slpInitState failed"
+    END
+  ENDIF
 
-RUN slpWaitReady(state, waitOK)
-IF NOT waitOK THEN
-  PRINT "TSTSLPIP: slpWaitReady failed"
-  END
-ENDIF
-iChildPID := state.childPid
-PRINT "Ready child "; iChildPID; " stat "; state.statusCode
-PRINT
+  RUN slpForkChild(childOK, errVal)
+  IF NOT childOK THEN
+    PRINT "TSTSLPIP: slpForkChild failed err "; errVal
+    END
+  ENDIF
 
-FOR idx := 1 TO 3
+  RUN slpWaitReady(state, waitOK)
+  IF NOT waitOK THEN
+    PRINT "TSTSLPIP: slpWaitReady failed"
+    END
+  ENDIF
+  iChildPID := state.childPid
+  PRINT "Ready child "; iChildPID; " stat "; state.statusCode
+
   RUN slpWaitChildSleep(state, waitOK)
   IF NOT waitOK THEN
     PRINT "TSTSLPIP: slpWaitChildSleep failed"
     END
   ENDIF
-  PRINT "Cycle "; idx; " child asleep"
-  IF idx = 1 THEN
-    wakeSig := 128
-  ELSE IF idx = 2 THEN
-    wakeSig := 200
-  ELSE
-    wakeSig := 255
-  ENDIF \ENDIF
-  PRINT "  wake "; wakeSig
+  PRINT "  child asleep"
 
-  state.reqSeq      := idx
+  state.reqSeq      := 1
   state.cmdCode     := 1
   state.errCode     := 0
   state.parentSleep := 1
@@ -81,56 +83,84 @@ FOR idx := 1 TO 3
     END
   ENDIF
 
+  RUN slpSendWake(iChildPID, 1, sigOK, errVal)
+  IF NOT sigOK THEN
+    PRINT "TSTSLPIP: wake send failed err "; errVal
+    END
+  ENDIF
+
+  RUN slpSleep(waitOK, errVal)
+  IF NOT waitOK THEN
+    PRINT "TSTSLPIP: parent slpSleep failed err "; errVal
+    END
+  ENDIF
+
   RUN slpSendWake(iChildPID, wakeSig, sigOK, errVal)
   IF NOT sigOK THEN
-    PRINT "TSTSLPIP: slpSendWake failed err "; errVal
-    END
+    PRINT "  extra signal send failed err "; errVal
+  ELSE
+    PRINT "  extra signal sent "; wakeSig
   ENDIF
 
-  RUN slpWaitResponse(idx, state, waitOK)
-  IF NOT waitOK THEN
-    PRINT "TSTSLPIP: slpWaitResponse failed"
-    END
+  IF wakeSig = 0 THEN
+    RUN slpWaitChildExit(exitStat, exitOK, errVal)
+    IF NOT exitOK THEN
+      PRINT "TSTSLPIP: kill slpWaitChildExit failed err "; errVal
+      END
+    ENDIF
+    PRINT "  kill exit status "; exitStat
+  ELSE
+    RUN slpWaitResponse(1, state, waitOK)
+    IF waitOK THEN
+      PRINT "  rsp "; state.rspSeq; " stat "; state.statusCode
+      PRINT "  err "; state.errCode; " pslp "; state.parentSleep
+      PRINT "  cslp "; state.childSleep
+
+      RUN slpWaitChildSleep(state, waitOK)
+      IF NOT waitOK THEN
+        PRINT "TSTSLPIP: slpWaitChildSleep before quit failed"
+        END
+      ENDIF
+      state.reqSeq      := 2
+      state.cmdCode     := 9
+      state.errCode     := 0
+      state.parentSleep := 1
+      RUN slpWriteState(state, fileOK)
+      IF NOT fileOK THEN
+        PRINT "TSTSLPIP: quit write failed"
+        END
+      ENDIF
+      RUN slpSendWake(iChildPID, 1, sigOK, errVal)
+      IF NOT sigOK THEN
+        PRINT "TSTSLPIP: quit wake failed err "; errVal
+        END
+      ENDIF
+      RUN slpWaitResponse(2, state, waitOK)
+      IF NOT waitOK THEN
+        PRINT "TSTSLPIP: quit response wait failed"
+        END
+      ENDIF
+      PRINT "  quit rsp "; state.rspSeq; " stat "; state.statusCode
+      PRINT "  quit err "; state.errCode
+      RUN slpWaitChildExit(exitStat, exitOK, errVal)
+      IF NOT exitOK THEN
+        PRINT "TSTSLPIP: slpWaitChildExit failed err "; errVal
+        END
+      ENDIF
+      PRINT "  child exit status "; exitStat
+    ELSE
+      PRINT "  no response after extra signal"
+      RUN slpWaitChildExit(exitStat, exitOK, errVal)
+      IF exitOK THEN
+        PRINT "  child exit status "; exitStat
+      ELSE
+        PRINT "TSTSLPIP: slpWaitChildExit failed err "; errVal
+        END
+      ENDIF
+    ENDIF
   ENDIF
-  PRINT "Cycle "; idx; " rsp "; state.rspSeq; " stat "; state.statusCode
-  PRINT "  err "; state.errCode; " pslp "; state.parentSleep
-  PRINT "  cslp "; state.childSleep
+  PRINT
 NEXT idx
-PRINT
-
-RUN slpWaitChildSleep(state, waitOK)
-IF NOT waitOK THEN
-  PRINT "TSTSLPIP: slpWaitChildSleep before quit failed"
-  END
-ENDIF
-state.reqSeq      := 4
-state.cmdCode     := 9
-state.errCode     := 0
-state.parentSleep := 1
-RUN slpWriteState(state, fileOK)
-IF NOT fileOK THEN
-  PRINT "TSTSLPIP: quit write failed"
-  END
-ENDIF
-wakeSig := 1
-RUN slpSendWake(iChildPID, wakeSig, sigOK, errVal)
-IF NOT sigOK THEN
-  PRINT "TSTSLPIP: quit wake failed err "; errVal
-  END
-ENDIF
-RUN slpWaitResponse(4, state, waitOK)
-IF NOT waitOK THEN
-  PRINT "TSTSLPIP: quit response wait failed"
-  END
-ENDIF
-PRINT "Quit rsp "; state.rspSeq; " stat "; state.statusCode
-PRINT "  err "; state.errCode
-RUN slpWaitChildExit(exitStat, exitOK, errVal)
-IF NOT exitOK THEN
-  PRINT "TSTSLPIP: slpWaitChildExit failed err "; errVal
-  END
-ENDIF
-PRINT "Child exit status "; exitStat
 END
 
 900 PRINT "TSTSLPIP error ("; ERR; ")"

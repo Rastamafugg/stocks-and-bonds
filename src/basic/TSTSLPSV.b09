@@ -17,7 +17,6 @@ DIM iChildPID   : INTEGER
 DIM lastReq     : INTEGER
 DIM errVal      : INTEGER
 DIM parentPidVal: INTEGER
-DIM wakeSig     : INTEGER
 
 ON ERROR GOTO 900
 
@@ -95,16 +94,7 @@ LOOP
 
   IF state.parentSleep <> 0 THEN
     parentPidVal := state.parentPid
-    IF state.reqSeq = 1 THEN
-      wakeSig := 128
-    ELSE IF state.reqSeq = 2 THEN
-      wakeSig := 200
-    ELSE IF state.reqSeq = 3 THEN
-      wakeSig := 255
-    ELSE
-      wakeSig := 1
-    ENDIF \ENDIF \ENDIF
-    RUN ssvSendWake(parentPidVal, wakeSig, sigOK, errVal)
+    RUN ssvSendWake(parentPidVal, 1, sigOK, errVal)
     IF NOT sigOK THEN
       PRINT "TSTSLPSV: ssvSendWake failed err "; errVal
       END
