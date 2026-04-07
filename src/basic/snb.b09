@@ -1024,7 +1024,10 @@ DIM dropOK       : BOOLEAN
 ON ERROR GOTO 900
 
 ok := FALSE
+PRINT "releasePhaseLib: begin"
+PRINT "releasePhaseLib: before parent unload"
 RUN unloadPhaseModuleList(ok)
+PRINT "releasePhaseLib: after parent unload ok "; ok
 IF NOT ok THEN
   END
 ENDIF
@@ -1039,7 +1042,9 @@ IF NOT ok THEN
   PRINT "releasePhaseLib: loadOneModule failed"
   END
 ENDIF
+PRINT "releasePhaseLib: before child unload"
 RUN bootUnloadPhase(ok)
+PRINT "releasePhaseLib: after child unload ok "; ok
 IF NOT ok THEN
   RUN unloadOneModule("snbModCtlBoot", bootHdrAdr, dropOK)
   END

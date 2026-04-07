@@ -528,6 +528,8 @@ PARAM errVal     : INTEGER
 
 ON ERROR GOTO 900
 
+PRINT "mmcUnloadCurrent: hdr "; hdrAddr; " sig "; currSigVal
+PRINT "  name "; currName
 ok       := FALSE
 errVal   := 0
 respStat := 255
