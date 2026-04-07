@@ -105,7 +105,9 @@ ENDIF
 state.reqSeq  := nextSeq
 state.reqSig  := 255
 state.errCode := 0
+PRINT "stopModCtl: before bootWriteState seq "; nextSeq; " sig 255"
 RUN bootWriteState(state, fileOK)
+PRINT "stopModCtl: after bootWriteState ok "; fileOK
 IF NOT fileOK THEN
   PRINT "stopModCtl: bootWriteState failed"
   END
@@ -216,7 +218,9 @@ ENDIF
 state.reqSeq  := nextSeq
 state.reqSig  := sigVal
 state.errCode := 0
+PRINT "bootRunRequest: before bootWriteState seq "; nextSeq; " sig "; sigVal
 RUN bootWriteState(state, fileOK)
+PRINT "bootRunRequest: after bootWriteState ok "; fileOK
 IF NOT fileOK THEN
   PRINT "bootRunRequest: bootWriteState failed"
   END
