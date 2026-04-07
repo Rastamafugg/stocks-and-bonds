@@ -162,10 +162,10 @@ IF state.magic <> $53 THEN
   END
 ENDIF
 
+PRINT "mmcReadState: after magic check"
 PRINT "mmcReadState: before close"
-CLOSE #path
-PRINT "mmcReadState: after close"
-isOpen := FALSE
+PRINT "mmcReadState: about to close path"
+PRINT "mmcReadState: diagnostic skip close"
 ok := TRUE
 END
 
