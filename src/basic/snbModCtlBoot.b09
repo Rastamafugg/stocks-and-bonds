@@ -37,12 +37,14 @@ IF NOT pidOK THEN
   END
 ENDIF
 
+PRINT "startModCtl: bootGetProcID parent "; iParentID
 RUN bootInitState(iParentID, fileOK)
 IF NOT fileOK THEN
   PRINT "startModCtl: bootInitState failed"
   END
 ENDIF
 
+PRINT "startModCtl: bootInitState ok parent "; iParentID
 RUN bootForkCtl(childOK, errVal)
 IF NOT childOK THEN
   PRINT "startModCtl: bootForkCtl failed err "; errVal

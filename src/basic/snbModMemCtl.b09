@@ -78,6 +78,7 @@ IF NOT fileOK THEN
 ENDIF
 
 parentPidVal := state.parentPid
+PRINT "snbModMemCtl: ready wake parent "; parentPidVal
 RUN mmcSendSignal(parentPidVal, 1, sigOK, errVal)
 IF NOT sigOK THEN
   PRINT "snbModMemCtl: ready wake failed err "; errVal
