@@ -117,26 +117,18 @@ These instructions apply to all work in this repository.
   repository.
 - Start that script with `basic09 #40k` so Basic09 runs with maximum memory for
   the packing session.
-- When a packed module already exists on the CoCo 3 workflow disk and must be
-  replaced, add `del -x <module>` to `src/script/packSnb` before the
-  `basic09 #40k` line.
-- Add `del -x <module>` only for module names that are known existing workflow
-  disk executables that must be removed before packing.
-- Any module first created in the current task must be treated as non-existent
-  on the workflow disk unless explicit current-task evidence proves otherwise.
-- Do not add `del -x <module>` for a brand-new module name that does not yet
-  exist on the workflow disk.
-- Do not add `del -x <new-module-name>` for the target name of a rename.
-- If a rename also requires removing the old packed module name from the
-  workflow disk, add `del -x <old-module-name>` only when that old module is
-  known to exist there.
-- Delete existing packed modules before entering Basic09 so the later `pack*`
-  step does not hit the replace prompt.
 - For each module that must be packed, add this command sequence to
   `src/script/packSnb` after the `basic09 #40k` line:
-  `load /d1/<module>.b09`, then `pack*`, then `kill*`.
+  `load /d1/<module>.b09`, then `pack*`, then `y`, then `kill*`.
+- Do not add `del -x` commands to `src/script/packSnb` for packed-module
+  replacement.
+- The `y` line is required immediately after each `pack*` so the script
+  confirms replacement when the module already exists on the workflow disk.
+- If the module is brand-new and no replacement prompt appears, the standalone
+  `y` line may produce a harmless `WHAT?` line. Leave it in place so the script
+  remains rerunnable and the following `kill*` still executes.
 - End the Basic09 command block in `src/script/packSnb` with `bye` after all
-  Basic09 `load`, `pack*`, and `kill*` commands have been
+  Basic09 `load`, `pack*`, `y`, and `kill*` commands have been
   listed.
 - Do not describe `bye` as a shell command. It exits the Basic09 session and
   returns control to the shell.

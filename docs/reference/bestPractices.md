@@ -91,6 +91,8 @@ DIR       EXEC      READ      UPDATE    WRITE
 
 * **Program statements cannot be extended across multiple lines.** The `\` symbol cannot be used to bridge a single statement across multiple lines.
 
+* **End every Basic09 source file with a line separator.** The last code line in a `.b09` file must be terminated by an end-of-line separator. Omitting the final line separator can cause Basic09 under NitrOS-9 to raise a syntax error when loading the file.
+
 * **Use end-of-line comments to clarify, not narrate.** End-of-line comments use the syntax `\ ! comment text`. The `!` alone is only legal at the start of a line or after a `\`.
 
   ```basic09
