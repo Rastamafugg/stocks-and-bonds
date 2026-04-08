@@ -17,6 +17,9 @@ DIM bootLoaded : BOOLEAN
 DIM ctlStarted : BOOLEAN
 DIM dropOK     : BOOLEAN
 DIM bootNam    : STRING[20]
+DIM logPath    : STRING[20]
+DIM logFile    : BYTE
+DIM logOpen    : BOOLEAN
 
 ON ERROR GOTO 900
 
@@ -24,22 +27,37 @@ bootHdrAdr := 0
 bootLoaded := FALSE
 ctlStarted := FALSE
 bootNam := "snbModCtlBoot"
+logPath := "/d1/TSTCTLH3.log"
+logOpen := FALSE
+
+ON ERROR GOTO 50
+DELETE logPath
+50 ON ERROR GOTO 900
+CREATE #logFile, logPath:WRITE
+logOpen := TRUE
 
 PRINT "=== TSTCTLH3 ==="
 PRINT "Reproduce snb releasePhaseLib path"
 PRINT
+PRINT #logFile, "=== TSTCTLH3 ==="
+PRINT #logFile, "Reproduce snb releasePhaseLib path"
+PRINT #logFile, ""
 
 PRINT "Step 1: load boot helper"
+PRINT #logFile, "Step 1: load boot helper"
 RUN h3LoadBoot(bootHdrAdr, bootLoaded)
 IF NOT bootLoaded THEN
   PRINT "TSTCTLH3: h3LoadBoot failed"
+  PRINT #logFile, "TSTCTLH3: h3LoadBoot failed"
   END
 ENDIF
 
 PRINT "Step 2: startModCtl"
+PRINT #logFile, "Step 2: startModCtl"
 RUN startModCtl(ok)
 IF NOT ok THEN
   PRINT "TSTCTLH3: startModCtl failed"
+  PRINT #logFile, "TSTCTLH3: startModCtl failed"
   GOTO 800
 ENDIF
 ctlStarted := TRUE
@@ -47,97 +65,150 @@ ctlStarted := TRUE
 RUN h3ReadState(state, fileOK)
 IF NOT fileOK THEN
   PRINT "TSTCTLH3: h3ReadState after start failed"
+  PRINT #logFile, "TSTCTLH3: h3ReadState after start failed"
   GOTO 800
 ENDIF
 RUN h3PrintState("after start", state)
+RUN h3LogState(logFile, "after start", state)
 PRINT
+PRINT #logFile, ""
 
 PRINT "Step 3: bootLoadPhase cmd 200"
+PRINT #logFile, "Step 3: bootLoadPhase cmd 200"
 RUN bootLoadPhase(200, ok)
 PRINT "bootLoadPhase ok "; ok
+PRINT #logFile, "bootLoadPhase ok "; ok
 IF NOT ok THEN
   PRINT "TSTCTLH3: bootLoadPhase failed"
+  PRINT #logFile, "TSTCTLH3: bootLoadPhase failed"
   GOTO 800
 ENDIF
 
 RUN h3ReadState(state, fileOK)
 IF NOT fileOK THEN
   PRINT "TSTCTLH3: h3ReadState after load failed"
+  PRINT #logFile, "TSTCTLH3: h3ReadState after load failed"
   GOTO 800
 ENDIF
 RUN h3PrintState("after load", state)
+RUN h3LogState(logFile, "after load", state)
 PRINT
+PRINT #logFile, ""
 
 PRINT "Step 4: probe MODULELIST after load"
+PRINT #logFile, "Step 4: probe MODULELIST after load"
 RUN h3ProbeModuleList(probeOK, modCnt, firstName, probeErr)
 IF probeOK THEN
   PRINT "MODULELIST count "; modCnt; " first "; firstName
+  PRINT #logFile, "MODULELIST count "; modCnt; " first "; firstName
 ELSE
   PRINT "MODULELIST probe err "; probeErr
+  PRINT #logFile, "MODULELIST probe err "; probeErr
 ENDIF
 PRINT
+PRINT #logFile, ""
 
 PRINT "Step 5: parent unloadPhaseModuleList"
+PRINT #logFile, "Step 5: parent unloadPhaseModuleList"
 RUN h3UnloadPhaseModuleList(ok)
 PRINT "parent unload ok "; ok
+PRINT #logFile, "parent unload ok "; ok
 IF NOT ok THEN
   PRINT "TSTCTLH3: h3UnloadPhaseModuleList failed"
+  PRINT #logFile, "TSTCTLH3: h3UnloadPhaseModuleList failed"
   GOTO 800
 ENDIF
 PRINT
+PRINT #logFile, ""
 
 PRINT "Step 6: bootUnloadPhase cmd 213"
+PRINT #logFile, "Step 6: bootUnloadPhase cmd 213"
 RUN bootUnloadPhase(ok)
 PRINT "bootUnloadPhase ok "; ok
+PRINT #logFile, "bootUnloadPhase ok "; ok
 IF NOT ok THEN
   PRINT "TSTCTLH3: bootUnloadPhase failed"
+  PRINT #logFile, "TSTCTLH3: bootUnloadPhase failed"
   GOTO 800
 ENDIF
 
 RUN h3ReadState(state, fileOK)
 IF NOT fileOK THEN
   PRINT "TSTCTLH3: h3ReadState after unload failed"
+  PRINT #logFile, "TSTCTLH3: h3ReadState after unload failed"
   GOTO 800
 ENDIF
 RUN h3PrintState("after unload", state)
+RUN h3LogState(logFile, "after unload", state)
 PRINT
+PRINT #logFile, ""
 
 PRINT "Step 7: probe MODULELIST after child unload"
+PRINT #logFile, "Step 7: probe MODULELIST after child unload"
 RUN h3ProbeModuleList(probeOK, modCnt, firstName, probeErr)
 IF probeOK THEN
   PRINT "Post-unload MODULELIST count "; modCnt; " first "; firstName
+  PRINT #logFile, "Post-unload MODULELIST count "; modCnt; " first "; firstName
 ELSE
   PRINT "Post-unload MODULELIST err "; probeErr
+  PRINT #logFile, "Post-unload MODULELIST err "; probeErr
 ENDIF
 PRINT
+PRINT #logFile, ""
 
 IF state.childPid <> 0 THEN
   PRINT "Step 8: stopModCtl"
+  PRINT #logFile, "Step 8: stopModCtl"
   RUN stopModCtl(ok)
   PRINT "stopModCtl ok "; ok
+  PRINT #logFile, "stopModCtl ok "; ok
   IF NOT ok THEN
     PRINT "TSTCTLH3: stopModCtl failed"
+    PRINT #logFile, "TSTCTLH3: stopModCtl failed"
   ELSE
     ctlStarted := FALSE
   ENDIF
 ELSE
   PRINT "Step 8: child already exited"
+  PRINT #logFile, "Step 8: child already exited"
 ENDIF
 PRINT
+PRINT #logFile, ""
 
 800 IF bootLoaded THEN
       RUN h3UnloadBoot(bootNam, bootHdrAdr, dropOK)
       PRINT "boot helper unloaded "; dropOK
+      IF logOpen THEN
+        PRINT #logFile, "boot helper unloaded "; dropOK
+      ENDIF
     ENDIF
     PRINT "TSTCTLH3 complete"
+    IF logOpen THEN
+      PRINT #logFile, "TSTCTLH3 complete"
+      CLOSE #logFile
+      logOpen := FALSE
+    ENDIF
     END
 
 900 PRINT "TSTCTLH3 error ("; ERR; ")"
+    IF logOpen THEN
+      PRINT #logFile, "TSTCTLH3 error ("; ERR; ")"
+    ENDIF
     IF ctlStarted THEN
       RUN stopModCtl(ok)
+      IF logOpen THEN
+        PRINT #logFile, "stopModCtl in error path "; ok
+      ENDIF
     ENDIF
     IF bootLoaded THEN
       RUN h3UnloadBoot(bootNam, bootHdrAdr, dropOK)
+      IF logOpen THEN
+        PRINT #logFile, "boot helper unloaded "; dropOK
+      ENDIF
+    ENDIF
+    IF logOpen THEN
+      CLOSE #logFile
+      logOpen := FALSE
     ENDIF
 END
 
@@ -191,6 +262,29 @@ PRINT "req "; state.reqSeq; " rsp "; state.rspSeq; " cmd "; state.reqCmd
 PRINT "pslp "; state.parentSleep; " cslp "; state.childSleep
 PRINT "stat "; state.statusCode; " err "; state.errCode
 PRINT "seen "; state.seenSig; " hits "; state.seenCount
+END
+
+PROCEDURE h3LogState
+(* ============================================================ *)
+(* PROCEDURE : h3LogState                                       *)
+(* PURPOSE   : Write one compact controller state snapshot.     *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
+PARAM pathNo : BYTE
+PARAM label  : STRING[20]
+PARAM state  : CtlState
+
+ON ERROR GOTO 900
+
+PRINT #pathNo, label
+PRINT #pathNo, "req "; state.reqSeq; " rsp "; state.rspSeq
+PRINT #pathNo, "cmd "; state.reqCmd
+PRINT #pathNo, "pslp "; state.parentSleep; " cslp "; state.childSleep
+PRINT #pathNo, "stat "; state.statusCode; " err "; state.errCode
+PRINT #pathNo, "seen "; state.seenSig; " hits "; state.seenCount
+END
+
+900 PRINT "h3LogState error ("; ERR; ")"
 END
 
 PROCEDURE h3ProbeModuleList
