@@ -80,6 +80,7 @@ ENDIF
 parentPidVal := state.parentPid
 PRINT "snbModMemCtl: ready wake parent "; parentPidVal
 RUN mmcSendSignal(parentPidVal, 1, sigOK, errVal)
+PRINT "snbModMemCtl: ready wake send ok "; sigOK; " err "; errVal
 IF NOT sigOK THEN
   PRINT "snbModMemCtl: ready wake failed err "; errVal
   END

@@ -565,7 +565,7 @@ ON ERROR GOTO 900
 
 ok := FALSE
 PRINT "bootWaitReady: begin"
-FOR tries := 1 TO 20
+FOR tries := 1 TO 40
   RUN bootReadState(state, ok)
   IF NOT ok THEN
     END
