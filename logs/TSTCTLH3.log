@@ -1,0 +1,1 @@
+=== TSTCTLH3 ===Reproduce snb releasePhaseLib pathStep 1: load boot helperStep 2: startModCtlafter startreq 0 rsp 0cmd 0pslp 0 cslp 1stat 10 err 0seen 0 hits 0Step 3: bootLoadPhase cmd 200bootLoadPhase ok FalseTSTCTLH3: bootLoadPhase failedboot helper unloaded TrueTSTCTLH3 complete
