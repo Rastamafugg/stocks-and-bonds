@@ -25,6 +25,14 @@ PRINT "install ok "; ok; " sig "; sig; " cnt "; cnt
 act := 2
 RUN SLPICPT(mem, act, sig, cnt, ok)
 PRINT "read ok "; ok; " sig "; sig; " cnt "; cnt
+
+act := 3
+RUN SLPICPT(mem, act, sig, cnt, ok)
+PRINT "reset ok "; ok; " sig "; sig; " cnt "; cnt
+
+act := 2
+RUN SLPICPT(mem, act, sig, cnt, ok)
+PRINT "post-reset ok "; ok; " sig "; sig; " cnt "; cnt
 END
 
 900 PRINT "TSTCI error ("; ERR; ")"

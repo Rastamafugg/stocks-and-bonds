@@ -3,10 +3,10 @@ PROCEDURE TSTCTLH1
 (* PROCEDURE : TSTCTLH1                                         *)
 (* PURPOSE   : Phase 1 controller harness. Exercises only the   *)
 (*             SNBMODCS request/response handshake by sending   *)
-(*             an unmapped signal repeatedly and observing the  *)
-(*             raw response records.                            *)
+(*             an unmapped command repeatedly and observing the  *)
+(*             raw response records for an unmapped command.                            *)
 (* ============================================================ *)
-TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
 DIM state       : CtlState
 DIM ok          : BOOLEAN
 DIM fileOK      : BOOLEAN
@@ -50,9 +50,9 @@ FOR idx := 1 TO 5
   ENDIF
 
   state.reqSeq  := nextSeq
-  state.reqSig  := 200
+  state.reqCmd  := 215
   state.errCode := 0
-  PRINT "Cycle "; idx; " write seq "; nextSeq; " sig 200"
+  PRINT "Cycle "; idx; " write seq "; nextSeq; " cmd 215"
   RUN h1WriteState(state, fileOK)
   IF NOT fileOK THEN
     PRINT "TSTCTLH1: h1WriteState failed"
@@ -61,9 +61,9 @@ FOR idx := 1 TO 5
 
   childPidVal := state.childPid
   IF idx = 1 THEN
-    PRINT "Cycle 1 skips wake signal"
+    PRINT "Cycle 1 skips command signal"
   ELSE
-    RUN h1SendSignal(childPidVal, 200, sigOK, errVal)
+    RUN h1SendSignal(childPidVal, 215, sigOK, errVal)
     IF NOT sigOK THEN
       PRINT "TSTCTLH1: h1SendSignal failed err "; errVal
       END
@@ -105,7 +105,7 @@ PROCEDURE h1WaitRspSeq
 (* PURPOSE   : Wait for one raw controller response sequence    *)
 (*             without treating nonzero errCode as failure.     *)
 (* ============================================================ *)
-TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
 PARAM wantSeq : INTEGER
 PARAM state   : CtlState
 PARAM ok      : BOOLEAN
@@ -186,7 +186,7 @@ PROCEDURE h1StartModCtl
 (* PURPOSE   : Initialize controller state, fork the persistent *)
 (*             controller child, and wait until it is ready.    *)
 (* ============================================================ *)
-TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
 PARAM ok      : BOOLEAN
 DIM state     : CtlState
 DIM fileOK    : BOOLEAN
@@ -237,7 +237,7 @@ PROCEDURE h1StopModCtl
 (* PURPOSE   : Send the controller quit request and wait for    *)
 (*             the child to exit cleanly.                       *)
 (* ============================================================ *)
-TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
 PARAM ok       : BOOLEAN
 DIM state      : CtlState
 DIM fileOK     : BOOLEAN
@@ -272,7 +272,7 @@ ELSE
 ENDIF
 
 state.reqSeq  := nextSeq
-state.reqSig  := 255
+state.reqCmd  := 214
 state.errCode := 0
 RUN h1WriteState(state, fileOK)
 IF NOT fileOK THEN
@@ -281,7 +281,7 @@ IF NOT fileOK THEN
 ENDIF
 
 childPidVal := state.childPid
-RUN h1SendSignal(childPidVal, 255, sigOK, errVal)
+RUN h1SendSignal(childPidVal, 214, sigOK, errVal)
 IF NOT sigOK THEN
   PRINT "h1StopModCtl: h1SendSignal failed err "; errVal
   END
@@ -319,7 +319,7 @@ PROCEDURE h1InitState
 (* PROCEDURE : h1InitState                                      *)
 (* PURPOSE   : Create or replace the shared controller state.   *)
 (* ============================================================ *)
-TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
 PARAM iParentID : INTEGER
 PARAM ok        : BOOLEAN
 DIM state       : CtlState
@@ -339,14 +339,18 @@ DELETE "MODULELIST"
 
 200 ON ERROR GOTO 900
 
-state.magic      := $53
-state.parentPid  := iParentID
-state.childPid   := 0
-state.reqSeq     := 0
-state.rspSeq     := 0
-state.reqSig     := 0
-state.statusCode := 0
-state.errCode    := 0
+state.magic       := $53
+state.parentPid   := iParentID
+state.childPid    := 0
+state.reqSeq      := 0
+state.rspSeq      := 0
+state.reqCmd      := 0
+state.parentSleep := 0
+state.childSleep  := 0
+state.statusCode  := 0
+state.errCode     := 0
+state.seenSig     := 0
+state.seenCount   := 0
 
 CREATE #path, "SNBMODCS":UPDATE
 isOpen := TRUE
@@ -369,7 +373,7 @@ PROCEDURE h1ReadState
 (* PROCEDURE : h1ReadState                                      *)
 (* PURPOSE   : Read the shared controller state record.         *)
 (* ============================================================ *)
-TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
 PARAM state : CtlState
 PARAM ok    : BOOLEAN
 DIM path    : BYTE
@@ -405,7 +409,7 @@ PROCEDURE h1WriteState
 (* PROCEDURE : h1WriteState                                     *)
 (* PURPOSE   : Rewrite the shared controller state record.      *)
 (* ============================================================ *)
-TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
 PARAM state : CtlState
 PARAM ok    : BOOLEAN
 DIM path    : BYTE
@@ -595,7 +599,7 @@ PROCEDURE h1WaitReady
 (* PROCEDURE : h1WaitReady                                      *)
 (* PURPOSE   : Wait until the controller publishes ready state. *)
 (* ============================================================ *)
-TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
 PARAM state : CtlState
 PARAM ok    : BOOLEAN
 DIM slpOK   : BOOLEAN
@@ -636,7 +640,7 @@ PROCEDURE h1WaitResponse
 (* PROCEDURE : h1WaitResponse                                   *)
 (* PURPOSE   : Wait until rspSeq reaches the requested value.   *)
 (* ============================================================ *)
-TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,statusCode,errCode:BYTE
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
 PARAM wantSeq : INTEGER
 PARAM state   : CtlState
 PARAM ok      : BOOLEAN

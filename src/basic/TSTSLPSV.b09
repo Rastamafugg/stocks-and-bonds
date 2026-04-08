@@ -64,6 +64,13 @@ IF NOT fileOK THEN
 ENDIF
 
 LOOP
+  actionVal := 3
+  RUN SLPICPT(icptMem, actionVal, iSeenSignal, iSeenCount, icptOK)
+  IF icptOK = 0 THEN
+    PRINT "TSTSLPSV: SLPICPT reset failed"
+    END
+  ENDIF
+
   state.childSleep := 1
   state.statusCode := 10
   RUN ssvWriteState(state, fileOK)

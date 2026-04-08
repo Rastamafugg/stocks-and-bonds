@@ -52,6 +52,13 @@ int okoutsz;
         return 0;
     }
 
+    if (*action == 3) {
+        lastsig = 0;
+        hitcount = 0;
+        *okout = 1;
+        return 0;
+    }
+
     return 0;
 }
 

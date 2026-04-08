@@ -76,7 +76,7 @@ DIM mkDvSusp(9): BOOLEAN
 DIM mkDvRnst(9): BOOLEAN
 DIM stateHdrAdr: INTEGER
 DIM ctlStarted : BOOLEAN
-DIM phaseSig   : INTEGER
+DIM phaseCmd   : INTEGER
 DIM i          : INTEGER
 
 ON ERROR GOTO 900
@@ -93,8 +93,8 @@ LOOP
     ! setup writes a fresh SNBSTATE for a new game or
     ! loads SNBGAME into SNBSTATE for resume flow.
     RUN chkStale(wasStale)
-    phaseSig := 128
-    RUN requestPhaseLib(phaseSig, ctlStarted, ok)
+    phaseCmd := 200
+    RUN requestPhaseLib(phaseCmd, ctlStarted, ok)
     IF NOT ok THEN
       GOSUB 50
       END
@@ -154,8 +154,8 @@ LOOP
       ! savedPhase 0 and 4 route back into the
       ! dividend module's resume points.
       IF iSavPh = 0 OR iSavPh = 4 THEN
-        phaseSig := 129
-        RUN requestPhaseLib(phaseSig, ctlStarted, ok)
+        phaseCmd := 201
+        RUN requestPhaseLib(phaseCmd, ctlStarted, ok)
         IF NOT ok THEN
           gameOver := TRUE
         ELSE
@@ -181,8 +181,8 @@ LOOP
       IF NOT gameOver THEN
         ! savedPhase 7 is market resume after save+exit.
         IF iSavPh = 0 OR iSavPh = 7 THEN
-          phaseSig := 131
-          RUN requestPhaseLib(phaseSig, ctlStarted, ok)
+          phaseCmd := 203
+          RUN requestPhaseLib(phaseCmd, ctlStarted, ok)
           IF NOT ok THEN
             gameOver := TRUE
           ELSE
@@ -195,8 +195,8 @@ LOOP
               END
             ENDIF
             IF marketAct = 1 THEN
-              phaseSig := 132
-              RUN requestPhaseLib(phaseSig, ctlStarted, ok)
+              phaseCmd := 204
+              RUN requestPhaseLib(phaseCmd, ctlStarted, ok)
               IF NOT ok THEN
                 gameOver := TRUE
               ELSE
@@ -220,8 +220,8 @@ LOOP
       IF NOT gameOver THEN
         ! savedPhase 11 is the post-update market display pass.
         IF iSavPh = 11 THEN
-          phaseSig := 132
-          RUN requestPhaseLib(phaseSig, ctlStarted, ok)
+          phaseCmd := 204
+          RUN requestPhaseLib(phaseCmd, ctlStarted, ok)
           IF NOT ok THEN
             gameOver := TRUE
           ELSE
@@ -246,8 +246,8 @@ LOOP
       IF NOT gameOver THEN
         ! savedPhase 3 is year-10 clearance before buy.
         IF iSavPh = 3 THEN
-          phaseSig := 139
-          RUN requestPhaseLib(phaseSig, ctlStarted, ok)
+          phaseCmd := 211
+          RUN requestPhaseLib(phaseCmd, ctlStarted, ok)
           IF NOT ok THEN
             gameOver := TRUE
           ELSE
@@ -302,8 +302,8 @@ LOOP
     IF doClsgMkt THEN
       ! Closing market pass uses the final-year state
       ! already written by the buy/margin path.
-      phaseSig := 131
-      RUN requestPhaseLib(phaseSig, ctlStarted, ok)
+      phaseCmd := 203
+      RUN requestPhaseLib(phaseCmd, ctlStarted, ok)
       IF NOT ok THEN
         GOSUB 50
         END
@@ -320,8 +320,8 @@ LOOP
         GOSUB 50
         END
       ENDIF
-      phaseSig := 132
-      RUN requestPhaseLib(phaseSig, ctlStarted, ok)
+      phaseCmd := 204
+      RUN requestPhaseLib(phaseCmd, ctlStarted, ok)
       IF NOT ok THEN
         GOSUB 50
         END
@@ -342,8 +342,8 @@ LOOP
         END
       ENDIF
       IF iSavPh = 11 THEN
-        phaseSig := 132
-        RUN requestPhaseLib(phaseSig, ctlStarted, ok)
+        phaseCmd := 204
+        RUN requestPhaseLib(phaseCmd, ctlStarted, ok)
         IF NOT ok THEN
           GOSUB 50
           END
@@ -366,8 +366,8 @@ LOOP
 
     ! Endgame may write RETURN_TO_SETUP (8) or
     ! QUIT_TO_MENU (9) back into SNBSTATE.
-    phaseSig := 140
-    RUN requestPhaseLib(phaseSig, ctlStarted, ok)
+    phaseCmd := 212
+    RUN requestPhaseLib(phaseCmd, ctlStarted, ok)
     IF NOT ok THEN
       GOSUB 50
       END
@@ -471,8 +471,8 @@ ENDLOOP
         savePlyrVal := phasePlyr
 
         IF iSavPh = 6 THEN
-          phaseSig := 130
-          RUN requestPhaseLib(phaseSig, ctlStarted, ok)
+          phaseCmd := 202
+          RUN requestPhaseLib(phaseCmd, ctlStarted, ok)
           IF NOT ok THEN
             gameOver := TRUE
           ELSE
@@ -481,8 +481,8 @@ ENDLOOP
           ENDIF
         ELSE IF iSavPh = 1 THEN
           IF plyr.plyrType = 2 THEN
-            phaseSig := 134
-            RUN requestPhaseLib(phaseSig, ctlStarted, ok)
+            phaseCmd := 206
+            RUN requestPhaseLib(phaseCmd, ctlStarted, ok)
             IF NOT ok THEN
               gameOver := TRUE
             ELSE
@@ -490,8 +490,8 @@ ENDLOOP
               RUN snbSellAI(iCYr, iMgnRule, phasePlyr, iPlyrCnt, plyr, mkt, phaseAct, savePhVal, savePlyrVal)
             ENDIF
           ELSE
-            phaseSig := 133
-            RUN requestPhaseLib(phaseSig, ctlStarted, ok)
+            phaseCmd := 205
+            RUN requestPhaseLib(phaseCmd, ctlStarted, ok)
             IF NOT ok THEN
               gameOver := TRUE
             ELSE
@@ -501,8 +501,8 @@ ENDLOOP
           ENDIF
         ELSE IF iSavPh = 2 THEN
           IF plyr.plyrType = 2 THEN
-            phaseSig := 136
-            RUN requestPhaseLib(phaseSig, ctlStarted, ok)
+            phaseCmd := 208
+            RUN requestPhaseLib(phaseCmd, ctlStarted, ok)
             IF NOT ok THEN
               gameOver := TRUE
             ELSE
@@ -510,8 +510,8 @@ ENDLOOP
               RUN snbBuyAI(iCYr, iMgnRule, phasePlyr, iPlyrCnt, plyr, mkt, phaseAct, savePhVal, savePlyrVal)
             ENDIF
           ELSE
-            phaseSig := 135
-            RUN requestPhaseLib(phaseSig, ctlStarted, ok)
+            phaseCmd := 207
+            RUN requestPhaseLib(phaseCmd, ctlStarted, ok)
             IF NOT ok THEN
               gameOver := TRUE
             ELSE
@@ -520,8 +520,8 @@ ENDLOOP
             ENDIF
           ENDIF
         ELSE IF iSavPh = 10 THEN
-          phaseSig := 137
-          RUN requestPhaseLib(phaseSig, ctlStarted, ok)
+          phaseCmd := 209
+          RUN requestPhaseLib(phaseCmd, ctlStarted, ok)
           IF NOT ok THEN
             gameOver := TRUE
           ELSE
@@ -529,8 +529,8 @@ ENDLOOP
             RUN snbMarketPlayer(phasePlyr, iPlyrCnt, plyr, mkSpOcc, phaseAct, savePhVal, savePlyrVal)
           ENDIF
         ELSE
-          phaseSig := 138
-          RUN requestPhaseLib(phaseSig, ctlStarted, ok)
+          phaseCmd := 210
+          RUN requestPhaseLib(phaseCmd, ctlStarted, ok)
           IF NOT ok THEN
             gameOver := TRUE
           ELSE

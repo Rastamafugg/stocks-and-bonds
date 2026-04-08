@@ -2,12 +2,13 @@ PROCEDURE snbModMemCtl
 (* ============================================================ *)
 (* PROCEDURE : snbModMemCtl                                     *)
 (* PURPOSE   : Persistent module memory controller child.       *)
-(*             Waits for signal-driven requests, loads the      *)
-(*             requested packed library into the module         *)
-(*             directory, writes MODULELIST, and unloads the    *)
-(*             full listed set on demand.                       *)
+(*             Installs the intercept helper, waits for         *)
+(*             command-driven requests, loads the requested     *)
+(*             packed library into the module directory,        *)
+(*             writes MODULELIST, and unloads the full listed   *)
+(*             set on demand.                                   *)
 (* ============================================================ *)
-TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,parentSleep,childSleep,statusCode,errCode:BYTE
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
 DIM state      : CtlState
 DIM ok         : BOOLEAN
 DIM fileOK     : BOOLEAN
@@ -16,23 +17,39 @@ DIM pidOK      : BOOLEAN
 DIM iChildID   : INTEGER
 DIM lastSeq    : INTEGER
 DIM hdrAddr    : INTEGER
-DIM currSigVal : INTEGER
+DIM currCmdVal : INTEGER
 DIM currName   : STRING[20]
 DIM respStat   : INTEGER
 DIM errVal     : INTEGER
-DIM reqSigVal  : INTEGER
+DIM reqCmdVal  : INTEGER
 DIM parentPidVal: INTEGER
+DIM actionVal  : INTEGER
+DIM iSeenSig   : INTEGER
+DIM iSeenCount : INTEGER
+DIM icptOK     : INTEGER
+DIM icptMem(32): INTEGER
+DIM memIdx     : INTEGER
 
 ON ERROR GOTO 900
 
 lastSeq    := 0
 hdrAddr    := 0
-currSigVal := 0
+currCmdVal := 0
 currName   := ""
+FOR memIdx := 1 TO 32
+  icptMem(memIdx) := 0
+NEXT memIdx
 
 RUN mmcGetProcID(iChildID, pidOK)
 IF NOT pidOK THEN
   PRINT "snbModMemCtl: mmcGetProcID failed"
+  END
+ENDIF
+
+actionVal := 1
+RUN SLPICPT(icptMem, actionVal, iSeenSig, iSeenCount, icptOK)
+IF icptOK = 0 THEN
+  PRINT "snbModMemCtl: SLPICPT install failed"
   END
 ENDIF
 
@@ -47,6 +64,8 @@ state.parentSleep := 0
 state.childSleep  := 0
 state.statusCode  := 10
 state.errCode     := 0
+state.seenSig     := 0
+state.seenCount   := 0
 RUN mmcWriteState(state, fileOK)
 IF NOT fileOK THEN
   PRINT "snbModMemCtl: initial state write failed"
@@ -61,49 +80,77 @@ IF NOT sigOK THEN
 ENDIF
 
 LOOP
+  actionVal := 3
+  RUN SLPICPT(icptMem, actionVal, iSeenSig, iSeenCount, icptOK)
+  IF icptOK = 0 THEN
+    PRINT "snbModMemCtl: SLPICPT reset failed"
+    END
+  ENDIF
+
   state.childSleep := 1
+  state.seenSig    := 0
+  state.seenCount  := 0
   RUN mmcWriteState(state, fileOK)
   IF NOT fileOK THEN
     PRINT "snbModMemCtl: pre-sleep write failed"
     END
   ENDIF
-  PRINT "snbModMemCtl: after pre-sleep write"
 
-  PRINT "snbModMemCtl: before mmcSleep"
   RUN mmcSleep(sigOK, errVal)
   IF NOT sigOK THEN
     PRINT "snbModMemCtl: sleep failed err "; errVal
     END
   ENDIF
-  PRINT "snbModMemCtl: after mmcSleep"
 
-  PRINT "snbModMemCtl: before mmcReadState"
   RUN mmcReadState(state, fileOK)
-  PRINT "snbModMemCtl: after mmcReadState"
   IF NOT fileOK THEN
     PRINT "snbModMemCtl: loop state read failed"
     END
   ENDIF
 
   state.childSleep := 0
-  PRINT "snbModMemCtl: after childSleep clear"
+  state.statusCode := 11
+  state.errCode    := 0
+  actionVal := 2
+  RUN SLPICPT(icptMem, actionVal, iSeenSig, iSeenCount, icptOK)
+  IF icptOK = 0 THEN
+    state.seenSig   := 0
+    state.seenCount := 0
+  ELSE
+    state.seenSig   := iSeenSig
+    state.seenCount := iSeenCount
+  ENDIF
+  RUN mmcWriteState(state, fileOK)
+  IF NOT fileOK THEN
+    PRINT "snbModMemCtl: wake state write failed"
+    END
+  ENDIF
 
   IF state.reqSeq <> lastSeq THEN
     lastSeq  := state.reqSeq
     respStat := 255
     errVal   := 0
 
-    IF state.reqSig = 254 THEN
-      RUN mmcUnloadCurrent(hdrAddr, currSigVal, currName, respStat, ok, errVal)
-    ELSE IF state.reqSig = 255 THEN
-      RUN mmcUnloadCurrent(hdrAddr, currSigVal, currName, respStat, ok, errVal)
+    IF icptOK = 0 THEN
+      respStat := 252
+      errVal := 243
+    ELSE IF state.seenCount = 0 THEN
+      respStat := 253
+      errVal := 240
+    ELSE IF state.seenSig <> state.reqCmd THEN
+      respStat := 253
+      errVal := 240
+    ELSE IF state.reqCmd = 213 THEN
+      RUN mmcUnloadCurrent(hdrAddr, currCmdVal, currName, respStat, ok, errVal)
+    ELSE IF state.reqCmd = 214 THEN
+      RUN mmcUnloadCurrent(hdrAddr, currCmdVal, currName, respStat, ok, errVal)
       IF ok THEN
         respStat := 40
       ENDIF
     ELSE
-      reqSigVal := state.reqSig
-      RUN mmcLoadSignal(reqSigVal, hdrAddr, currSigVal, currName, respStat, ok, errVal)
-    ENDIF \ENDIF
+      reqCmdVal := state.reqCmd
+      RUN mmcLoadCommand(reqCmdVal, hdrAddr, currCmdVal, currName, respStat, ok, errVal)
+    ENDIF \ENDIF \ENDIF \ENDIF \ENDIF
 
     state.statusCode := respStat
     state.errCode    := errVal
@@ -123,8 +170,10 @@ LOOP
       ENDIF
     ENDIF
 
-    IF state.reqSig = 255 THEN
-      END
+    IF state.reqCmd = 214 THEN
+      IF state.errCode = 0 THEN
+        END
+      ENDIF
     ENDIF
   ENDIF
 ENDLOOP
@@ -138,7 +187,7 @@ PROCEDURE mmcReadState
 (* PROCEDURE : mmcReadState                                     *)
 (* PURPOSE   : Read the shared module-controller state record.  *)
 (* ============================================================ *)
-TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,parentSleep,childSleep,statusCode,errCode:BYTE
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
 PARAM state : CtlState
 PARAM ok    : BOOLEAN
 DIM path    : BYTE
@@ -164,7 +213,7 @@ isOpen := TRUE
 GET #path, state
 PRINT "  magic "; state.magic; " parent "; state.parentPid; " child "; state.childPid
 PRINT "mmcReadState: after get req "; state.reqSeq; " rsp "; state.rspSeq
-PRINT "  sig "; state.reqSig; " pslp "; state.parentSleep; " cslp "; state.childSleep
+PRINT "  sig "; state.reqCmd; " pslp "; state.parentSleep; " cslp "; state.childSleep
 PRINT "  stat "; state.statusCode; " err "; state.errCode
 PRINT "mmcReadState: before magic check"
 IF state.magic <> $53 THEN
@@ -193,7 +242,7 @@ END
       GET #path, state
       PRINT "  magic "; state.magic; " parent "; state.parentPid; " child "; state.childPid
       PRINT "mmcReadState: after get req "; state.reqSeq; " rsp "; state.rspSeq
-      PRINT "  sig "; state.reqSig; " pslp "; state.parentSleep; " cslp "; state.childSleep
+      PRINT "  sig "; state.reqCmd; " pslp "; state.parentSleep; " cslp "; state.childSleep
       PRINT "  stat "; state.statusCode; " err "; state.errCode
       PRINT "mmcReadState: before magic check"
       IF state.magic <> $53 THEN
@@ -226,7 +275,7 @@ PROCEDURE mmcWriteState
 (* PROCEDURE : mmcWriteState                                    *)
 (* PURPOSE   : Rewrite the shared module-controller state.      *)
 (* ============================================================ *)
-TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqSig,parentSleep,childSleep,statusCode,errCode:BYTE
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
 PARAM state : CtlState
 PARAM ok    : BOOLEAN
 DIM path    : BYTE
@@ -287,7 +336,8 @@ END
 PROCEDURE mmcSendSignal
 (* ============================================================ *)
 (* PROCEDURE : mmcSendSignal                                    *)
-(* PURPOSE   : Send a wake signal to another process.           *)
+(* PURPOSE   : Send one signal to another process, retrying     *)
+(*             error 233 for up to five attempts.               *)
 (* ============================================================ *)
 TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
 PARAM procID  : INTEGER
@@ -297,22 +347,34 @@ PARAM errVal  : INTEGER
 DIM regs      : Register
 DIM callCode  : BYTE
 DIM iCC       : INTEGER
+DIM tries     : INTEGER
+DIM slpOK     : BOOLEAN
+DIM slpErr    : INTEGER
 
 ON ERROR GOTO 900
 
 ok       := FALSE
 errVal   := 0
 callCode := $08
-regs.a   := procID
-regs.b   := sigVal
-RUN SysCall(callCode, regs)
-iCC := regs.cc
-IF LAND(iCC, 1) <> 0 THEN
+FOR tries := 1 TO 5
+  regs.a := procID
+  regs.b := sigVal
+  RUN SysCall(callCode, regs)
+  iCC := regs.cc
+  IF LAND(iCC, 1) = 0 THEN
+    ok := TRUE
+    END
+  ENDIF
   errVal := regs.b
-  END
-ENDIF
-
-ok := TRUE
+  IF errVal <> 233 OR tries >= 5 THEN
+    END
+  ENDIF
+  RUN mmcSleep(slpOK, slpErr)
+  IF NOT slpOK THEN
+    errVal := slpErr
+    END
+  ENDIF
+NEXT tries
 END
 
 900 PRINT "mmcSendSignal error ("; ERR; ")"
@@ -353,16 +415,16 @@ END
     errVal := ERR
 END
 
-PROCEDURE mmcLoadSignal
+PROCEDURE mmcLoadCommand
 (* ============================================================ *)
-(* PROCEDURE : mmcLoadSignal                                    *)
-(* PURPOSE   : Map one request signal to one packed library and *)
+(* PROCEDURE : mmcLoadCommand                                    *)
+(* PURPOSE   : Map one request command to one packed library and*)
 (*             ensure that library is loaded in the child.      *)
 (* ============================================================ *)
 TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
-PARAM sigVal     : INTEGER
+PARAM cmdVal     : INTEGER
 PARAM hdrAddr    : INTEGER
-PARAM currSigVal : INTEGER
+PARAM currCmdVal : INTEGER
 PARAM currName   : STRING[20]
 PARAM respStat   : INTEGER
 PARAM ok         : BOOLEAN
@@ -380,27 +442,27 @@ ok       := FALSE
 errVal   := 0
 respStat := 255
 
-RUN mmcMapSignal(sigVal, modName, mapOK)
+RUN mmcMapCommand(cmdVal, modName, mapOK)
 IF NOT mapOK THEN
-  errVal := sigVal
+  errVal := cmdVal
   respStat := 254
   END
 ENDIF
 
 IF hdrAddr <> 0 THEN
-  IF currSigVal = sigVal THEN
-    PRINT "mmcLoadSignal: before mmcWriteModuleList"
+  IF currCmdVal = cmdVal THEN
+    PRINT "mmcLoadCommand: before mmcWriteModuleList"
     RUN mmcWriteModuleList(hdrAddr, listOK)
-    PRINT "mmcLoadSignal: after mmcWriteModuleList ok "; listOK
+    PRINT "mmcLoadCommand: after mmcWriteModuleList ok "; listOK
     IF NOT listOK THEN
-      PRINT "mmcLoadSignal: MODULELIST write failed"
+      PRINT "mmcLoadCommand: MODULELIST write failed"
       END
     ENDIF
     ok       := TRUE
     respStat := 20
     END
   ENDIF
-  RUN mmcUnloadCurrent(hdrAddr, currSigVal, currName, respStat, ok, errVal)
+  RUN mmcUnloadCurrent(hdrAddr, currCmdVal, currName, respStat, ok, errVal)
   IF NOT ok THEN
     END
   ENDIF
@@ -413,13 +475,13 @@ RUN SysCall(callCode, regs)
 iCC := regs.cc
 IF LAND(iCC, 1) = 0 THEN
   hdrAddr    := regs.u
-  currSigVal := sigVal
+  currCmdVal := cmdVal
   currName   := modName
-  PRINT "mmcLoadSignal: before mmcWriteModuleList"
+  PRINT "mmcLoadCommand: before mmcWriteModuleList"
   RUN mmcWriteModuleList(hdrAddr, listOK)
-  PRINT "mmcLoadSignal: after mmcWriteModuleList ok "; listOK
+  PRINT "mmcLoadCommand: after mmcWriteModuleList ok "; listOK
   IF NOT listOK THEN
-    PRINT "mmcLoadSignal: MODULELIST write failed"
+    PRINT "mmcLoadCommand: MODULELIST write failed"
     END
   ENDIF
   ok       := TRUE
@@ -434,36 +496,36 @@ RUN SysCall(callCode, regs)
 iCC := regs.cc
 IF LAND(iCC, 1) <> 0 THEN
   errVal := regs.b
-  PRINT "mmcLoadSignal: load failed "; modName; " err "; errVal
+  PRINT "mmcLoadCommand: load failed "; modName; " err "; errVal
   END
 ENDIF
 
 hdrAddr    := regs.u
-currSigVal := sigVal
+currCmdVal := cmdVal
 currName   := modName
-PRINT "mmcLoadSignal: before mmcWriteModuleList"
+PRINT "mmcLoadCommand: before mmcWriteModuleList"
 RUN mmcWriteModuleList(hdrAddr, listOK)
-PRINT "mmcLoadSignal: after mmcWriteModuleList ok "; listOK
+PRINT "mmcLoadCommand: after mmcWriteModuleList ok "; listOK
 IF NOT listOK THEN
-  PRINT "mmcLoadSignal: MODULELIST write failed"
+  PRINT "mmcLoadCommand: MODULELIST write failed"
   END
 ENDIF
 ok       := TRUE
 respStat := 20
 END
 
-900 PRINT "mmcLoadSignal error ("; ERR; ")"
+900 PRINT "mmcLoadCommand error ("; ERR; ")"
     ok := FALSE
     errVal := ERR
     respStat := 255
 END
 
-PROCEDURE mmcMapSignal
+PROCEDURE mmcMapCommand
 (* ============================================================ *)
-(* PROCEDURE : mmcMapSignal                                     *)
-(* PURPOSE   : Map one controller request signal to one module. *)
+(* PROCEDURE : mmcMapCommand                                      *)
+(* PURPOSE   : Map one controller request command to one module. *)
 (* ============================================================ *)
-PARAM sigVal  : INTEGER
+PARAM cmdVal  : INTEGER
 PARAM modName : STRING[20]
 PARAM ok      : BOOLEAN
 
@@ -471,31 +533,31 @@ ON ERROR GOTO 900
 
 ok := TRUE
 
-IF sigVal = 128 THEN
+IF cmdVal = 200 THEN
   modName := "snbSetup"
-ELSE IF sigVal = 129 THEN
+ELSE IF cmdVal = 201 THEN
   modName := "snbDividend"
-ELSE IF sigVal = 130 THEN
+ELSE IF cmdVal = 202 THEN
   modName := "snbMgnInt"
-ELSE IF sigVal = 131 THEN
+ELSE IF cmdVal = 203 THEN
   modName := "snbMarket"
-ELSE IF sigVal = 132 THEN
+ELSE IF cmdVal = 204 THEN
   modName := "snbMarketTable"
-ELSE IF sigVal = 133 THEN
+ELSE IF cmdVal = 205 THEN
   modName := "snbSellHumanStub"
-ELSE IF sigVal = 134 THEN
+ELSE IF cmdVal = 206 THEN
   modName := "snbSellAI"
-ELSE IF sigVal = 135 THEN
+ELSE IF cmdVal = 207 THEN
   modName := "snbBuy"
-ELSE IF sigVal = 136 THEN
+ELSE IF cmdVal = 208 THEN
   modName := "snbBuyAI"
-ELSE IF sigVal = 137 THEN
+ELSE IF cmdVal = 209 THEN
   modName := "snbMarketPlayer"
-ELSE IF sigVal = 138 THEN
+ELSE IF cmdVal = 210 THEN
   modName := "snbMarginPay"
-ELSE IF sigVal = 139 THEN
+ELSE IF cmdVal = 211 THEN
   modName := "snbYear10Clear"
-ELSE IF sigVal = 140 THEN
+ELSE IF cmdVal = 212 THEN
   modName := "snbEndGame"
 ELSE
   modName := ""
@@ -503,7 +565,7 @@ ELSE
 ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF \ENDIF
 END
 
-900 PRINT "mmcMapSignal error ("; ERR; ")"
+900 PRINT "mmcMapCommand error ("; ERR; ")"
     ok := FALSE
 END
 
@@ -597,7 +659,7 @@ PROCEDURE mmcUnloadCurrent
 (* PURPOSE   : Unload the full current MODULELIST in the child. *)
 (* ============================================================ *)
 PARAM hdrAddr    : INTEGER
-PARAM currSigVal : INTEGER
+PARAM currCmdVal : INTEGER
 PARAM currName   : STRING[20]
 PARAM respStat   : INTEGER
 PARAM ok         : BOOLEAN
@@ -610,7 +672,7 @@ errVal   := 0
 respStat := 255
 
 IF hdrAddr = 0 THEN
-  currSigVal := 0
+  currCmdVal := 0
   currName   := ""
   ok       := TRUE
   respStat := 30
@@ -623,7 +685,7 @@ IF NOT ok THEN
 ENDIF
 
 hdrAddr    := 0
-currSigVal := 0
+currCmdVal := 0
 currName   := ""
 ok       := TRUE
 respStat := 30
@@ -723,8 +785,4 @@ END
     ok := FALSE
     errVal := ERR
 END
-
-
-
-
 
