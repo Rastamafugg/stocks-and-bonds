@@ -10,9 +10,11 @@ done
 SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
 
 IMAGE_PATH="${1:-$SCRIPT_DIR/disks/snbsrc.dsk}"
-SOURCE_FILE="${2:-TSTCTLH3.log}"
 DEST_DIR="$SCRIPT_DIR/logs"
-DEST_PATH="$DEST_DIR/TSTCTLH3.log"
+HARNESS_SOURCE="TSTCTLH3.log"
+HARNESS_DEST="$DEST_DIR/TSTCTLH3.log"
+CHILD_SOURCE="snbModMemCtl.log"
+CHILD_DEST="$DEST_DIR/snbModMemCtl.log"
 
 if ! command -v os9 >/dev/null 2>&1; then
   echo "ERROR: ToolShed os9 utility not found on PATH."
@@ -26,6 +28,10 @@ fi
 
 mkdir -p "$DEST_DIR"
 
-echo "Extracting $SOURCE_FILE from $IMAGE_PATH"
-os9 copy -l -r "$IMAGE_PATH,$SOURCE_FILE" "$DEST_PATH"
-echo "Wrote $DEST_PATH"
+echo "Extracting $HARNESS_SOURCE from $IMAGE_PATH"
+os9 copy -l -r "$IMAGE_PATH,$HARNESS_SOURCE" "$HARNESS_DEST"
+echo "Wrote $HARNESS_DEST"
+
+echo "Extracting $CHILD_SOURCE from $IMAGE_PATH"
+os9 copy -l -r "$IMAGE_PATH,$CHILD_SOURCE" "$CHILD_DEST"
+echo "Wrote $CHILD_DEST"

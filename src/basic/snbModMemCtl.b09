@@ -53,6 +53,10 @@ IF icptOK = 0 THEN
   END
 ENDIF
 
+ON ERROR GOTO 50
+DELETE "/d1/snbModMemCtl.log"
+50 ON ERROR GOTO 900
+
 RUN mmcReadState(state, fileOK)
 IF NOT fileOK THEN
   PRINT "snbModMemCtl: initial state read failed"
@@ -280,6 +284,7 @@ PARAM state : CtlState
 PARAM ok    : BOOLEAN
 DIM path    : BYTE
 DIM isOpen  : BOOLEAN
+DIM logOK   : BOOLEAN
 
 ON ERROR GOTO 900
 
@@ -288,7 +293,7 @@ ok     := FALSE
 
 OPEN #path, "SNBMODCS":UPDATE
 isOpen := TRUE
-PRINT "mmcWriteState: req "; state.reqSeq; " rsp "; state.rspSeq; " cmd "; state.reqCmd; " pslp "; state.parentSleep; " cslp "; state.childSleep; " stat "; state.statusCode; " err "; state.errCode
+RUN mmcAppendStateLog(state, logOK)
 PUT #path, state
 
 CLOSE #path
@@ -300,6 +305,51 @@ END
       CLOSE #path
     ENDIF
     PRINT "mmcWriteState error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE mmcAppendStateLog
+(* ============================================================ *)
+(* PROCEDURE : mmcAppendStateLog                                *)
+(* PURPOSE   : Append one controller state row to the child     *)
+(*             diagnostic log on /d1.                           *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
+PARAM state : CtlState
+PARAM ok    : BOOLEAN
+DIM path    : BYTE
+DIM isOpen  : BOOLEAN
+DIM lineVal : STRING[80]
+
+ON ERROR GOTO 900
+
+isOpen := FALSE
+ok     := FALSE
+lineVal := ""
+
+ON ERROR GOTO 100
+OPEN #path, "/d1/snbModMemCtl.log":UPDATE
+ON ERROR GOTO 900
+isOpen := TRUE
+WHILE NOT(EOF(#path)) DO
+  READ #path, lineVal
+ENDWHILE
+GOTO 200
+
+100 ON ERROR GOTO 900
+CREATE #path, "/d1/snbModMemCtl.log":WRITE
+isOpen := TRUE
+
+200 WRITE #path, "mmcWriteState", state.reqSeq, state.rspSeq, state.reqCmd, state.parentSleep, state.childSleep, state.statusCode, state.errCode
+
+CLOSE #path
+isOpen := FALSE
+ok := TRUE
+END
+
+900 IF isOpen THEN
+      CLOSE #path
+    ENDIF
     ok := FALSE
 END
 
