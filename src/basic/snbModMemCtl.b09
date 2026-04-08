@@ -71,6 +71,7 @@ state.errCode     := 0
 state.seenSig     := 0
 state.seenCount   := 0
 RUN mmcWriteState(state, fileOK)
+PRINT "snbModMemCtl: initial mmcWriteState ok "; fileOK
 IF NOT fileOK THEN
   PRINT "snbModMemCtl: initial state write failed"
   END
