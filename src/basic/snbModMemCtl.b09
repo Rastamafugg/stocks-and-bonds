@@ -210,28 +210,17 @@ openTry := 1
 slpOK   := FALSE
 errVal  := 0
 
-PRINT "mmcReadState: before open"
 ON ERROR GOTO 100
 OPEN #path, "SNBMODCS":READ
 ON ERROR GOTO 900
-PRINT "mmcReadState: after open"
 isOpen := TRUE
 GET #path, state
-PRINT "  magic "; state.magic; " parent "; state.parentPid; " child "; state.childPid
-PRINT "mmcReadState: after get req "; state.reqSeq; " rsp "; state.rspSeq
-PRINT "  sig "; state.reqCmd; " pslp "; state.parentSleep; " cslp "; state.childSleep
-PRINT "  stat "; state.statusCode; " err "; state.errCode
-PRINT "mmcReadState: before magic check"
 IF state.magic <> $53 THEN
   PRINT "mmcReadState: invalid magic"
   END
 ENDIF
 
-  PRINT "mmcReadState: after magic check"
-PRINT "mmcReadState: before close"
-PRINT "mmcReadState: about to close path"
 CLOSE #path
-PRINT "mmcReadState: after close"
 isOpen := FALSE
 ok := TRUE
 END
@@ -243,23 +232,13 @@ END
       ON ERROR GOTO 200
       OPEN #path, "SNBMODCS":READ
       ON ERROR GOTO 900
-      PRINT "mmcReadState: retry open succeeded"
       isOpen := TRUE
       GET #path, state
-      PRINT "  magic "; state.magic; " parent "; state.parentPid; " child "; state.childPid
-      PRINT "mmcReadState: after get req "; state.reqSeq; " rsp "; state.rspSeq
-      PRINT "  sig "; state.reqCmd; " pslp "; state.parentSleep; " cslp "; state.childSleep
-      PRINT "  stat "; state.statusCode; " err "; state.errCode
-      PRINT "mmcReadState: before magic check"
       IF state.magic <> $53 THEN
         PRINT "mmcReadState: invalid magic"
         END
       ENDIF
-      PRINT "mmcReadState: after magic check"
-      PRINT "mmcReadState: before close"
-      PRINT "mmcReadState: about to close path"
       CLOSE #path
-      PRINT "mmcReadState: after close"
       isOpen := FALSE
       ok := TRUE
       END

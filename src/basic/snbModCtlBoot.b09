@@ -564,6 +564,7 @@ DIM tries   : INTEGER
 ON ERROR GOTO 900
 
 ok := FALSE
+PRINT "bootWaitReady: begin"
 FOR tries := 1 TO 20
   RUN bootReadState(state, ok)
   IF NOT ok THEN
@@ -584,6 +585,8 @@ NEXT tries
 
 ok := FALSE
 PRINT "bootWaitReady: timed out"
+PRINT "bootWaitReady: state child "; state.childPid
+PRINT "  stat "; state.statusCode; " cslp "; state.childSleep
 END
 
 900 PRINT "bootWaitReady error ("; ERR; ")"
