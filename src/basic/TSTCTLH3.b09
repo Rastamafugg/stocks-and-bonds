@@ -73,9 +73,9 @@ RUN h3LogState(logFile, "after start", state)
 PRINT
 PRINT #logFile, ""
 
-PRINT "Step 3: bootLoadPhase cmd 200"
-PRINT #logFile, "Step 3: bootLoadPhase cmd 200"
-RUN bootLoadPhase(200, ok)
+PRINT "Step 3: traced load request cmd 200"
+PRINT #logFile, "Step 3: traced load request cmd 200"
+RUN h3TraceLoadRequest(200, logFile, state, ok)
 PRINT "bootLoadPhase ok "; ok
 PRINT #logFile, "bootLoadPhase ok "; ok
 IF NOT ok THEN
@@ -83,15 +83,6 @@ IF NOT ok THEN
   PRINT #logFile, "TSTCTLH3: bootLoadPhase failed"
   GOTO 800
 ENDIF
-
-RUN h3ReadState(state, fileOK)
-IF NOT fileOK THEN
-  PRINT "TSTCTLH3: h3ReadState after load failed"
-  PRINT #logFile, "TSTCTLH3: h3ReadState after load failed"
-  GOTO 800
-ENDIF
-RUN h3PrintState("after load", state)
-RUN h3LogState(logFile, "after load", state)
 PRINT
 PRINT #logFile, ""
 
@@ -285,6 +276,105 @@ PRINT #pathNo, "seen "; state.seenSig; " hits "; state.seenCount
 END
 
 900 PRINT "h3LogState error ("; ERR; ")"
+END
+
+PROCEDURE h3TraceLoadRequest
+(* ============================================================ *)
+(* PROCEDURE : h3TraceLoadRequest                               *)
+(* PURPOSE   : Reproduce bootRunRequest for cmdVal and log      *)
+(*             each sub-step and shared-state transition.       *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
+PARAM cmdVal : INTEGER
+PARAM pathNo : BYTE
+PARAM state  : CtlState
+PARAM ok     : BOOLEAN
+DIM fileOK   : BOOLEAN
+DIM sigOK    : BOOLEAN
+DIM stepOK   : BOOLEAN
+DIM errVal   : INTEGER
+DIM childPidVal: INTEGER
+DIM nextSeq  : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+PRINT #pathNo, "trace: bootReadState begin"
+RUN bootReadState(state, fileOK)
+PRINT #pathNo, "trace: bootReadState ok "; fileOK
+IF NOT fileOK THEN
+  END
+ENDIF
+RUN h3LogState(pathNo, "trace after bootReadState", state)
+
+nextSeq := state.reqSeq
+IF nextSeq >= 255 THEN
+  nextSeq := 1
+ELSE
+  nextSeq := nextSeq + 1
+ENDIF
+PRINT #pathNo, "trace: nextSeq "; nextSeq
+
+PRINT #pathNo, "trace: bootWaitChildSleep begin"
+RUN bootWaitChildSleep(state, stepOK)
+PRINT #pathNo, "trace: bootWaitChildSleep ok "; stepOK
+IF NOT stepOK THEN
+  RUN h3ReadState(state, fileOK)
+  IF fileOK THEN
+    RUN h3LogState(pathNo, "trace after bootWaitChildSleep fail", state)
+  ENDIF
+  END
+ENDIF
+RUN h3LogState(pathNo, "trace after bootWaitChildSleep", state)
+
+state.reqSeq      := nextSeq
+state.reqCmd      := cmdVal
+state.parentSleep := 1
+state.errCode     := 0
+PRINT #pathNo, "trace: bootWriteState begin"
+RUN bootWriteState(state, fileOK)
+PRINT #pathNo, "trace: bootWriteState ok "; fileOK
+IF NOT fileOK THEN
+  END
+ENDIF
+RUN h3ReadState(state, fileOK)
+IF fileOK THEN
+  RUN h3LogState(pathNo, "trace after bootWriteState", state)
+ENDIF
+
+childPidVal := state.childPid
+PRINT #pathNo, "trace: bootSendSignal pid "; childPidVal; " cmd "; cmdVal
+RUN bootSendSignal(childPidVal, cmdVal, sigOK, errVal)
+PRINT #pathNo, "trace: bootSendSignal ok "; sigOK; " err "; errVal
+IF NOT sigOK THEN
+  RUN h3ReadState(state, fileOK)
+  IF fileOK THEN
+    RUN h3LogState(pathNo, "trace after bootSendSignal fail", state)
+  ENDIF
+  END
+ENDIF
+RUN h3ReadState(state, fileOK)
+IF fileOK THEN
+  RUN h3LogState(pathNo, "trace after bootSendSignal", state)
+ENDIF
+
+PRINT #pathNo, "trace: bootWaitResponse begin want "; nextSeq
+RUN bootWaitResponse(nextSeq, state, stepOK)
+PRINT #pathNo, "trace: bootWaitResponse ok "; stepOK
+RUN h3ReadState(state, fileOK)
+IF fileOK THEN
+  RUN h3LogState(pathNo, "trace after bootWaitResponse", state)
+ENDIF
+IF NOT stepOK THEN
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "h3TraceLoadRequest error ("; ERR; ")"
+    PRINT #pathNo, "h3TraceLoadRequest error ("; ERR; ")"
+    ok := FALSE
 END
 
 PROCEDURE h3ProbeModuleList
