@@ -1,0 +1,409 @@
+PROCEDURE TSTCTLH3
+(* ============================================================ *)
+(* PROCEDURE : TSTCTLH3                                         *)
+(* PURPOSE   : Reproduce the snb releasePhaseLib path using     *)
+(*             the real controller bootstrap procedures.        *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
+DIM state      : CtlState
+DIM ok         : BOOLEAN
+DIM fileOK     : BOOLEAN
+DIM probeOK    : BOOLEAN
+DIM modCnt     : INTEGER
+DIM probeErr   : INTEGER
+DIM firstName  : STRING[20]
+DIM bootHdrAdr : INTEGER
+DIM bootLoaded : BOOLEAN
+DIM ctlStarted : BOOLEAN
+DIM dropOK     : BOOLEAN
+DIM bootNam    : STRING[20]
+
+ON ERROR GOTO 900
+
+bootHdrAdr := 0
+bootLoaded := FALSE
+ctlStarted := FALSE
+bootNam := "snbModCtlBoot"
+
+PRINT "=== TSTCTLH3 ==="
+PRINT "Reproduce snb releasePhaseLib path"
+PRINT
+
+PRINT "Step 1: load boot helper"
+RUN h3LoadBoot(bootHdrAdr, bootLoaded)
+IF NOT bootLoaded THEN
+  PRINT "TSTCTLH3: h3LoadBoot failed"
+  END
+ENDIF
+
+PRINT "Step 2: startModCtl"
+RUN startModCtl(ok)
+IF NOT ok THEN
+  PRINT "TSTCTLH3: startModCtl failed"
+  GOTO 800
+ENDIF
+ctlStarted := TRUE
+
+RUN h3ReadState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTCTLH3: h3ReadState after start failed"
+  GOTO 800
+ENDIF
+RUN h3PrintState("after start", state)
+PRINT
+
+PRINT "Step 3: bootLoadPhase cmd 200"
+RUN bootLoadPhase(200, ok)
+PRINT "bootLoadPhase ok "; ok
+IF NOT ok THEN
+  PRINT "TSTCTLH3: bootLoadPhase failed"
+  GOTO 800
+ENDIF
+
+RUN h3ReadState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTCTLH3: h3ReadState after load failed"
+  GOTO 800
+ENDIF
+RUN h3PrintState("after load", state)
+PRINT
+
+PRINT "Step 4: probe MODULELIST after load"
+RUN h3ProbeModuleList(probeOK, modCnt, firstName, probeErr)
+IF probeOK THEN
+  PRINT "MODULELIST count "; modCnt; " first "; firstName
+ELSE
+  PRINT "MODULELIST probe err "; probeErr
+ENDIF
+PRINT
+
+PRINT "Step 5: parent unloadPhaseModuleList"
+RUN h3UnloadPhaseModuleList(ok)
+PRINT "parent unload ok "; ok
+IF NOT ok THEN
+  PRINT "TSTCTLH3: h3UnloadPhaseModuleList failed"
+  GOTO 800
+ENDIF
+PRINT
+
+PRINT "Step 6: bootUnloadPhase cmd 213"
+RUN bootUnloadPhase(ok)
+PRINT "bootUnloadPhase ok "; ok
+IF NOT ok THEN
+  PRINT "TSTCTLH3: bootUnloadPhase failed"
+  GOTO 800
+ENDIF
+
+RUN h3ReadState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTCTLH3: h3ReadState after unload failed"
+  GOTO 800
+ENDIF
+RUN h3PrintState("after unload", state)
+PRINT
+
+PRINT "Step 7: probe MODULELIST after child unload"
+RUN h3ProbeModuleList(probeOK, modCnt, firstName, probeErr)
+IF probeOK THEN
+  PRINT "Post-unload MODULELIST count "; modCnt; " first "; firstName
+ELSE
+  PRINT "Post-unload MODULELIST err "; probeErr
+ENDIF
+PRINT
+
+IF state.childPid <> 0 THEN
+  PRINT "Step 8: stopModCtl"
+  RUN stopModCtl(ok)
+  PRINT "stopModCtl ok "; ok
+  IF NOT ok THEN
+    PRINT "TSTCTLH3: stopModCtl failed"
+  ELSE
+    ctlStarted := FALSE
+  ENDIF
+ELSE
+  PRINT "Step 8: child already exited"
+ENDIF
+PRINT
+
+800 IF bootLoaded THEN
+      RUN h3UnloadBoot(bootNam, bootHdrAdr, dropOK)
+      PRINT "boot helper unloaded "; dropOK
+    ENDIF
+    PRINT "TSTCTLH3 complete"
+    END
+
+900 PRINT "TSTCTLH3 error ("; ERR; ")"
+    IF ctlStarted THEN
+      RUN stopModCtl(ok)
+    ENDIF
+    IF bootLoaded THEN
+      RUN h3UnloadBoot(bootNam, bootHdrAdr, dropOK)
+    ENDIF
+END
+
+PROCEDURE h3ReadState
+(* ============================================================ *)
+(* PROCEDURE : h3ReadState                                      *)
+(* PURPOSE   : Read SNBMODCS into the current controller state. *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
+PARAM state : CtlState
+PARAM ok    : BOOLEAN
+DIM path    : BYTE
+DIM isOpen  : BOOLEAN
+
+ON ERROR GOTO 900
+
+isOpen := FALSE
+ok := FALSE
+
+OPEN #path, "SNBMODCS":READ
+isOpen := TRUE
+GET #path, state
+IF state.magic <> $53 THEN
+  PRINT "h3ReadState: invalid magic"
+  END
+ENDIF
+
+CLOSE #path
+isOpen := FALSE
+ok := TRUE
+END
+
+900 IF isOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "h3ReadState error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h3PrintState
+(* ============================================================ *)
+(* PROCEDURE : h3PrintState                                     *)
+(* PURPOSE   : Print one compact controller state snapshot.     *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
+PARAM label : STRING[20]
+PARAM state : CtlState
+
+PRINT label
+PRINT "req "; state.reqSeq; " rsp "; state.rspSeq; " cmd "; state.reqCmd
+PRINT "pslp "; state.parentSleep; " cslp "; state.childSleep
+PRINT "stat "; state.statusCode; " err "; state.errCode
+PRINT "seen "; state.seenSig; " hits "; state.seenCount
+END
+
+PROCEDURE h3ProbeModuleList
+(* ============================================================ *)
+(* PROCEDURE : h3ProbeModuleList                                *)
+(* PURPOSE   : Probe MODULELIST count and first entry name.     *)
+(* ============================================================ *)
+PARAM ok        : BOOLEAN
+PARAM modCnt    : INTEGER
+PARAM firstName : STRING[20]
+PARAM errVal    : INTEGER
+DIM path        : BYTE
+DIM isOpen      : BOOLEAN
+DIM cnt         : BYTE
+
+ON ERROR GOTO 900
+
+isOpen := FALSE
+ok := FALSE
+modCnt := 0
+firstName := ""
+errVal := 0
+
+OPEN #path, "MODULELIST":READ
+isOpen := TRUE
+GET #path, cnt
+modCnt := cnt
+IF modCnt > 0 THEN
+  GET #path, firstName
+ENDIF
+
+CLOSE #path
+isOpen := FALSE
+ok := TRUE
+END
+
+900 IF isOpen THEN
+      CLOSE #path
+    ENDIF
+    errVal := ERR
+    ok := FALSE
+END
+
+PROCEDURE h3UnloadPhaseModuleList
+(* ============================================================ *)
+(* PROCEDURE : h3UnloadPhaseModuleList                          *)
+(* PURPOSE   : Unload each name in MODULELIST in the parent.    *)
+(*             Error 221 is ignored as the known miss case.     *)
+(* ============================================================ *)
+PARAM ok      : BOOLEAN
+DIM path      : BYTE
+DIM isOpen    : BOOLEAN
+DIM cnt       : BYTE
+DIM modCnt    : INTEGER
+DIM idx       : INTEGER
+DIM modName   : STRING[20]
+DIM oneOK     : BOOLEAN
+DIM oneErr    : INTEGER
+
+ON ERROR GOTO 900
+
+isOpen := FALSE
+ok := FALSE
+
+OPEN #path, "MODULELIST":READ
+isOpen := TRUE
+GET #path, cnt
+modCnt := cnt
+
+FOR idx := 1 TO modCnt
+  GET #path, modName
+  RUN h3UnloadPhaseModuleByName(modName, oneOK, oneErr)
+  IF NOT oneOK THEN
+    IF oneErr <> 221 THEN
+      PRINT "h3UnloadPhaseModuleList: unload failed "; modName; " err "; oneErr
+      END
+    ENDIF
+  ENDIF
+NEXT idx
+
+CLOSE #path
+isOpen := FALSE
+ok := TRUE
+END
+
+900 IF isOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "h3UnloadPhaseModuleList error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h3UnloadPhaseModuleByName
+(* ============================================================ *)
+(* PROCEDURE : h3UnloadPhaseModuleByName                        *)
+(* PURPOSE   : Issue F$UnLoad by module name.                   *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM modName : STRING[20]
+PARAM ok      : BOOLEAN
+PARAM errVal  : INTEGER
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+errVal := 0
+callCode := $1D
+regs.a := 0
+regs.x := ADDR(modName)
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "h3UnloadPhaseModuleByName error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
+
+PROCEDURE h3LoadBoot
+(* ============================================================ *)
+(* PROCEDURE : h3LoadBoot                                       *)
+(* PURPOSE   : Ensure snbModCtlBoot is resident.                *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM hdrAddr : INTEGER
+PARAM ok      : BOOLEAN
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+DIM errB      : INTEGER
+DIM modNam    : STRING[20]
+
+ON ERROR GOTO 900
+
+ok := FALSE
+hdrAddr := 0
+modNam := "snbModCtlBoot"
+
+callCode := $00
+regs.a := 0
+regs.x := ADDR(modNam)
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) = 0 THEN
+  hdrAddr := regs.u
+  ok := TRUE
+  END
+ENDIF
+
+callCode := $01
+regs.a := 0
+regs.x := ADDR(modNam)
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errB := regs.b
+  PRINT "h3LoadBoot: load failed "; modNam; " err "; errB
+  END
+ENDIF
+
+hdrAddr := regs.u
+ok := TRUE
+END
+
+900 PRINT "h3LoadBoot error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h3UnloadBoot
+(* ============================================================ *)
+(* PROCEDURE : h3UnloadBoot                                     *)
+(* PURPOSE   : Unlink one module by saved header address.       *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM modNam  : STRING[20]
+PARAM hdrAddr : INTEGER
+PARAM ok      : BOOLEAN
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+DIM errB      : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+IF hdrAddr = 0 THEN
+  ok := TRUE
+  END
+ENDIF
+
+callCode := $02
+regs.u := hdrAddr
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errB := regs.b
+  PRINT "h3UnloadBoot: unlink failed "; modNam; " err "; errB
+  END
+ENDIF
+
+hdrAddr := 0
+ok := TRUE
+END
+
+900 PRINT "h3UnloadBoot error ("; ERR; ")"
+    ok := FALSE
+END
