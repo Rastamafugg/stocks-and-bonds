@@ -36,15 +36,11 @@ IF NOT pidOK THEN
   PRINT "startModCtl: bootGetProcID failed"
   END
 ENDIF
-
-PRINT "startModCtl: bootGetProcID parent "; iParentID
 RUN bootInitState(iParentID, fileOK)
 IF NOT fileOK THEN
   PRINT "startModCtl: bootInitState failed"
   END
 ENDIF
-
-PRINT "startModCtl: bootInitState ok parent "; iParentID
 RUN bootForkCtl(childOK, errVal)
 IF NOT childOK THEN
   PRINT "startModCtl: bootForkCtl failed err "; errVal
@@ -564,7 +560,6 @@ DIM tries   : INTEGER
 ON ERROR GOTO 900
 
 ok := FALSE
-PRINT "bootWaitReady: begin"
 FOR tries := 1 TO 40
   RUN bootReadState(state, ok)
   IF NOT ok THEN

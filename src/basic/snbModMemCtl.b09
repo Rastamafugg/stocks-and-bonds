@@ -71,16 +71,13 @@ state.errCode     := 0
 state.seenSig     := 0
 state.seenCount   := 0
 RUN mmcWriteState(state, fileOK)
-PRINT "snbModMemCtl: initial mmcWriteState ok "; fileOK
 IF NOT fileOK THEN
   PRINT "snbModMemCtl: initial state write failed"
   END
 ENDIF
 
 parentPidVal := state.parentPid
-PRINT "snbModMemCtl: ready wake parent "; parentPidVal
 RUN mmcSendSignal(parentPidVal, 1, sigOK, errVal)
-PRINT "snbModMemCtl: ready wake send ok "; sigOK; " err "; errVal
 IF NOT sigOK THEN
   PRINT "snbModMemCtl: ready wake failed err "; errVal
   END
@@ -114,6 +111,8 @@ LOOP
     PRINT "snbModMemCtl: loop state read failed"
     END
   ENDIF
+  PRINT "snbModMemCtl: after wake read req "; state.reqSeq; " rsp "; state.rspSeq; " cmd "; state.reqCmd
+  PRINT "  pslp "; state.parentSleep; " cslp "; state.childSleep; " stat "; state.statusCode; " err "; state.errCode
 
   state.childSleep := 0
   state.statusCode := 11
@@ -127,6 +126,8 @@ LOOP
     state.seenSig   := iSeenSig
     state.seenCount := iSeenCount
   ENDIF
+  PRINT "snbModMemCtl: before wake write req "; state.reqSeq; " rsp "; state.rspSeq; " cmd "; state.reqCmd
+  PRINT "  pslp "; state.parentSleep; " cslp "; state.childSleep; " stat "; state.statusCode; " err "; state.errCode
   RUN mmcWriteState(state, fileOK)
   IF NOT fileOK THEN
     PRINT "snbModMemCtl: wake state write failed"
