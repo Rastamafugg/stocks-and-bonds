@@ -819,35 +819,69 @@ PARAM ok    : BOOLEAN
 DIM slpOK   : BOOLEAN
 DIM errVal  : INTEGER
 DIM tries   : INTEGER
+DIM logPath : STRING[24]
+DIM logFile : BYTE
+DIM logOpen : BOOLEAN
 
 ON ERROR GOTO 900
 
 ok := FALSE
+logPath := "/d1/bootWaitReady.log"
+logOpen := FALSE
+ON ERROR GOTO 50
+DELETE logPath
+50 ON ERROR GOTO 900
+CREATE #logFile, logPath:WRITE
+logOpen := TRUE
+PRINT #logFile, "=== bootWaitReady ==="
 FOR tries := 1 TO 40
   RUN bootReadState(state, ok)
   IF NOT ok THEN
+    IF logOpen THEN
+      PRINT #logFile, "read failed try "; tries
+    ENDIF
     END
   ENDIF
+  PRINT #logFile, "try "; tries; " child "; state.childPid; " stat "; state.statusCode; " cslp "; state.childSleep
   IF state.childPid <> 0 THEN
     IF state.statusCode = 10 THEN
+      IF logOpen THEN
+        PRINT #logFile, "ready"
+        CLOSE #logFile
+        logOpen := FALSE
+      ENDIF
       ok := TRUE
       END
     ENDIF
   ENDIF
   RUN bootSleep(slpOK, errVal)
   IF NOT slpOK THEN
+    IF logOpen THEN
+      PRINT #logFile, "sleep failed err "; errVal
+      CLOSE #logFile
+      logOpen := FALSE
+    ENDIF
     PRINT "bootWaitReady: sleep failed err "; errVal
     END
   ENDIF
 NEXT tries
 
 ok := FALSE
+IF logOpen THEN
+  PRINT #logFile, "timed out"
+  CLOSE #logFile
+  logOpen := FALSE
+ENDIF
 PRINT "bootWaitReady: timed out"
 PRINT "bootWaitReady: state child "; state.childPid
 PRINT "  stat "; state.statusCode; " cslp "; state.childSleep
 END
 
 900 PRINT "bootWaitReady error ("; ERR; ")"
+    IF logOpen THEN
+      CLOSE #logFile
+      logOpen := FALSE
+    ENDIF
     ok := FALSE
 END
 
@@ -973,4 +1007,5 @@ END
     ok := FALSE
     errVal := ERR
 END
+
 

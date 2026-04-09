@@ -3,8 +3,5 @@ load /d1/snbModCtlBoot.b09
 pack*
 y
 kill*
-load /d1/snbModMemCtl.b09
-pack*
-y
-kill*
 bye
+
