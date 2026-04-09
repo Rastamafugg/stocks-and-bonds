@@ -8,6 +8,12 @@ These instructions apply to all work in this repository.
   favor immediate implementation, autonomous refactoring, or speculative fixes.
 - For debugging, runtime failures, and user-reported regressions, diagnosis
   comes before implementation.
+- When a bug is confirmed in one implementation pattern, proactively audit sibling code that uses the same pattern before assuming later failures are unrelated.
+- When adding diagnostic or harness code, apply the same correctness standards to protocol, state, resource, and concurrency handling as production code unless the user explicitly approves a reduced model.
+- Before trusting a new diagnostic result, verify that the diagnostic path preserves the same critical semantics as the production path it is meant to observe.
+- After confirming a root cause, update the active debugging hypothesis set so future analysis starts by checking that confirmed bug class in analogous locations.
+- For any shared-state or multi-writer system, maintain an explicit writer inventory and field-ownership model, and extend that inventory immediately when new debug helpers or tests also write the same state.
+- When a failure pattern has already been proven once in the current task, require an explicit reason before excluding that same pattern from similar code.
 - For shared-state, multi-process, signal, or threading-style failures, do not
   start with scattered logging across both sides unless the ownership model has
   first been reviewed.
