@@ -8,6 +8,28 @@ These instructions apply to all work in this repository.
   favor immediate implementation, autonomous refactoring, or speculative fixes.
 - For debugging, runtime failures, and user-reported regressions, diagnosis
   comes before implementation.
+- For shared-state, multi-process, signal, or threading-style failures, do not
+  start with scattered logging across both sides unless the ownership model has
+  first been reviewed.
+- In those cases, first perform an ownership-and-overwrite review of every
+  writer touching the shared state or synchronization channel.
+- That review must identify, before adding broad instrumentation:
+  1. which side owns each field while idle
+  2. which side may write each field during handoff
+  3. whether either side can write a stale in-memory snapshot over newer
+     shared-state data
+  4. whether any write path must reread and merge current shared state before
+     updating only its owned fields
+- When the bug involves a shared file or record used by multiple processes, the
+  first verification step should prefer checking for stale-state overwrite,
+  missing reread-before-write, and unclear field ownership before adding
+  dispersed debug prints.
+- For shared-state concurrency bugs, prefer one short written ownership summary
+  and one targeted verification at the suspected overwrite point over repeated
+  cycles of adding logs in multiple procedures.
+- If a protocol uses one shared record for both request and response state, the
+  assistant must treat stale local copies as a primary hazard by default and
+  explicitly rule that hazard in or out early.
 - A plausible fix is not sufficient reason to patch code when the root cause is
   still unverified.
 - When multiple causes remain plausible, first separate:
