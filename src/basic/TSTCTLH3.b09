@@ -295,6 +295,7 @@ DIM stepOK   : BOOLEAN
 DIM errVal   : INTEGER
 DIM childPidVal: INTEGER
 DIM nextSeq  : INTEGER
+DIM mergeState : CtlState
 
 ON ERROR GOTO 900
 
@@ -332,7 +333,16 @@ state.reqCmd      := cmdVal
 state.parentSleep := 1
 state.errCode     := 0
 PRINT #pathNo, "trace: bootWriteState begin"
-RUN bootWriteState(state, fileOK)
+RUN bootReadState(mergeState, fileOK)
+PRINT #pathNo, "trace: merge bootReadState ok "; fileOK
+IF NOT fileOK THEN
+  END
+ENDIF
+mergeState.reqSeq      := state.reqSeq
+mergeState.reqCmd      := state.reqCmd
+mergeState.parentSleep := state.parentSleep
+mergeState.errCode     := state.errCode
+RUN bootWriteState(mergeState, fileOK)
 PRINT #pathNo, "trace: bootWriteState ok "; fileOK
 IF NOT fileOK THEN
   END
@@ -342,7 +352,7 @@ IF fileOK THEN
   RUN h3LogState(pathNo, "trace after bootWriteState", state)
 ENDIF
 
-childPidVal := state.childPid
+childPidVal := mergeState.childPid
 PRINT #pathNo, "trace: bootSendSignal pid "; childPidVal; " cmd "; cmdVal
 RUN bootSendSignal(childPidVal, cmdVal, sigOK, errVal)
 PRINT #pathNo, "trace: bootSendSignal ok "; sigOK; " err "; errVal
