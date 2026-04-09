@@ -16,7 +16,7 @@ trace: bootReadState ok True
 trace after bootRead
 req 0 rsp 0
 cmd 0
-pslp 0 cslp 0
+pslp 0 cslp 1
 stat 11 err 0
 seen 0 hits 0
 trace: nextSeq 1
@@ -50,16 +50,73 @@ trace: bootWaitResponse ok True
 trace after bootWait
 req 1 rsp 1
 cmd 200
-pslp 0 cslp 0
-stat 11 err 0
+pslp 0 cslp 1
+stat 20 err 0
 seen 0 hits 0
 bootLoadPhase ok True
 
 Step 4: probe MODULELIST after load
-MODULELIST probe err 216
+MODULELIST count 14 first snbSetup
 
 Step 5: parent unloadPhaseModuleList
-parent unload ok False
-TSTCTLH3: h3UnloadPhaseModuleList failed
+parent unload ok True
+
+Step 6: bootUnloadPhase cmd 213
+trace: bootReadState begin
+trace: bootReadState ok True
+trace after bootRead
+req 1 rsp 1
+cmd 200
+pslp 0 cslp 1
+stat 11 err 0
+seen 0 hits 0
+trace: nextSeq 2
+trace: bootWaitChildSleep begin
+trace: bootWaitChildSleep ok True
+trace after bootWait
+req 1 rsp 1
+cmd 200
+pslp 0 cslp 1
+stat 11 err 0
+seen 0 hits 0
+trace: bootWriteState begin
+trace: merge bootReadState ok True
+trace: bootWriteState ok True
+trace after bootWrit
+req 2 rsp 1
+cmd 213
+pslp 1 cslp 0
+stat 11 err 0
+seen 0 hits 0
+trace: bootSendSignal pid 4 cmd 213
+trace: bootSendSignal ok True err 0
+trace after bootSend
+req 2 rsp 1
+cmd 213
+pslp 1 cslp 1
+stat 11 err 0
+seen 0 hits 0
+trace: bootWaitResponse begin want 2
+trace: bootWaitResponse ok True
+trace after bootWait
+req 2 rsp 2
+cmd 213
+pslp 0 cslp 1
+stat 30 err 0
+seen 0 hits 0
+bootUnloadPhase ok True
+after unload
+req 2 rsp 2
+cmd 213
+pslp 0 cslp 1
+stat 30 err 0
+seen 0 hits 0
+
+Step 7: probe MODULELIST after child unload
+Post-unload MODULELIST count 14 first snbSetup
+
+Step 8: stopModCtl
+stopModCtl ok True
+
 boot helper unloaded True
 TSTCTLH3 complete
