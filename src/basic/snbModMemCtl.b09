@@ -93,6 +93,23 @@ LOOP
     PRINT "snbModMemCtl: pre-sleep state read failed"
     END
   ENDIF
+  RUN mmcReadState(mergeState, fileOK)
+  IF NOT fileOK THEN
+    PRINT "snbModMemCtl: pre-sleep merge state read failed"
+    END
+  ENDIF
+  state.magic       := mergeState.magic
+  state.parentPid   := mergeState.parentPid
+  state.childPid    := mergeState.childPid
+  state.reqSeq      := mergeState.reqSeq
+  state.rspSeq      := mergeState.rspSeq
+  state.reqCmd      := mergeState.reqCmd
+  state.parentSleep := mergeState.parentSleep
+  state.childSleep  := mergeState.childSleep
+  state.statusCode  := mergeState.statusCode
+  state.errCode     := mergeState.errCode
+  state.seenSig     := mergeState.seenSig
+  state.seenCount   := mergeState.seenCount
   state.childSleep := 1
   state.seenSig    := 0
   state.seenCount  := 0
