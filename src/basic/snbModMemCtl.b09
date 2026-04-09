@@ -29,7 +29,6 @@ DIM iSeenCount : INTEGER
 DIM icptOK     : INTEGER
 DIM icptMem(32): INTEGER
 DIM memIdx     : INTEGER
-DIM mergeState : CtlState
 DIM logPath    : STRING[24]
 DIM logFile    : BYTE
 DIM logOpen    : BOOLEAN
@@ -103,34 +102,9 @@ LOOP
   ENDIF
   PRINT #logFile, "reset ok "; icptOK; " sig "; iSeenSig; " cnt "; iSeenCount
 
-  RUN mmcReadState(state, fileOK)
+  RUN mmcWritePreSleepState(state, fileOK)
   IF NOT fileOK THEN
-    PRINT "snbModMemCtl: pre-sleep state read failed"
-    END
-  ENDIF
-  RUN mmcReadState(mergeState, fileOK)
-  IF NOT fileOK THEN
-    PRINT "snbModMemCtl: pre-sleep merge state read failed"
-    END
-  ENDIF
-  state.magic       := mergeState.magic
-  state.parentPid   := mergeState.parentPid
-  state.childPid    := mergeState.childPid
-  state.reqSeq      := mergeState.reqSeq
-  state.rspSeq      := mergeState.rspSeq
-  state.reqCmd      := mergeState.reqCmd
-  state.parentSleep := mergeState.parentSleep
-  state.childSleep  := mergeState.childSleep
-  state.statusCode  := mergeState.statusCode
-  state.errCode     := mergeState.errCode
-  state.seenSig     := mergeState.seenSig
-  state.seenCount   := mergeState.seenCount
-  state.childSleep := 1
-  state.seenSig    := 0
-  state.seenCount  := 0
-  RUN mmcWriteState(state, fileOK)
-  IF NOT fileOK THEN
-    PRINT "snbModMemCtl: pre-sleep write failed"
+    PRINT "snbModMemCtl: mmcWritePreSleepState failed"
     END
   ENDIF
   PRINT #logFile, "pre-sleep req "; state.reqSeq; " rsp "; state.rspSeq; " cmd "; state.reqCmd
@@ -150,26 +124,6 @@ LOOP
   PRINT "snbModMemCtl: after wake read req "; state.reqSeq; " rsp "; state.rspSeq; " cmd "; state.reqCmd
   PRINT "  pslp "; state.parentSleep; " cslp "; state.childSleep; " stat "; state.statusCode; " err "; state.errCode
 
-  RUN mmcReadState(mergeState, fileOK)
-  IF NOT fileOK THEN
-    PRINT "snbModMemCtl: merge state read failed"
-    END
-  ENDIF
-  state.magic       := mergeState.magic
-  state.parentPid   := mergeState.parentPid
-  state.childPid    := mergeState.childPid
-  state.reqSeq      := mergeState.reqSeq
-  state.rspSeq      := mergeState.rspSeq
-  state.reqCmd      := mergeState.reqCmd
-  state.parentSleep := mergeState.parentSleep
-  state.childSleep  := mergeState.childSleep
-  state.statusCode  := mergeState.statusCode
-  state.errCode     := mergeState.errCode
-  state.seenSig     := mergeState.seenSig
-  state.seenCount   := mergeState.seenCount
-  state.childSleep := 0
-  state.statusCode := 11
-  state.errCode    := 0
   actionVal := 2
   RUN SLPICPT(icptMem, actionVal, iSeenSig, iSeenCount, icptOK)
   IF icptOK = 0 THEN
@@ -180,13 +134,13 @@ LOOP
     state.seenCount := iSeenCount
   ENDIF
   PRINT #logFile, "read ok "; icptOK; " sig "; iSeenSig; " cnt "; iSeenCount
-  PRINT "snbModMemCtl: before wake write req "; state.reqSeq; " rsp "; state.rspSeq; " cmd "; state.reqCmd
-  PRINT "  pslp "; state.parentSleep; " cslp "; state.childSleep; " stat "; state.statusCode; " err "; state.errCode
-  RUN mmcWriteState(state, fileOK)
+  RUN mmcWriteWakeState(11, 0, state.seenSig, state.seenCount, state, fileOK)
   IF NOT fileOK THEN
-    PRINT "snbModMemCtl: wake state write failed"
+    PRINT "snbModMemCtl: mmcWriteWakeState failed"
     END
   ENDIF
+  PRINT "snbModMemCtl: before wake write req "; state.reqSeq; " rsp "; state.rspSeq; " cmd "; state.reqCmd
+  PRINT "  pslp "; state.parentSleep; " cslp "; state.childSleep; " stat "; state.statusCode; " err "; state.errCode
 
   IF state.reqSeq <> lastSeq THEN
     lastSeq  := state.reqSeq
@@ -217,9 +171,9 @@ LOOP
     state.statusCode := respStat
     state.errCode    := errVal
     state.rspSeq     := state.reqSeq
-    RUN mmcWriteState(state, fileOK)
+    RUN mmcWriteResponseState(state.rspSeq, state.statusCode, state.errCode, state, fileOK)
     IF NOT fileOK THEN
-      PRINT "snbModMemCtl: loop state write failed"
+      PRINT "snbModMemCtl: mmcWriteResponseState failed"
       END
     ENDIF
 
@@ -251,6 +205,238 @@ END
       CLOSE #logFile
       logOpen := FALSE
     ENDIF
+END
+
+PROCEDURE mmcWritePreSleepState
+(* ============================================================ *)
+(* PROCEDURE : mmcWritePreSleepState                            *)
+(* PURPOSE   : Lock SNBMODCS, reread current state, and publish *)
+(*             the child sleep-ready state.                     *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
+PARAM state : CtlState
+PARAM ok    : BOOLEAN
+DIM path    : BYTE
+DIM isOpen  : BOOLEAN
+DIM lockOK  : BOOLEAN
+DIM lockHeld: BOOLEAN
+DIM errVal  : INTEGER
+
+ON ERROR GOTO 900
+
+isOpen   := FALSE
+lockHeld := FALSE
+ok       := FALSE
+
+OPEN #path, "SNBMODCS":UPDATE
+isOpen := TRUE
+RUN mmcSetTicks(path, 10, lockOK, errVal)
+IF NOT lockOK THEN
+  GOTO 800
+ENDIF
+RUN mmcLockWhole(path, lockOK, errVal)
+IF NOT lockOK THEN
+  GOTO 800
+ENDIF
+lockHeld := TRUE
+GET #path, state
+IF state.magic <> $53 THEN
+  PRINT "mmcWritePreSleepState: invalid magic"
+  GOTO 800
+ENDIF
+state.childSleep := 1
+state.seenSig    := 0
+state.seenCount  := 0
+SEEK #path, 0
+PUT #path, state
+RUN mmcUnlockWhole(path, lockOK, errVal)
+IF NOT lockOK THEN
+  GOTO 800
+ENDIF
+lockHeld := FALSE
+
+CLOSE #path
+isOpen := FALSE
+ok := TRUE
+END
+
+800 IF lockHeld THEN
+      RUN mmcUnlockWhole(path, lockOK, errVal)
+      lockHeld := FALSE
+    ENDIF
+    IF isOpen THEN
+      CLOSE #path
+      isOpen := FALSE
+    ENDIF
+    ok := FALSE
+END
+
+900 IF lockHeld THEN
+      RUN mmcUnlockWhole(path, lockOK, errVal)
+    ENDIF
+    IF isOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "mmcWritePreSleepState error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE mmcWriteWakeState
+(* ============================================================ *)
+(* PROCEDURE : mmcWriteWakeState                                *)
+(* PURPOSE   : Lock SNBMODCS, reread current state, and publish *)
+(*             the child wake state plus intercept results.     *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
+PARAM statusVal : INTEGER
+PARAM errCodeVal: INTEGER
+PARAM seenSigVal: INTEGER
+PARAM seenCntVal: INTEGER
+PARAM state     : CtlState
+PARAM ok        : BOOLEAN
+DIM path        : BYTE
+DIM isOpen      : BOOLEAN
+DIM lockOK      : BOOLEAN
+DIM lockHeld    : BOOLEAN
+DIM errVal      : INTEGER
+
+ON ERROR GOTO 900
+
+isOpen   := FALSE
+lockHeld := FALSE
+ok       := FALSE
+
+OPEN #path, "SNBMODCS":UPDATE
+isOpen := TRUE
+RUN mmcSetTicks(path, 10, lockOK, errVal)
+IF NOT lockOK THEN
+  GOTO 800
+ENDIF
+RUN mmcLockWhole(path, lockOK, errVal)
+IF NOT lockOK THEN
+  GOTO 800
+ENDIF
+lockHeld := TRUE
+GET #path, state
+IF state.magic <> $53 THEN
+  PRINT "mmcWriteWakeState: invalid magic"
+  GOTO 800
+ENDIF
+state.childSleep := 0
+state.statusCode := statusVal
+state.errCode    := errCodeVal
+state.seenSig    := seenSigVal
+state.seenCount  := seenCntVal
+SEEK #path, 0
+PUT #path, state
+RUN mmcUnlockWhole(path, lockOK, errVal)
+IF NOT lockOK THEN
+  GOTO 800
+ENDIF
+lockHeld := FALSE
+
+CLOSE #path
+isOpen := FALSE
+ok := TRUE
+END
+
+800 IF lockHeld THEN
+      RUN mmcUnlockWhole(path, lockOK, errVal)
+      lockHeld := FALSE
+    ENDIF
+    IF isOpen THEN
+      CLOSE #path
+      isOpen := FALSE
+    ENDIF
+    ok := FALSE
+END
+
+900 IF lockHeld THEN
+      RUN mmcUnlockWhole(path, lockOK, errVal)
+    ENDIF
+    IF isOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "mmcWriteWakeState error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE mmcWriteResponseState
+(* ============================================================ *)
+(* PROCEDURE : mmcWriteResponseState                            *)
+(* PURPOSE   : Lock SNBMODCS, reread current state, and publish *)
+(*             the child response fields.                       *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
+PARAM rspSeqVal : INTEGER
+PARAM statusVal : INTEGER
+PARAM errCodeVal: INTEGER
+PARAM state     : CtlState
+PARAM ok        : BOOLEAN
+DIM path        : BYTE
+DIM isOpen      : BOOLEAN
+DIM lockOK      : BOOLEAN
+DIM lockHeld    : BOOLEAN
+DIM errVal      : INTEGER
+
+ON ERROR GOTO 900
+
+isOpen   := FALSE
+lockHeld := FALSE
+ok       := FALSE
+
+OPEN #path, "SNBMODCS":UPDATE
+isOpen := TRUE
+RUN mmcSetTicks(path, 10, lockOK, errVal)
+IF NOT lockOK THEN
+  GOTO 800
+ENDIF
+RUN mmcLockWhole(path, lockOK, errVal)
+IF NOT lockOK THEN
+  GOTO 800
+ENDIF
+lockHeld := TRUE
+GET #path, state
+IF state.magic <> $53 THEN
+  PRINT "mmcWriteResponseState: invalid magic"
+  GOTO 800
+ENDIF
+state.childSleep := 0
+state.statusCode := statusVal
+state.errCode    := errCodeVal
+state.rspSeq     := rspSeqVal
+SEEK #path, 0
+PUT #path, state
+RUN mmcUnlockWhole(path, lockOK, errVal)
+IF NOT lockOK THEN
+  GOTO 800
+ENDIF
+lockHeld := FALSE
+
+CLOSE #path
+isOpen := FALSE
+ok := TRUE
+END
+
+800 IF lockHeld THEN
+      RUN mmcUnlockWhole(path, lockOK, errVal)
+      lockHeld := FALSE
+    ENDIF
+    IF isOpen THEN
+      CLOSE #path
+      isOpen := FALSE
+    ENDIF
+    ok := FALSE
+END
+
+900 IF lockHeld THEN
+      RUN mmcUnlockWhole(path, lockOK, errVal)
+    ENDIF
+    IF isOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "mmcWriteResponseState error ("; ERR; ")"
+    ok := FALSE
 END
 
 PROCEDURE mmcReadState
