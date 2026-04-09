@@ -30,6 +30,9 @@ DIM icptOK     : INTEGER
 DIM icptMem(32): INTEGER
 DIM memIdx     : INTEGER
 DIM mergeState : CtlState
+DIM logPath    : STRING[24]
+DIM logFile    : BYTE
+DIM logOpen    : BOOLEAN
 
 ON ERROR GOTO 900
 
@@ -37,9 +40,20 @@ lastSeq    := 0
 hdrAddr    := 0
 currCmdVal := 0
 currName   := ""
+logPath    := "/d1/snbModMemCtl.log"
+logOpen    := FALSE
 FOR memIdx := 1 TO 32
   icptMem(memIdx) := 0
 NEXT memIdx
+
+ON ERROR GOTO 50
+DELETE logPath
+50 ON ERROR GOTO 900
+CREATE #logFile, logPath:WRITE
+logOpen := TRUE
+PRINT #logFile, "=== snbModMemCtl ==="
+PRINT #logFile, "bounded SLPICPT diagnostics"
+PRINT #logFile, ""
 
 RUN mmcGetProcID(iChildID, pidOK)
 IF NOT pidOK THEN
@@ -87,6 +101,7 @@ LOOP
     PRINT "snbModMemCtl: SLPICPT reset failed"
     END
   ENDIF
+  PRINT #logFile, "reset ok "; icptOK; " sig "; iSeenSig; " cnt "; iSeenCount
 
   RUN mmcReadState(state, fileOK)
   IF NOT fileOK THEN
@@ -118,6 +133,8 @@ LOOP
     PRINT "snbModMemCtl: pre-sleep write failed"
     END
   ENDIF
+  PRINT #logFile, "pre-sleep req "; state.reqSeq; " rsp "; state.rspSeq; " cmd "; state.reqCmd
+  PRINT #logFile, "  pslp "; state.parentSleep; " cslp "; state.childSleep; " stat "; state.statusCode; " err "; state.errCode
 
   RUN mmcSleep(sigOK, errVal)
   IF NOT sigOK THEN
@@ -162,6 +179,7 @@ LOOP
     state.seenSig   := iSeenSig
     state.seenCount := iSeenCount
   ENDIF
+  PRINT #logFile, "read ok "; icptOK; " sig "; iSeenSig; " cnt "; iSeenCount
   PRINT "snbModMemCtl: before wake write req "; state.reqSeq; " rsp "; state.rspSeq; " cmd "; state.reqCmd
   PRINT "  pslp "; state.parentSleep; " cslp "; state.childSleep; " stat "; state.statusCode; " err "; state.errCode
   RUN mmcWriteState(state, fileOK)
@@ -216,6 +234,10 @@ LOOP
 
     IF state.reqCmd = 214 THEN
       IF state.errCode = 0 THEN
+        IF logOpen THEN
+          CLOSE #logFile
+          logOpen := FALSE
+        ENDIF
         END
       ENDIF
     ENDIF
@@ -224,6 +246,11 @@ ENDLOOP
 END
 
 900 PRINT "snbModMemCtl error ("; ERR; ")"
+    IF logOpen THEN
+      PRINT #logFile, "snbModMemCtl error ("; ERR; ")"
+      CLOSE #logFile
+      logOpen := FALSE
+    ENDIF
 END
 
 PROCEDURE mmcReadState
