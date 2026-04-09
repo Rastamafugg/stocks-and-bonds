@@ -42,6 +42,14 @@ These instructions apply to all work in this repository.
 - Prefer one bounded verification pass that captures the key state transitions
   across the suspected logic boundary over repeated single-log iterations,
   especially in CoCo or packed-module workflows with high turnaround cost.
+- When a debugging pass is likely to produce many lines of output that the user
+  would otherwise need to transcribe or manually copy back to the agent, prefer
+  writing those diagnostics to a text file on `/d1` instead of relying on fast
+  scrolling console output.
+- In this repository, treat `/d1` text logs as the preferred medium for large
+  diagnostic captures because they can be extracted from the CoCo environment
+  and added to the repository or copied outside the emulator with less manual
+  effort.
 - Before adding that verification set, state why each added diagnostic is
   necessary and why the set is still minimal.
 - After proposing that verification set, wait for user approval before making
