@@ -134,7 +134,9 @@ LOOP
     state.seenCount := iSeenCount
   ENDIF
   PRINT #logFile, "read ok "; icptOK; " sig "; iSeenSig; " cnt "; iSeenCount
-  RUN mmcWriteWakeState(11, 0, state.seenSig, state.seenCount, state, fileOK)
+  state.statusCode := 11
+  state.errCode    := 0
+  RUN mmcWriteWakeState(state, fileOK)
   IF NOT fileOK THEN
     PRINT "snbModMemCtl: mmcWriteWakeState failed"
     END
@@ -171,7 +173,7 @@ LOOP
     state.statusCode := respStat
     state.errCode    := errVal
     state.rspSeq     := state.reqSeq
-    RUN mmcWriteResponseState(state.rspSeq, state.statusCode, state.errCode, state, fileOK)
+    RUN mmcWriteResponseState(state, fileOK)
     IF NOT fileOK THEN
       PRINT "snbModMemCtl: mmcWriteResponseState failed"
       END
@@ -288,23 +290,27 @@ PROCEDURE mmcWriteWakeState
 (*             the child wake state plus intercept results.     *)
 (* ============================================================ *)
 TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
-PARAM statusVal : INTEGER
-PARAM errCodeVal: INTEGER
-PARAM seenSigVal: INTEGER
-PARAM seenCntVal: INTEGER
-PARAM state     : CtlState
-PARAM ok        : BOOLEAN
-DIM path        : BYTE
-DIM isOpen      : BOOLEAN
-DIM lockOK      : BOOLEAN
-DIM lockHeld    : BOOLEAN
-DIM errVal      : INTEGER
+PARAM state        : CtlState
+PARAM ok           : BOOLEAN
+DIM path           : BYTE
+DIM isOpen         : BOOLEAN
+DIM lockOK         : BOOLEAN
+DIM lockHeld       : BOOLEAN
+DIM errVal         : INTEGER
+DIM statusVal      : INTEGER
+DIM errCodeVal     : INTEGER
+DIM seenSigVal     : INTEGER
+DIM seenCntVal     : INTEGER
 
 ON ERROR GOTO 900
 
 isOpen   := FALSE
 lockHeld := FALSE
 ok       := FALSE
+statusVal  := state.statusCode
+errCodeVal := state.errCode
+seenSigVal := state.seenSig
+seenCntVal := state.seenCount
 
 OPEN #path, "SNBMODCS":UPDATE
 isOpen := TRUE
@@ -368,22 +374,25 @@ PROCEDURE mmcWriteResponseState
 (*             the child response fields.                       *)
 (* ============================================================ *)
 TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
-PARAM rspSeqVal : INTEGER
-PARAM statusVal : INTEGER
-PARAM errCodeVal: INTEGER
-PARAM state     : CtlState
-PARAM ok        : BOOLEAN
-DIM path        : BYTE
-DIM isOpen      : BOOLEAN
-DIM lockOK      : BOOLEAN
-DIM lockHeld    : BOOLEAN
-DIM errVal      : INTEGER
+PARAM state        : CtlState
+PARAM ok           : BOOLEAN
+DIM path           : BYTE
+DIM isOpen         : BOOLEAN
+DIM lockOK         : BOOLEAN
+DIM lockHeld       : BOOLEAN
+DIM errVal         : INTEGER
+DIM rspSeqVal      : INTEGER
+DIM statusVal      : INTEGER
+DIM errCodeVal     : INTEGER
 
 ON ERROR GOTO 900
 
 isOpen   := FALSE
 lockHeld := FALSE
 ok       := FALSE
+rspSeqVal  := state.rspSeq
+statusVal  := state.statusCode
+errCodeVal := state.errCode
 
 OPEN #path, "SNBMODCS":UPDATE
 isOpen := TRUE

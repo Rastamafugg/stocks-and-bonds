@@ -110,7 +110,7 @@ state.reqSeq      := nextSeq
 state.reqCmd      := 214
 state.parentSleep := 1
 state.errCode     := 0
-RUN bootWriteParentState(state.reqSeq, state.reqCmd, state.parentSleep, state.errCode, state, fileOK)
+RUN bootWriteParentState(state, fileOK)
 IF NOT fileOK THEN
   PRINT "stopModCtl: bootWriteParentState failed"
   END
@@ -228,7 +228,7 @@ state.reqSeq      := nextSeq
 state.reqCmd      := cmdVal
 state.parentSleep := 1
 state.errCode     := 0
-RUN bootWriteParentState(state.reqSeq, state.reqCmd, state.parentSleep, state.errCode, state, fileOK)
+RUN bootWriteParentState(state, fileOK)
 IF NOT fileOK THEN
   PRINT "bootRunRequest: bootWriteParentState failed"
   END
@@ -256,13 +256,10 @@ PROCEDURE bootWriteParentState
 (* ============================================================ *)
 (* PROCEDURE : bootWriteParentState                             *)
 (* PURPOSE   : Lock SNBMODCS, reread current state, merge the   *)
-(*             parent-owned fields, and rewrite the record.     *)
+(*             parent-owned fields from state, and rewrite the  *)
+(*             record.                                          *)
 (* ============================================================ *)
 TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
-PARAM reqSeqVal      : INTEGER
-PARAM reqCmdVal      : INTEGER
-PARAM parentSleepVal : INTEGER
-PARAM errCodeVal     : INTEGER
 PARAM state          : CtlState
 PARAM ok             : BOOLEAN
 DIM path             : BYTE
@@ -270,12 +267,20 @@ DIM isOpen           : BOOLEAN
 DIM lockOK           : BOOLEAN
 DIM lockHeld         : BOOLEAN
 DIM errVal           : INTEGER
+DIM reqSeqVal        : INTEGER
+DIM reqCmdVal        : INTEGER
+DIM parentSleepVal   : INTEGER
+DIM errCodeVal       : INTEGER
 
 ON ERROR GOTO 900
 
 isOpen   := FALSE
 lockHeld := FALSE
 ok       := FALSE
+reqSeqVal      := state.reqSeq
+reqCmdVal      := state.reqCmd
+parentSleepVal := state.parentSleep
+errCodeVal     := state.errCode
 
 OPEN #path, "SNBMODCS":UPDATE
 isOpen := TRUE
@@ -911,7 +916,8 @@ FOR tries := 1 TO 20
     END
   ENDIF
   IF state.rspSeq = wantSeq THEN
-    RUN bootWriteParentState(state.reqSeq, state.reqCmd, 0, state.errCode, state, slpOK)
+    state.parentSleep := 0
+    RUN bootWriteParentState(state, slpOK)
     IF NOT slpOK THEN
       PRINT "bootWaitResponse: clear parentSleep failed"
       END
