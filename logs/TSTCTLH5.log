@@ -6,7 +6,7 @@ startCtlSession ok True
 after start
 req 0 rsp 0
 cmd 0
-pslp 0 cslp 0
+pslp 0 cslp 1
 stat 10 err 0
 seen 0 hits 0
 
@@ -21,18 +21,28 @@ requestPhaseLib ok True
 after request
 req 1 rsp 1
 cmd 200
-pslp 0 cslp 0
-stat 253 err 240
+pslp 0 cslp 1
+stat 11 err 0
 seen 0 hits 0
-MODULELIST probe err 216
+MODULELIST count 14 first snbSetup
 
 Step 3: releasePhaseLib
 before release
 req 1 rsp 1
 cmd 200
-pslp 0 cslp 0
+pslp 0 cslp 1
 stat 11 err 0
 seen 0 hits 0
-releasePhaseLib ok False
-TSTCTLH5: releasePhaseLib failed
+releasePhaseLib ok True
+after release
+req 2 rsp 2
+cmd 213
+pslp 0 cslp 1
+stat 11 err 0
+seen 0 hits 0
+Post-release MODULELIST count 14 first snbSetup
+
+Step 4: stopCtlSession
+stopCtlSession ok True
+
 TSTCTLH5 complete
