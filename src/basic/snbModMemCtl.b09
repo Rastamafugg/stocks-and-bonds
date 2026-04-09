@@ -303,26 +303,171 @@ PARAM state : CtlState
 PARAM ok    : BOOLEAN
 DIM path    : BYTE
 DIM isOpen  : BOOLEAN
+DIM lockOK  : BOOLEAN
+DIM lockHeld: BOOLEAN
+DIM errVal  : INTEGER
 
 ON ERROR GOTO 900
 
 isOpen := FALSE
+lockHeld := FALSE
 ok     := FALSE
 
 OPEN #path, "SNBMODCS":UPDATE
 isOpen := TRUE
+RUN mmcSetTicks(path, 10, lockOK, errVal)
+IF NOT lockOK THEN
+  GOTO 800
+ENDIF
+RUN mmcLockWhole(path, lockOK, errVal)
+IF NOT lockOK THEN
+  GOTO 800
+ENDIF
+lockHeld := TRUE
+SEEK #path, 0
 PUT #path, state
+
+RUN mmcUnlockWhole(path, lockOK, errVal)
+IF NOT lockOK THEN
+  GOTO 800
+ENDIF
+lockHeld := FALSE
 
 CLOSE #path
 isOpen := FALSE
 ok := TRUE
 END
 
-900 IF isOpen THEN
+800 IF lockHeld THEN
+      RUN mmcUnlockWhole(path, lockOK, errVal)
+      lockHeld := FALSE
+    ENDIF
+    IF isOpen THEN
+      CLOSE #path
+      isOpen := FALSE
+    ENDIF
+    ok := FALSE
+END
+
+900 IF lockHeld THEN
+      RUN mmcUnlockWhole(path, lockOK, errVal)
+    ENDIF
+    IF isOpen THEN
       CLOSE #path
     ENDIF
     PRINT "mmcWriteState error ("; ERR; ")"
     ok := FALSE
+END
+
+PROCEDURE mmcSetTicks
+(* ============================================================ *)
+(* PROCEDURE : mmcSetTicks                                      *)
+(* PURPOSE   : Set a bounded wait time for record lock release. *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM pathNo  : BYTE
+PARAM tickCnt : INTEGER
+PARAM ok      : BOOLEAN
+PARAM errVal  : INTEGER
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errVal   := 0
+callCode := $8E
+regs.a   := pathNo
+regs.b   := $10
+regs.x   := tickCnt
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "mmcSetTicks error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
+
+PROCEDURE mmcLockWhole
+(* ============================================================ *)
+(* PROCEDURE : mmcLockWhole                                     *)
+(* PURPOSE   : Lock the entire shared controller state file.    *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM pathNo : BYTE
+PARAM ok     : BOOLEAN
+PARAM errVal : INTEGER
+DIM regs     : Register
+DIM callCode : BYTE
+DIM iCC      : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errVal   := 0
+callCode := $8E
+regs.a   := pathNo
+regs.b   := $11
+regs.u   := -1
+regs.x   := -1
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "mmcLockWhole error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
+
+PROCEDURE mmcUnlockWhole
+(* ============================================================ *)
+(* PROCEDURE : mmcUnlockWhole                                   *)
+(* PURPOSE   : Release the shared controller state file lock.   *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM pathNo : BYTE
+PARAM ok     : BOOLEAN
+PARAM errVal : INTEGER
+DIM regs     : Register
+DIM callCode : BYTE
+DIM iCC      : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errVal   := 0
+callCode := $8E
+regs.a   := pathNo
+regs.b   := $11
+regs.u   := 0
+regs.x   := 0
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "mmcUnlockWhole error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
 END
 
 PROCEDURE mmcGetProcID
