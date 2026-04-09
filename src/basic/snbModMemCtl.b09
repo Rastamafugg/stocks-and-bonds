@@ -91,6 +91,11 @@ LOOP
     END
   ENDIF
 
+  RUN mmcReadState(state, fileOK)
+  IF NOT fileOK THEN
+    PRINT "snbModMemCtl: pre-sleep state read failed"
+    END
+  ENDIF
   state.childSleep := 1
   state.seenSig    := 0
   state.seenCount  := 0
