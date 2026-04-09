@@ -1,0 +1,552 @@
+PROCEDURE TSTCTLH4
+(* ============================================================ *)
+(* PROCEDURE : TSTCTLH4                                         *)
+(* PURPOSE   : Verify whether whole-file locking on SNBMODCS    *)
+(*             blocks shared-file overwrite races between a      *)
+(*             parent and child writer.                         *)
+(* ============================================================ *)
+TYPE LockState = magic,parentCnt,childCnt,lastWriter,lastErr,pad1,pad2,pad3:BYTE
+DIM state      : LockState
+DIM ok         : BOOLEAN
+DIM errVal     : INTEGER
+DIM loopIdx    : INTEGER
+DIM exitStat   : INTEGER
+DIM exitOK     : BOOLEAN
+DIM childOK    : BOOLEAN
+DIM logPath    : STRING[20]
+DIM logFile    : BYTE
+DIM logOpen    : BOOLEAN
+
+ON ERROR GOTO 900
+
+logPath := "/d1/TSTCTLH4.log"
+logOpen := FALSE
+
+ON ERROR GOTO 50
+DELETE logPath
+50 ON ERROR GOTO 100
+DELETE "SNBMODCS"
+100 ON ERROR GOTO 900
+CREATE #logFile, logPath:WRITE
+logOpen := TRUE
+
+PRINT "=== TSTCTLH4 ==="
+PRINT "Lock SNBMODCS whole-file during shared writes"
+PRINT
+PRINT #logFile, "=== TSTCTLH4 ==="
+PRINT #logFile, "Lock SNBMODCS whole-file during shared writes"
+PRINT #logFile, ""
+
+RUN h4InitState(ok)
+PRINT "init ok "; ok
+PRINT #logFile, "init ok "; ok
+IF NOT ok THEN
+  GOTO 700
+ENDIF
+
+RUN h4ForkChild(childOK, errVal)
+PRINT "fork child ok "; childOK; " err "; errVal
+PRINT #logFile, "fork child ok "; childOK; " err "; errVal
+IF NOT childOK THEN
+  GOTO 700
+ENDIF
+
+FOR loopIdx := 1 TO 40
+  RUN h4BumpParent(ok, errVal)
+  IF NOT ok THEN
+    PRINT "parent bump failed iter "; loopIdx; " err "; errVal
+    PRINT #logFile, "parent bump failed iter "; loopIdx; " err "; errVal
+    GOTO 700
+  ENDIF
+NEXT loopIdx
+PRINT "parent loop ok True"
+PRINT #logFile, "parent loop ok True"
+
+RUN h4WaitChildExit(exitStat, exitOK, errVal)
+PRINT "wait child ok "; exitOK; " stat "; exitStat; " err "; errVal
+PRINT #logFile, "wait child ok "; exitOK; " stat "; exitStat; " err "; errVal
+IF NOT exitOK THEN
+  GOTO 700
+ENDIF
+
+RUN h4ReadState(state, ok)
+PRINT "final read ok "; ok
+PRINT #logFile, "final read ok "; ok
+IF NOT ok THEN
+  GOTO 700
+ENDIF
+RUN h4LogState(logFile, "final state", state)
+RUN h4PrintState("final state", state)
+
+IF state.parentCnt = 40 THEN
+  IF state.childCnt = 40 THEN
+    PRINT "lock experiment ok True"
+    PRINT #logFile, "lock experiment ok True"
+  ELSE
+    PRINT "lock experiment ok False childCnt "; state.childCnt
+    PRINT #logFile, "lock experiment ok False childCnt "; state.childCnt
+  ENDIF
+ELSE
+  PRINT "lock experiment ok False parentCnt "; state.parentCnt
+  PRINT #logFile, "lock experiment ok False parentCnt "; state.parentCnt
+ENDIF
+
+ON ERROR GOTO 200
+DELETE "SNBMODCS"
+200 ON ERROR GOTO 900
+
+700 IF logOpen THEN
+      CLOSE #logFile
+      logOpen := FALSE
+    ENDIF
+END
+
+900 PRINT "TSTCTLH4 error ("; ERR; ")"
+    IF logOpen THEN
+      PRINT #logFile, "TSTCTLH4 error ("; ERR; ")"
+      CLOSE #logFile
+      logOpen := FALSE
+    ENDIF
+END
+
+PROCEDURE h4InitState
+(* ============================================================ *)
+(* PROCEDURE : h4InitState                                      *)
+(* PURPOSE   : Create fresh SNBMODCS state for the lock test.   *)
+(* ============================================================ *)
+TYPE LockState = magic,parentCnt,childCnt,lastWriter,lastErr,pad1,pad2,pad3:BYTE
+PARAM ok      : BOOLEAN
+DIM state     : LockState
+DIM path      : BYTE
+DIM isOpen    : BOOLEAN
+
+ON ERROR GOTO 900
+
+isOpen := FALSE
+ok := FALSE
+
+state.magic      := $53
+state.parentCnt  := 0
+state.childCnt   := 0
+state.lastWriter := 0
+state.lastErr    := 0
+state.pad1       := 0
+state.pad2       := 0
+state.pad3       := 0
+
+CREATE #path, "SNBMODCS":UPDATE
+isOpen := TRUE
+PUT #path, state
+CLOSE #path
+isOpen := FALSE
+ok := TRUE
+END
+
+900 IF isOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "h4InitState error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h4BumpParent
+(* ============================================================ *)
+(* PROCEDURE : h4BumpParent                                     *)
+(* PURPOSE   : Lock SNBMODCS, increment the parent counter,     *)
+(*             and release the lock.                            *)
+(* ============================================================ *)
+TYPE LockState = magic,parentCnt,childCnt,lastWriter,lastErr,pad1,pad2,pad3:BYTE
+PARAM ok     : BOOLEAN
+PARAM errVal : INTEGER
+DIM state    : LockState
+DIM path     : BYTE
+DIM isOpen   : BOOLEAN
+DIM lockOK   : BOOLEAN
+DIM lockHeld : BOOLEAN
+DIM slpOK    : BOOLEAN
+DIM slpErr   : INTEGER
+
+ON ERROR GOTO 900
+
+isOpen   := FALSE
+lockHeld := FALSE
+ok       := FALSE
+errVal   := 0
+
+OPEN #path, "SNBMODCS":UPDATE
+isOpen := TRUE
+RUN h4SetTicks(path, 10, lockOK, errVal)
+IF NOT lockOK THEN
+  GOTO 800
+ENDIF
+RUN h4LockWhole(path, lockOK, errVal)
+IF NOT lockOK THEN
+  GOTO 800
+ENDIF
+lockHeld := TRUE
+
+GET #path, state
+IF state.magic <> $53 THEN
+  PRINT "h4BumpParent: invalid magic"
+  errVal := 1
+  GOTO 800
+ENDIF
+state.parentCnt  := state.parentCnt + 1
+state.lastWriter := 1
+state.lastErr    := 0
+RUN h4Sleep(slpOK, slpErr)
+IF NOT slpOK THEN
+  errVal := slpErr
+  GOTO 800
+ENDIF
+SEEK #path, 0
+PUT #path, state
+
+RUN h4UnlockWhole(path, lockOK, errVal)
+IF NOT lockOK THEN
+  GOTO 800
+ENDIF
+lockHeld := FALSE
+ok := TRUE
+
+CLOSE #path
+isOpen := FALSE
+END
+
+800 IF lockHeld THEN
+      RUN h4UnlockWhole(path, lockOK, slpErr)
+      lockHeld := FALSE
+    ENDIF
+    IF isOpen THEN
+      CLOSE #path
+      isOpen := FALSE
+    ENDIF
+    ok := FALSE
+END
+
+900 IF lockHeld THEN
+      RUN h4UnlockWhole(path, lockOK, slpErr)
+    ENDIF
+    IF isOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "h4BumpParent error ("; ERR; ")"
+    ok := FALSE
+    IF errVal = 0 THEN
+      errVal := ERR
+    ENDIF
+END
+
+PROCEDURE h4ReadState
+(* ============================================================ *)
+(* PROCEDURE : h4ReadState                                      *)
+(* PURPOSE   : Read the current lock experiment state.          *)
+(* ============================================================ *)
+TYPE LockState = magic,parentCnt,childCnt,lastWriter,lastErr,pad1,pad2,pad3:BYTE
+PARAM state : LockState
+PARAM ok    : BOOLEAN
+DIM path    : BYTE
+DIM isOpen  : BOOLEAN
+
+ON ERROR GOTO 900
+
+isOpen := FALSE
+ok := FALSE
+
+OPEN #path, "SNBMODCS":READ
+isOpen := TRUE
+GET #path, state
+IF state.magic <> $53 THEN
+  PRINT "h4ReadState: invalid magic"
+  GOTO 800
+ENDIF
+
+CLOSE #path
+isOpen := FALSE
+ok := TRUE
+END
+
+800 IF isOpen THEN
+      CLOSE #path
+      isOpen := FALSE
+    ENDIF
+    ok := FALSE
+END
+
+900 IF isOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "h4ReadState error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h4PrintState
+(* ============================================================ *)
+(* PROCEDURE : h4PrintState                                     *)
+(* PURPOSE   : Print one lock experiment state snapshot.        *)
+(* ============================================================ *)
+TYPE LockState = magic,parentCnt,childCnt,lastWriter,lastErr,pad1,pad2,pad3:BYTE
+PARAM label : STRING[20]
+PARAM state : LockState
+
+PRINT label
+PRINT "pcnt "; state.parentCnt; " ccnt "; state.childCnt
+PRINT "last "; state.lastWriter; " err "; state.lastErr
+END
+
+PROCEDURE h4LogState
+(* ============================================================ *)
+(* PROCEDURE : h4LogState                                       *)
+(* PURPOSE   : Write one lock experiment state snapshot.        *)
+(* ============================================================ *)
+TYPE LockState = magic,parentCnt,childCnt,lastWriter,lastErr,pad1,pad2,pad3:BYTE
+PARAM pathNo : BYTE
+PARAM label  : STRING[20]
+PARAM state  : LockState
+
+ON ERROR GOTO 900
+
+PRINT #pathNo, label
+PRINT #pathNo, "pcnt "; state.parentCnt; " ccnt "; state.childCnt
+PRINT #pathNo, "last "; state.lastWriter; " err "; state.lastErr
+END
+
+900 PRINT "h4LogState error ("; ERR; ")"
+END
+
+PROCEDURE h4ForkChild
+(* ============================================================ *)
+(* PROCEDURE : h4ForkChild                                      *)
+(* PURPOSE   : Fork the lock-test child worker.                 *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM ok      : BOOLEAN
+PARAM errVal  : INTEGER
+DIM regs        : Register
+DIM callCode    : BYTE
+DIM runbBuf(6)  : BYTE
+DIM paramBuf(24): BYTE
+DIM iCC         : INTEGER
+DIM nameLen     : INTEGER
+DIM i           : INTEGER
+DIM childName   : STRING[20]
+
+ON ERROR GOTO 900
+
+ok        := FALSE
+errVal    := 0
+childName := "TSTCTLH4C"
+
+runbBuf(1) := ASC("R")
+runbBuf(2) := ASC("u")
+runbBuf(3) := ASC("n")
+runbBuf(4) := LOR(ASC("B"), $80)
+
+nameLen := LEN(childName)
+FOR i := 1 TO 24
+  paramBuf(i) := 0
+NEXT i
+FOR i := 1 TO nameLen
+  paramBuf(i) := ASC(MID$(childName, i, 1))
+NEXT i
+paramBuf(nameLen + 1) := $0D
+
+callCode := $03
+regs.a   := 0
+regs.b   := 4
+regs.x   := ADDR(runbBuf)
+regs.y   := nameLen + 1
+regs.u   := ADDR(paramBuf)
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "h4ForkChild error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
+
+PROCEDURE h4WaitChildExit
+(* ============================================================ *)
+(* PROCEDURE : h4WaitChildExit                                  *)
+(* PURPOSE   : Wait for the lock-test child to exit.            *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM exitStat : INTEGER
+PARAM ok       : BOOLEAN
+PARAM errVal   : INTEGER
+DIM regs       : Register
+DIM callCode   : BYTE
+DIM iCC        : INTEGER
+
+ON ERROR GOTO 900
+
+exitStat := 0
+ok       := FALSE
+errVal   := 0
+callCode := $04
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+exitStat := regs.b
+ok := TRUE
+END
+
+900 PRINT "h4WaitChildExit error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
+
+PROCEDURE h4Sleep
+(* ============================================================ *)
+(* PROCEDURE : h4Sleep                                          *)
+(* PURPOSE   : Sleep briefly to increase lock contention.       *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM ok      : BOOLEAN
+PARAM errVal  : INTEGER
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errVal   := 0
+callCode := $0A
+regs.x   := 1
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "h4Sleep error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
+
+PROCEDURE h4SetTicks
+(* ============================================================ *)
+(* PROCEDURE : h4SetTicks                                       *)
+(* PURPOSE   : Set a bounded wait time for record lock release. *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM pathNo  : BYTE
+PARAM tickCnt : INTEGER
+PARAM ok      : BOOLEAN
+PARAM errVal  : INTEGER
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errVal   := 0
+callCode := $8E
+regs.a   := pathNo
+regs.b   := $10
+regs.x   := tickCnt
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "h4SetTicks error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
+
+PROCEDURE h4LockWhole
+(* ============================================================ *)
+(* PROCEDURE : h4LockWhole                                      *)
+(* PURPOSE   : Lock the entire SNBMODCS file through RBF.       *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM pathNo : BYTE
+PARAM ok     : BOOLEAN
+PARAM errVal : INTEGER
+DIM regs     : Register
+DIM callCode : BYTE
+DIM iCC      : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errVal   := 0
+callCode := $8E
+regs.a   := pathNo
+regs.b   := $11
+regs.u   := -1
+regs.x   := -1
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "h4LockWhole error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
+
+PROCEDURE h4UnlockWhole
+(* ============================================================ *)
+(* PROCEDURE : h4UnlockWhole                                    *)
+(* PURPOSE   : Release the whole-file lock on SNBMODCS.         *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM pathNo : BYTE
+PARAM ok     : BOOLEAN
+PARAM errVal : INTEGER
+DIM regs     : Register
+DIM callCode : BYTE
+DIM iCC      : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errVal   := 0
+callCode := $8E
+regs.a   := pathNo
+regs.b   := $11
+regs.u   := 0
+regs.x   := 0
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "h4UnlockWhole error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
