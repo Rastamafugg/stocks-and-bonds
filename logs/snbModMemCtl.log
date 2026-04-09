@@ -1,0 +1,104 @@
+=== snbModMemCtl ===
+bounded load-path SLPICPT diagnostics
+
+reset ok 1 sig 0 cnt 0
+pre-sleep req 0 rsp 0 cmd 0
+  pslp 0 cslp 1 stat 10 err 0
+read ok 1 sig 0 cnt 0
+  req 0 rsp 0 cmd 0
+reset ok 1 sig 0 cnt 0
+pre-sleep req 0 rsp 0 cmd 0
+  pslp 0 cslp 1 stat 11 err 0
+read ok 1 sig 0 cnt 0
+  req 0 rsp 0 cmd 0
+reset ok 1 sig 0 cnt 0
+pre-sleep req 0 rsp 0 cmd 0
+  pslp 0 cslp 1 stat 11 err 0
+read ok 1 sig 0 cnt 0
+  req 0 rsp 0 cmd 0
+reset ok 1 sig 0 cnt 0
+pre-sleep req 0 rsp 0 cmd 0
+  pslp 0 cslp 1 stat 11 err 0
+re1) {
+        lastsig = 0;
+        hitcount = 0;
+        if (!installed) {
+            intercept(sigtrap);
+            installed = 1;
+        }
+        *okout = 1;
+        return 0;
+    }
+
+    if (*action == 2) {
+        *sigout = lastsig;
+        *cntout = hitcount;
+        *okout = 1;
+        return 0;
+    }
+
+    if (*action == 3) {
+        lastsig = 0;
+        hitcount = 0;
+        *okout = 1;
+        return 0;
+    }
+
+    return 0;
+}
+
+#asm
+_stkcheck:
+_stkchec:
+        rts
+
+        vsect
+_flacc: rmb 8
+errno:  rmb 2
+        endsect
+#endasm==================================== *)
+PARAM action:BYTE
+
+DIM k:STRING[1]
+
+ON ERROR GOTO 900
+
+PRINT
+PRINT "  Any key=continue  S=save+exit  Q=quit: ";
+GET #0, k
+PRINT
+
+IF k = "S" OR k = "s" THEN
+  action := 2
+ELSE IF k = "dcc /d1/SLPICPT.c -rs -f=/d1/SLPICPT.r
+rlink /d1/SLPICPT.r -o=/dd/cmds/SLPICPT -b=slpicpt -t -l=/dd/lib/clib.l
+
+END
+
+ modCnt
+  GET #path, modName
+  RUN mmcUnloadByName(modName, oneOK, oneErr)
+  IF NOT oneOK THEN
+    IF oneErr <> 221 THEN
+      errVal := onbasic09 #40k
+load /d1/snbModCtlBoot.b09
+pack*
+y
+kill*
+bye
+
+================ *)
+(* PROCEDURE: snbTradeMgn                             *)
+(* PURPOSE:   README entry for snbTradeMgn module.    *)
+(*            Lists all procedures in this module.    *)
+(* PAR=== bootWaitReady ===
+try 1 child 4 stat 11 cslp 0
+ready
+=============================================== *)
+PRINT "snbTradeMgn"
+PRINT "  applyStockMgnRepay"
+END
+
+PROCEDURE applyStockMgnRepay
+(* ================================================== *)
+(* PROCE
