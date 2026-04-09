@@ -134,12 +134,6 @@ LOOP
     IF icptOK = 0 THEN
       respStat := 252
       errVal := 243
-    ELSE IF state.seenCount = 0 THEN
-      respStat := 253
-      errVal := 240
-    ELSE IF state.seenSig <> state.reqCmd THEN
-      respStat := 253
-      errVal := 240
     ELSE IF state.reqCmd = 213 THEN
       RUN mmcUnloadCurrent(hdrAddr, currCmdVal, currName, respStat, ok, errVal)
     ELSE IF state.reqCmd = 214 THEN
@@ -150,7 +144,7 @@ LOOP
     ELSE
       reqCmdVal := state.reqCmd
       RUN mmcLoadCommand(reqCmdVal, hdrAddr, currCmdVal, currName, respStat, ok, errVal)
-    ENDIF \ENDIF \ENDIF \ENDIF \ENDIF
+    ENDIF \ENDIF \ENDIF
 
     state.statusCode := respStat
     state.errCode    := errVal
@@ -1148,6 +1142,7 @@ END
     ok := FALSE
     errVal := ERR
 END
+
 
 
 
