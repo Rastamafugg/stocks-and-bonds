@@ -96,16 +96,6 @@ IF NOT sigOK THEN
 ENDIF
 
 LOOP
-  actionVal := 3
-  RUN SLPICPT(icptMem, actionVal, iSeenSig, iSeenCount, icptOK)
-  IF icptOK = 0 THEN
-    PRINT "snbModMemCtl: SLPICPT reset failed"
-    END
-  ENDIF
-  IF NOT loadTraceDone THEN
-    PRINT #logFile, "reset ok "; icptOK; " sig "; iSeenSig; " cnt "; iSeenCount
-  ENDIF
-
   RUN mmcWritePreSleepState(state, fileOK)
   IF NOT fileOK THEN
     PRINT "snbModMemCtl: mmcWritePreSleepState failed"
@@ -114,6 +104,16 @@ LOOP
   IF NOT loadTraceDone THEN
     PRINT #logFile, "pre-sleep req "; state.reqSeq; " rsp "; state.rspSeq; " cmd "; state.reqCmd
     PRINT #logFile, "  pslp "; state.parentSleep; " cslp "; state.childSleep; " stat "; state.statusCode; " err "; state.errCode
+  ENDIF
+
+  actionVal := 3
+  RUN SLPICPT(icptMem, actionVal, iSeenSig, iSeenCount, icptOK)
+  IF icptOK = 0 THEN
+    PRINT "snbModMemCtl: SLPICPT reset failed"
+    END
+  ENDIF
+  IF NOT loadTraceDone THEN
+    PRINT #logFile, "reset ok "; icptOK; " sig "; iSeenSig; " cnt "; iSeenCount
   ENDIF
 
   RUN mmcSleep(sigOK, errVal)
