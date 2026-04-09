@@ -1,0 +1,38 @@
+=== TSTCTLH5 ===
+Reproduce snb wrapper flow
+
+Step 1: startCtlSession
+startCtlSession ok True
+after start
+req 0 rsp 0
+cmd 0
+pslp 0 cslp 0
+stat 10 err 0
+seen 0 hits 0
+
+Step 2: requestPhaseLib cmd 200
+before request
+req 0 rsp 0
+cmd 0
+pslp 0 cslp 1
+stat 10 err 0
+seen 0 hits 0
+requestPhaseLib ok True
+after request
+req 1 rsp 1
+cmd 200
+pslp 0 cslp 0
+stat 253 err 240
+seen 0 hits 0
+MODULELIST probe err 216
+
+Step 3: releasePhaseLib
+before release
+req 1 rsp 1
+cmd 200
+pslp 0 cslp 0
+stat 11 err 0
+seen 0 hits 0
+releasePhaseLib ok False
+TSTCTLH5: releasePhaseLib failed
+TSTCTLH5 complete
