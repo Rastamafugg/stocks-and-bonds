@@ -1,0 +1,618 @@
+PROCEDURE TSTCTLH5
+(* ============================================================ *)
+(* PROCEDURE : TSTCTLH5                                         *)
+(* PURPOSE   : Reproduce the snb wrapper flow using local       *)
+(*             copies of the production wrapper behavior.       *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
+DIM state      : CtlState
+DIM ok         : BOOLEAN
+DIM fileOK     : BOOLEAN
+DIM probeOK    : BOOLEAN
+DIM modCnt     : INTEGER
+DIM probeErr   : INTEGER
+DIM firstName  : STRING[20]
+DIM ctlStarted : BOOLEAN
+DIM logPath    : STRING[20]
+DIM logFile    : BYTE
+DIM logOpen    : BOOLEAN
+
+ON ERROR GOTO 900
+
+ctlStarted := FALSE
+logPath := "/d1/TSTCTLH5.log"
+logOpen := FALSE
+
+ON ERROR GOTO 50
+DELETE logPath
+50 ON ERROR GOTO 900
+CREATE #logFile, logPath:WRITE
+logOpen := TRUE
+
+PRINT "=== TSTCTLH5 ==="
+PRINT "Reproduce snb wrapper flow"
+PRINT
+PRINT #logFile, "=== TSTCTLH5 ==="
+PRINT #logFile, "Reproduce snb wrapper flow"
+PRINT #logFile, ""
+
+PRINT "Step 1: startCtlSession"
+PRINT #logFile, "Step 1: startCtlSession"
+RUN h5StartCtlSession(ctlStarted, ok)
+PRINT "startCtlSession ok "; ok
+PRINT #logFile, "startCtlSession ok "; ok
+IF NOT ok THEN
+  PRINT "TSTCTLH5: startCtlSession failed"
+  PRINT #logFile, "TSTCTLH5: startCtlSession failed"
+  GOTO 800
+ENDIF
+RUN h5ReadState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTCTLH5: h5ReadState after start failed"
+  PRINT #logFile, "TSTCTLH5: h5ReadState after start failed"
+  GOTO 800
+ENDIF
+RUN h5PrintState("after start", state)
+RUN h5LogState(logFile, "after start", state)
+PRINT
+PRINT #logFile, ""
+
+PRINT "Step 2: requestPhaseLib cmd 200"
+PRINT #logFile, "Step 2: requestPhaseLib cmd 200"
+RUN h5ReadState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTCTLH5: h5ReadState before request failed"
+  PRINT #logFile, "TSTCTLH5: h5ReadState before request failed"
+  GOTO 800
+ENDIF
+RUN h5PrintState("before request", state)
+RUN h5LogState(logFile, "before request", state)
+RUN h5RequestPhaseLib(200, ctlStarted, ok)
+PRINT "requestPhaseLib ok "; ok
+PRINT #logFile, "requestPhaseLib ok "; ok
+IF NOT ok THEN
+  PRINT "TSTCTLH5: requestPhaseLib failed"
+  PRINT #logFile, "TSTCTLH5: requestPhaseLib failed"
+  GOTO 800
+ENDIF
+RUN h5ReadState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTCTLH5: h5ReadState after request failed"
+  PRINT #logFile, "TSTCTLH5: h5ReadState after request failed"
+  GOTO 800
+ENDIF
+RUN h5PrintState("after request", state)
+RUN h5LogState(logFile, "after request", state)
+RUN h5ProbeModuleList(probeOK, modCnt, firstName, probeErr)
+IF probeOK THEN
+  PRINT "MODULELIST count "; modCnt; " first "; firstName
+  PRINT #logFile, "MODULELIST count "; modCnt; " first "; firstName
+ELSE
+  PRINT "MODULELIST probe err "; probeErr
+  PRINT #logFile, "MODULELIST probe err "; probeErr
+ENDIF
+PRINT
+PRINT #logFile, ""
+
+PRINT "Step 3: releasePhaseLib"
+PRINT #logFile, "Step 3: releasePhaseLib"
+RUN h5ReadState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTCTLH5: h5ReadState before release failed"
+  PRINT #logFile, "TSTCTLH5: h5ReadState before release failed"
+  GOTO 800
+ENDIF
+RUN h5PrintState("before release", state)
+RUN h5LogState(logFile, "before release", state)
+RUN h5ReleasePhaseLib(ctlStarted, ok)
+PRINT "releasePhaseLib ok "; ok
+PRINT #logFile, "releasePhaseLib ok "; ok
+IF NOT ok THEN
+  PRINT "TSTCTLH5: releasePhaseLib failed"
+  PRINT #logFile, "TSTCTLH5: releasePhaseLib failed"
+  GOTO 800
+ENDIF
+RUN h5ReadState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTCTLH5: h5ReadState after release failed"
+  PRINT #logFile, "TSTCTLH5: h5ReadState after release failed"
+  GOTO 800
+ENDIF
+RUN h5PrintState("after release", state)
+RUN h5LogState(logFile, "after release", state)
+RUN h5ProbeModuleList(probeOK, modCnt, firstName, probeErr)
+IF probeOK THEN
+  PRINT "Post-release MODULELIST count "; modCnt; " first "; firstName
+  PRINT #logFile, "Post-release MODULELIST count "; modCnt; " first "; firstName
+ELSE
+  PRINT "Post-release MODULELIST err "; probeErr
+  PRINT #logFile, "Post-release MODULELIST err "; probeErr
+ENDIF
+PRINT
+PRINT #logFile, ""
+
+PRINT "Step 4: stopCtlSession"
+PRINT #logFile, "Step 4: stopCtlSession"
+RUN h5StopCtlSession(ctlStarted, ok)
+PRINT "stopCtlSession ok "; ok
+PRINT #logFile, "stopCtlSession ok "; ok
+IF NOT ok THEN
+  PRINT "TSTCTLH5: stopCtlSession failed"
+  PRINT #logFile, "TSTCTLH5: stopCtlSession failed"
+ENDIF
+PRINT
+PRINT #logFile, ""
+
+800 PRINT "TSTCTLH5 complete"
+    IF logOpen THEN
+      PRINT #logFile, "TSTCTLH5 complete"
+      CLOSE #logFile
+      logOpen := FALSE
+    ENDIF
+    END
+
+900 PRINT "TSTCTLH5 error ("; ERR; ")"
+    IF logOpen THEN
+      PRINT #logFile, "TSTCTLH5 error ("; ERR; ")"
+      CLOSE #logFile
+      logOpen := FALSE
+    ENDIF
+END
+
+PROCEDURE h5StartCtlSession
+(* ============================================================ *)
+(* PROCEDURE : h5StartCtlSession                                *)
+(* PURPOSE   : Mirror snb startCtlSession wrapper flow.         *)
+(* ============================================================ *)
+PARAM ctlStarted : BOOLEAN
+PARAM ok         : BOOLEAN
+DIM bootHdrAdr   : INTEGER
+DIM dropOK       : BOOLEAN
+
+ON ERROR GOTO 900
+
+ok := FALSE
+IF ctlStarted THEN
+  ok := TRUE
+  END
+ENDIF
+
+bootHdrAdr := 0
+RUN h5LoadOneModule("snbModCtlBoot", bootHdrAdr, ok)
+IF NOT ok THEN
+  PRINT "h5StartCtlSession: loadOneModule failed"
+  END
+ENDIF
+RUN startModCtl(ok)
+IF NOT ok THEN
+  RUN h5UnloadOneModule("snbModCtlBoot", bootHdrAdr, dropOK)
+  END
+ENDIF
+RUN h5UnloadOneModule("snbModCtlBoot", bootHdrAdr, ok)
+IF NOT ok THEN
+  PRINT "h5StartCtlSession: unloadOneModule failed"
+  END
+ENDIF
+ctlStarted := TRUE
+ok := TRUE
+END
+
+900 PRINT "h5StartCtlSession error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h5StopCtlSession
+(* ============================================================ *)
+(* PROCEDURE : h5StopCtlSession                                 *)
+(* PURPOSE   : Mirror snb stopCtlSession wrapper flow.          *)
+(* ============================================================ *)
+PARAM ctlStarted : BOOLEAN
+PARAM ok         : BOOLEAN
+DIM bootHdrAdr   : INTEGER
+DIM dropOK       : BOOLEAN
+
+ON ERROR GOTO 900
+
+ok := TRUE
+IF NOT ctlStarted THEN
+  END
+ENDIF
+
+bootHdrAdr := 0
+RUN h5LoadOneModule("snbModCtlBoot", bootHdrAdr, ok)
+IF NOT ok THEN
+  PRINT "h5StopCtlSession: loadOneModule failed"
+  END
+ENDIF
+RUN stopModCtl(ok)
+IF NOT ok THEN
+  RUN h5UnloadOneModule("snbModCtlBoot", bootHdrAdr, dropOK)
+  END
+ENDIF
+RUN h5UnloadOneModule("snbModCtlBoot", bootHdrAdr, ok)
+IF NOT ok THEN
+  PRINT "h5StopCtlSession: unloadOneModule failed"
+  END
+ENDIF
+ctlStarted := FALSE
+ok := TRUE
+END
+
+900 PRINT "h5StopCtlSession error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h5RequestPhaseLib
+(* ============================================================ *)
+(* PROCEDURE : h5RequestPhaseLib                                *)
+(* PURPOSE   : Mirror snb requestPhaseLib wrapper flow.         *)
+(* ============================================================ *)
+PARAM sigVal     : INTEGER
+PARAM ctlStarted : BOOLEAN
+PARAM ok         : BOOLEAN
+DIM bootHdrAdr   : INTEGER
+DIM dropOK       : BOOLEAN
+
+ON ERROR GOTO 900
+
+ok := FALSE
+IF NOT ctlStarted THEN
+  RUN h5StartCtlSession(ctlStarted, ok)
+  IF NOT ok THEN
+    END
+  ENDIF
+ENDIF
+
+bootHdrAdr := 0
+RUN h5LoadOneModule("snbModCtlBoot", bootHdrAdr, ok)
+IF NOT ok THEN
+  PRINT "h5RequestPhaseLib: loadOneModule failed"
+  END
+ENDIF
+RUN bootLoadPhase(sigVal, ok)
+IF NOT ok THEN
+  RUN h5UnloadOneModule("snbModCtlBoot", bootHdrAdr, dropOK)
+  END
+ENDIF
+RUN h5UnloadOneModule("snbModCtlBoot", bootHdrAdr, ok)
+IF NOT ok THEN
+  PRINT "h5RequestPhaseLib: unloadOneModule failed"
+  END
+ENDIF
+END
+
+900 PRINT "h5RequestPhaseLib error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h5ReleasePhaseLib
+(* ============================================================ *)
+(* PROCEDURE : h5ReleasePhaseLib                                *)
+(* PURPOSE   : Mirror snb releasePhaseLib wrapper flow.         *)
+(* ============================================================ *)
+PARAM ctlStarted : BOOLEAN
+PARAM ok         : BOOLEAN
+DIM bootHdrAdr   : INTEGER
+DIM dropOK       : BOOLEAN
+
+ON ERROR GOTO 900
+
+ok := FALSE
+RUN h5UnloadPhaseModuleList(ok)
+IF NOT ok THEN
+  END
+ENDIF
+IF NOT ctlStarted THEN
+  PRINT "h5ReleasePhaseLib: controller not started"
+  END
+ENDIF
+
+bootHdrAdr := 0
+RUN h5LoadOneModule("snbModCtlBoot", bootHdrAdr, ok)
+IF NOT ok THEN
+  PRINT "h5ReleasePhaseLib: loadOneModule failed"
+  END
+ENDIF
+RUN bootUnloadPhase(ok)
+IF NOT ok THEN
+  RUN h5UnloadOneModule("snbModCtlBoot", bootHdrAdr, dropOK)
+  END
+ENDIF
+RUN h5UnloadOneModule("snbModCtlBoot", bootHdrAdr, ok)
+IF NOT ok THEN
+  PRINT "h5ReleasePhaseLib: unloadOneModule failed"
+  END
+ENDIF
+END
+
+900 PRINT "h5ReleasePhaseLib error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h5ReadState
+(* ============================================================ *)
+(* PROCEDURE : h5ReadState                                      *)
+(* PURPOSE   : Read SNBMODCS into the current controller state. *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
+PARAM state : CtlState
+PARAM ok    : BOOLEAN
+DIM path    : BYTE
+DIM isOpen  : BOOLEAN
+
+ON ERROR GOTO 900
+
+isOpen := FALSE
+ok := FALSE
+
+OPEN #path, "SNBMODCS":READ
+isOpen := TRUE
+GET #path, state
+IF state.magic <> $53 THEN
+  PRINT "h5ReadState: invalid magic"
+  END
+ENDIF
+
+CLOSE #path
+isOpen := FALSE
+ok := TRUE
+END
+
+900 IF isOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "h5ReadState error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h5PrintState
+(* ============================================================ *)
+(* PROCEDURE : h5PrintState                                     *)
+(* PURPOSE   : Print one compact controller state snapshot.     *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
+PARAM label : STRING[20]
+PARAM state : CtlState
+
+PRINT label
+PRINT "req "; state.reqSeq; " rsp "; state.rspSeq; " cmd "; state.reqCmd
+PRINT "pslp "; state.parentSleep; " cslp "; state.childSleep
+PRINT "stat "; state.statusCode; " err "; state.errCode
+PRINT "seen "; state.seenSig; " hits "; state.seenCount
+END
+
+PROCEDURE h5LogState
+(* ============================================================ *)
+(* PROCEDURE : h5LogState                                       *)
+(* PURPOSE   : Write one compact controller state snapshot.     *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
+PARAM pathNo : BYTE
+PARAM label  : STRING[20]
+PARAM state  : CtlState
+
+ON ERROR GOTO 900
+
+PRINT #pathNo, label
+PRINT #pathNo, "req "; state.reqSeq; " rsp "; state.rspSeq
+PRINT #pathNo, "cmd "; state.reqCmd
+PRINT #pathNo, "pslp "; state.parentSleep; " cslp "; state.childSleep
+PRINT #pathNo, "stat "; state.statusCode; " err "; state.errCode
+PRINT #pathNo, "seen "; state.seenSig; " hits "; state.seenCount
+END
+
+900 PRINT "h5LogState error ("; ERR; ")"
+END
+
+PROCEDURE h5ProbeModuleList
+(* ============================================================ *)
+(* PROCEDURE : h5ProbeModuleList                                *)
+(* PURPOSE   : Probe MODULELIST count and first entry name.     *)
+(* ============================================================ *)
+PARAM ok        : BOOLEAN
+PARAM modCnt    : INTEGER
+PARAM firstName : STRING[20]
+PARAM errVal    : INTEGER
+DIM path        : BYTE
+DIM isOpen      : BOOLEAN
+DIM cnt         : BYTE
+
+ON ERROR GOTO 900
+
+isOpen := FALSE
+ok := FALSE
+modCnt := 0
+firstName := ""
+errVal := 0
+
+OPEN #path, "MODULELIST":READ
+isOpen := TRUE
+GET #path, cnt
+modCnt := cnt
+IF modCnt > 0 THEN
+  GET #path, firstName
+ENDIF
+
+CLOSE #path
+isOpen := FALSE
+ok := TRUE
+END
+
+900 IF isOpen THEN
+      CLOSE #path
+    ENDIF
+    errVal := ERR
+    ok := FALSE
+END
+
+PROCEDURE h5UnloadPhaseModuleList
+(* ============================================================ *)
+(* PROCEDURE : h5UnloadPhaseModuleList                          *)
+(* PURPOSE   : Unload each name in MODULELIST in the parent.    *)
+(*             Error 221 is ignored as the known miss case.     *)
+(* ============================================================ *)
+PARAM ok      : BOOLEAN
+DIM path      : BYTE
+DIM isOpen    : BOOLEAN
+DIM cnt       : BYTE
+DIM modCnt    : INTEGER
+DIM idx       : INTEGER
+DIM modName   : STRING[20]
+DIM oneOK     : BOOLEAN
+DIM oneErr    : INTEGER
+
+ON ERROR GOTO 900
+
+isOpen := FALSE
+ok := FALSE
+
+OPEN #path, "MODULELIST":READ
+isOpen := TRUE
+GET #path, cnt
+modCnt := cnt
+
+FOR idx := 1 TO modCnt
+  GET #path, modName
+  RUN h5UnloadPhaseModuleByName(modName, oneOK, oneErr)
+  IF NOT oneOK THEN
+    IF oneErr <> 221 THEN
+      PRINT "h5UnloadPhaseModuleList: unload failed "; modName; " err "; oneErr
+      END
+    ENDIF
+  ENDIF
+NEXT idx
+
+CLOSE #path
+isOpen := FALSE
+ok := TRUE
+END
+
+900 IF isOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "h5UnloadPhaseModuleList error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h5UnloadPhaseModuleByName
+(* ============================================================ *)
+(* PROCEDURE : h5UnloadPhaseModuleByName                        *)
+(* PURPOSE   : Issue F$UnLoad by module name.                   *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM modName : STRING[20]
+PARAM ok      : BOOLEAN
+PARAM errVal  : INTEGER
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+errVal := 0
+callCode := $1D
+regs.a := 0
+regs.x := ADDR(modName)
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "h5UnloadPhaseModuleByName error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
+
+PROCEDURE h5LoadOneModule
+(* ============================================================ *)
+(* PROCEDURE : h5LoadOneModule                                  *)
+(* PURPOSE   : Load one module by name and return header addr.  *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM modName : STRING[20]
+PARAM hdrAddr : INTEGER
+PARAM ok      : BOOLEAN
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+DIM errB      : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+hdrAddr := 0
+
+callCode := $00
+regs.a := 0
+regs.x := ADDR(modName)
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) = 0 THEN
+  hdrAddr := regs.u
+  ok := TRUE
+  END
+ENDIF
+
+callCode := $01
+regs.a := 0
+regs.x := ADDR(modName)
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errB := regs.b
+  PRINT "h5LoadOneModule: load failed "; modName; " err "; errB
+  END
+ENDIF
+
+hdrAddr := regs.u
+ok := TRUE
+END
+
+900 PRINT "h5LoadOneModule error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h5UnloadOneModule
+(* ============================================================ *)
+(* PROCEDURE : h5UnloadOneModule                                *)
+(* PURPOSE   : Unlink one module by saved header address.       *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM modName : STRING[20]
+PARAM hdrAddr : INTEGER
+PARAM ok      : BOOLEAN
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+DIM errB      : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+IF hdrAddr = 0 THEN
+  ok := TRUE
+  END
+ENDIF
+
+callCode := $02
+regs.u := hdrAddr
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errB := regs.b
+  PRINT "h5UnloadOneModule: unlink failed "; modName; " err "; errB
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "h5UnloadOneModule error ("; ERR; ")"
+    ok := FALSE
+END
