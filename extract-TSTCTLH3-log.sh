@@ -13,6 +13,8 @@ IMAGE_PATH="${1:-$SCRIPT_DIR/disks/snbsrc.dsk}"
 DEST_DIR="$SCRIPT_DIR/logs"
 HARNESS_SOURCE="TSTCTLH3.log"
 HARNESS_DEST="$DEST_DIR/TSTCTLH3.log"
+BOOTWAIT_SOURCE="bootWaitReady.log"
+BOOTWAIT_DEST="$DEST_DIR/bootWaitReady.log"
 
 if ! command -v os9 >/dev/null 2>&1; then
   echo "ERROR: ToolShed os9 utility not found on PATH."
@@ -29,3 +31,7 @@ mkdir -p "$DEST_DIR"
 echo "Extracting $HARNESS_SOURCE from $IMAGE_PATH"
 os9 copy -l -r "$IMAGE_PATH,$HARNESS_SOURCE" "$HARNESS_DEST"
 echo "Wrote $HARNESS_DEST"
+
+echo "Extracting $BOOTWAIT_SOURCE from $IMAGE_PATH"
+os9 copy -l -r "$IMAGE_PATH,$BOOTWAIT_SOURCE" "$BOOTWAIT_DEST"
+echo "Wrote $BOOTWAIT_DEST"
