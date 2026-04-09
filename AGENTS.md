@@ -35,8 +35,16 @@ These instructions apply to all work in this repository.
 - When multiple causes remain plausible, first separate:
   1. observed facts
   2. hypotheses
-  3. the smallest verification step that would distinguish them
-- After proposing that verification step, wait for user approval before making
+  3. the smallest verification set that would distinguish them
+- The verification set may include multiple tightly scoped, non-interfering
+  diagnostics when one-at-a-time logging would create excessive rebuild, pack,
+  or test cycles.
+- Prefer one bounded verification pass that captures the key state transitions
+  across the suspected logic boundary over repeated single-log iterations,
+  especially in CoCo or packed-module workflows with high turnaround cost.
+- Before adding that verification set, state why each added diagnostic is
+  necessary and why the set is still minimal.
+- After proposing that verification set, wait for user approval before making
   any speculative code change.
 - Do not treat a bug report, failing output, or error message by itself as
   permission to implement a fix immediately when the cause is still uncertain.
