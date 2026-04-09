@@ -19,26 +19,45 @@ DIM nextSeq     : INTEGER
 DIM modCnt      : INTEGER
 DIM probeErr    : INTEGER
 DIM firstName   : STRING[20]
+DIM logPath     : STRING[20]
+DIM logFile     : BYTE
+DIM logOpen     : BOOLEAN
 
 ON ERROR GOTO 900
+
+logPath := "/d1/TSTCTLH2.log"
+logOpen := FALSE
+
+ON ERROR GOTO 50
+DELETE logPath
+50 ON ERROR GOTO 900
+CREATE #logFile, logPath:WRITE
+logOpen := TRUE
 
 PRINT "=== TSTCTLH2 ==="
 PRINT "Phase 2: cmd 200 plus MODULELIST"
 PRINT
+PRINT #logFile, "=== TSTCTLH2 ==="
+PRINT #logFile, "Phase 2: cmd 200 plus MODULELIST"
+PRINT #logFile, ""
 
 RUN h2StartModCtl(ok)
 IF NOT ok THEN
   PRINT "TSTCTLH2: h2StartModCtl failed"
+  PRINT #logFile, "TSTCTLH2: h2StartModCtl failed"
   END
 ENDIF
 
 RUN h2ReadState(state, fileOK)
 IF NOT fileOK THEN
   PRINT "TSTCTLH2: h2ReadState failed"
+  PRINT #logFile, "TSTCTLH2: h2ReadState failed"
   END
 ENDIF
 PRINT "Ready child "; state.childPid; " stat "; state.statusCode
 PRINT
+PRINT #logFile, "Ready child "; state.childPid; " stat "; state.statusCode
+PRINT #logFile, ""
 
 nextSeq := state.reqSeq
 IF nextSeq >= 255 THEN
@@ -51,9 +70,11 @@ state.reqSeq  := nextSeq
 state.reqCmd  := 200
 state.errCode := 0
 PRINT "Write setup request seq "; nextSeq; " cmd 200"
+PRINT #logFile, "Write setup request seq "; nextSeq; " cmd 200"
 RUN h2WriteState(state, fileOK)
 IF NOT fileOK THEN
   PRINT "TSTCTLH2: h2WriteState failed"
+  PRINT #logFile, "TSTCTLH2: h2WriteState failed"
   END
 ENDIF
 
@@ -61,24 +82,31 @@ childPidVal := state.childPid
 RUN h2SendSignal(childPidVal, 200, sigOK, errVal)
 IF NOT sigOK THEN
   PRINT "TSTCTLH2: h2SendSignal failed err "; errVal
+  PRINT #logFile, "TSTCTLH2: h2SendSignal failed err "; errVal
   END
 ENDIF
 
 RUN h2WaitRspSeq(nextSeq, state, waitOK)
 IF NOT waitOK THEN
   PRINT "TSTCTLH2: wait setup response failed"
+  PRINT #logFile, "TSTCTLH2: wait setup response failed"
   END
 ENDIF
 PRINT "Setup rsp "; state.rspSeq; " stat "; state.statusCode
 PRINT "  err "; state.errCode
+PRINT #logFile, "Setup rsp "; state.rspSeq; " stat "; state.statusCode
+PRINT #logFile, "  err "; state.errCode
 
 RUN h2ProbeModuleList(probeOK, modCnt, firstName, probeErr)
 IF probeOK THEN
   PRINT "MODULELIST count "; modCnt; " first "; firstName
+  PRINT #logFile, "MODULELIST count "; modCnt; " first "; firstName
 ELSE
   PRINT "MODULELIST probe err "; probeErr
+  PRINT #logFile, "MODULELIST probe err "; probeErr
 ENDIF
 PRINT
+PRINT #logFile, ""
 
 nextSeq := state.reqSeq
 IF nextSeq >= 255 THEN
@@ -91,9 +119,11 @@ state.reqSeq  := nextSeq
 state.reqCmd  := 213
 state.errCode := 0
 PRINT "Write unload request seq "; nextSeq; " cmd 213"
+PRINT #logFile, "Write unload request seq "; nextSeq; " cmd 213"
 RUN h2WriteState(state, fileOK)
 IF NOT fileOK THEN
   PRINT "TSTCTLH2: h2WriteState unload failed"
+  PRINT #logFile, "TSTCTLH2: h2WriteState unload failed"
   END
 ENDIF
 
@@ -101,33 +131,185 @@ childPidVal := state.childPid
 RUN h2SendSignal(childPidVal, 213, sigOK, errVal)
 IF NOT sigOK THEN
   PRINT "TSTCTLH2: h2SendSignal unload failed err "; errVal
+  PRINT #logFile, "TSTCTLH2: h2SendSignal unload failed err "; errVal
   END
 ENDIF
 
 RUN h2WaitRspSeq(nextSeq, state, waitOK)
 IF NOT waitOK THEN
   PRINT "TSTCTLH2: wait unload response failed"
+  PRINT #logFile, "TSTCTLH2: wait unload response failed"
   END
 ENDIF
 PRINT "Unload rsp "; state.rspSeq; " stat "; state.statusCode
 PRINT "  err "; state.errCode
+PRINT #logFile, "Unload rsp "; state.rspSeq; " stat "; state.statusCode
+PRINT #logFile, "  err "; state.errCode
 
 RUN h2ProbeModuleList(probeOK, modCnt, firstName, probeErr)
 IF probeOK THEN
   PRINT "Post-unload MODULELIST count "; modCnt; " first "; firstName
+  PRINT #logFile, "Post-unload MODULELIST count "; modCnt; " first "; firstName
 ELSE
   PRINT "Post-unload MODULELIST err "; probeErr
+  PRINT #logFile, "Post-unload MODULELIST err "; probeErr
 ENDIF
 PRINT
+PRINT #logFile, ""
 
-RUN h2StopModCtl(stopOK)
+PRINT "Trace stop request cmd 214"
+PRINT #logFile, "Trace stop request cmd 214"
+RUN h2TraceStopRequest(logFile, state, stopOK)
 IF NOT stopOK THEN
   PRINT "TSTCTLH2: h2StopModCtl failed"
+  PRINT #logFile, "TSTCTLH2: h2StopModCtl failed"
   END
+ENDIF
+PRINT #logFile, "TSTCTLH2 complete"
+PRINT #logFile, ""
+IF logOpen THEN
+  CLOSE #logFile
+  logOpen := FALSE
 ENDIF
 END
 
 900 PRINT "TSTCTLH2 error ("; ERR; ")"
+    IF logOpen THEN
+      PRINT #logFile, "TSTCTLH2 error ("; ERR; ")"
+      CLOSE #logFile
+      logOpen := FALSE
+    ENDIF
+END
+
+PROCEDURE h2LogState
+(* ============================================================ *)
+(* PROCEDURE : h2LogState                                       *)
+(* PURPOSE   : Write one compact controller state snapshot.     *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
+PARAM pathNo : BYTE
+PARAM label  : STRING[24]
+PARAM state  : CtlState
+
+ON ERROR GOTO 900
+
+PRINT #pathNo, label
+PRINT #pathNo, "req "; state.reqSeq; " rsp "; state.rspSeq
+PRINT #pathNo, "cmd "; state.reqCmd
+PRINT #pathNo, "pslp "; state.parentSleep; " cslp "; state.childSleep
+PRINT #pathNo, "stat "; state.statusCode; " err "; state.errCode
+PRINT #pathNo, "seen "; state.seenSig; " hits "; state.seenCount
+END
+
+900 PRINT "h2LogState error ("; ERR; ")"
+END
+
+PROCEDURE h2TraceStopRequest
+(* ============================================================ *)
+(* PROCEDURE : h2TraceStopRequest                               *)
+(* PURPOSE   : Reproduce h2StopModCtl and log each stop         *)
+(*             sub-step plus state transitions to a text file.  *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
+PARAM pathNo : BYTE
+PARAM state  : CtlState
+PARAM ok     : BOOLEAN
+DIM fileOK     : BOOLEAN
+DIM sigOK      : BOOLEAN
+DIM waitOK     : BOOLEAN
+DIM exitOK     : BOOLEAN
+DIM errVal     : INTEGER
+DIM childPidVal: INTEGER
+DIM exitStat   : INTEGER
+DIM nextSeq    : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+PRINT #pathNo, "trace: h2ReadState begin"
+RUN h2ReadState(state, fileOK)
+PRINT #pathNo, "trace: h2ReadState ok "; fileOK
+IF NOT fileOK THEN
+  END
+ENDIF
+RUN h2LogState(pathNo, "trace after h2ReadState", state)
+
+IF state.childPid = 0 THEN
+  PRINT #pathNo, "trace: child already exited"
+  ok := TRUE
+  END
+ENDIF
+
+nextSeq := state.reqSeq
+IF nextSeq >= 255 THEN
+  nextSeq := 1
+ELSE
+  nextSeq := nextSeq + 1
+ENDIF
+PRINT #pathNo, "trace: nextSeq "; nextSeq
+
+state.reqSeq  := nextSeq
+state.reqCmd  := 214
+state.errCode := 0
+PRINT #pathNo, "trace: h2WriteState begin"
+RUN h2WriteState(state, fileOK)
+PRINT #pathNo, "trace: h2WriteState ok "; fileOK
+IF NOT fileOK THEN
+  END
+ENDIF
+RUN h2ReadState(state, fileOK)
+IF fileOK THEN
+  RUN h2LogState(pathNo, "trace after h2WriteState", state)
+ENDIF
+
+childPidVal := state.childPid
+PRINT #pathNo, "trace: h2SendSignal pid "; childPidVal; " cmd 214"
+RUN h2SendSignal(childPidVal, 214, sigOK, errVal)
+PRINT #pathNo, "trace: h2SendSignal ok "; sigOK; " err "; errVal
+IF NOT sigOK THEN
+  RUN h2ReadState(state, fileOK)
+  IF fileOK THEN
+    RUN h2LogState(pathNo, "trace after h2SendSignal fail", state)
+  ENDIF
+  END
+ENDIF
+RUN h2ReadState(state, fileOK)
+IF fileOK THEN
+  RUN h2LogState(pathNo, "trace after h2SendSignal", state)
+ENDIF
+
+PRINT #pathNo, "trace: h2WaitResponse begin want "; nextSeq
+RUN h2WaitResponse(nextSeq, state, waitOK)
+PRINT #pathNo, "trace: h2WaitResponse ok "; waitOK
+RUN h2ReadState(state, fileOK)
+IF fileOK THEN
+  RUN h2LogState(pathNo, "trace after h2WaitResponse", state)
+ENDIF
+IF NOT waitOK THEN
+  END
+ENDIF
+
+PRINT #pathNo, "trace: h2WaitChildExit begin"
+RUN h2WaitChildExit(exitStat, exitOK, errVal)
+PRINT #pathNo, "trace: h2WaitChildExit ok "; exitOK; " stat "; exitStat; " err "; errVal
+IF NOT exitOK THEN
+  END
+ENDIF
+
+ON ERROR GOTO 100
+DELETE "SNBMODCS"
+
+100 ON ERROR GOTO 200
+DELETE "MODULELIST"
+
+200 ON ERROR GOTO 900
+
+ok := TRUE
+END
+
+900 PRINT "h2TraceStopRequest error ("; ERR; ")"
+    PRINT #pathNo, "h2TraceStopRequest error ("; ERR; ")"
+    ok := FALSE
 END
 
 PROCEDURE h2WaitRspSeq
@@ -748,4 +930,3 @@ END
     ok := FALSE
     errVal := ERR
 END
-
