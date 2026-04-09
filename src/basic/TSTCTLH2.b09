@@ -115,27 +115,9 @@ ELSE
   nextSeq := nextSeq + 1
 ENDIF
 
-state.reqSeq  := nextSeq
-state.reqCmd  := 213
-state.errCode := 0
-PRINT "Write unload request seq "; nextSeq; " cmd 213"
-PRINT #logFile, "Write unload request seq "; nextSeq; " cmd 213"
-RUN h2WriteState(state, fileOK)
-IF NOT fileOK THEN
-  PRINT "TSTCTLH2: h2WriteState unload failed"
-  PRINT #logFile, "TSTCTLH2: h2WriteState unload failed"
-  END
-ENDIF
-
-childPidVal := state.childPid
-RUN h2SendSignal(childPidVal, 213, sigOK, errVal)
-IF NOT sigOK THEN
-  PRINT "TSTCTLH2: h2SendSignal unload failed err "; errVal
-  PRINT #logFile, "TSTCTLH2: h2SendSignal unload failed err "; errVal
-  END
-ENDIF
-
-RUN h2WaitRspSeq(nextSeq, state, waitOK)
+PRINT "Trace unload request cmd 213"
+PRINT #logFile, "Trace unload request cmd 213"
+RUN h2TraceUnloadRequest(logFile, state, waitOK)
 IF NOT waitOK THEN
   PRINT "TSTCTLH2: wait unload response failed"
   PRINT #logFile, "TSTCTLH2: wait unload response failed"
@@ -309,6 +291,85 @@ END
 
 900 PRINT "h2TraceStopRequest error ("; ERR; ")"
     PRINT #pathNo, "h2TraceStopRequest error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h2TraceUnloadRequest
+(* ============================================================ *)
+(* PROCEDURE : h2TraceUnloadRequest                             *)
+(* PURPOSE   : Reproduce the unload request and log each        *)
+(*             unload sub-step plus state transitions.          *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
+PARAM pathNo : BYTE
+PARAM state  : CtlState
+PARAM ok     : BOOLEAN
+DIM fileOK     : BOOLEAN
+DIM sigOK      : BOOLEAN
+DIM errVal     : INTEGER
+DIM childPidVal: INTEGER
+DIM nextSeq    : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+PRINT #pathNo, "trace: h2ReadState begin"
+RUN h2ReadState(state, fileOK)
+PRINT #pathNo, "trace: h2ReadState ok "; fileOK
+IF NOT fileOK THEN
+  END
+ENDIF
+RUN h2LogState(pathNo, "trace after h2ReadState", state)
+
+nextSeq := state.reqSeq
+IF nextSeq >= 255 THEN
+  nextSeq := 1
+ELSE
+  nextSeq := nextSeq + 1
+ENDIF
+PRINT #pathNo, "trace: nextSeq "; nextSeq
+
+state.reqSeq  := nextSeq
+state.reqCmd  := 213
+state.errCode := 0
+PRINT #pathNo, "trace: h2WriteState begin"
+RUN h2WriteState(state, fileOK)
+PRINT #pathNo, "trace: h2WriteState ok "; fileOK
+IF NOT fileOK THEN
+  END
+ENDIF
+RUN h2ReadState(state, fileOK)
+IF fileOK THEN
+  RUN h2LogState(pathNo, "trace after h2WriteState", state)
+ENDIF
+
+childPidVal := state.childPid
+PRINT #pathNo, "trace: h2SendSignal pid "; childPidVal; " cmd 213"
+RUN h2SendSignal(childPidVal, 213, sigOK, errVal)
+PRINT #pathNo, "trace: h2SendSignal ok "; sigOK; " err "; errVal
+IF NOT sigOK THEN
+  RUN h2ReadState(state, fileOK)
+  IF fileOK THEN
+    RUN h2LogState(pathNo, "trace after h2SendSignal fail", state)
+  ENDIF
+  END
+ENDIF
+RUN h2ReadState(state, fileOK)
+IF fileOK THEN
+  RUN h2LogState(pathNo, "trace after h2SendSignal", state)
+ENDIF
+
+PRINT #pathNo, "trace: h2WaitRspSeq begin want "; nextSeq
+RUN h2WaitRspSeq(nextSeq, state, ok)
+PRINT #pathNo, "trace: h2WaitRspSeq ok "; ok
+RUN h2ReadState(state, fileOK)
+IF fileOK THEN
+  RUN h2LogState(pathNo, "trace after h2WaitRspSeq", state)
+ENDIF
+END
+
+900 PRINT "h2TraceUnloadRequest error ("; ERR; ")"
+    PRINT #pathNo, "h2TraceUnloadRequest error ("; ERR; ")"
     ok := FALSE
 END
 
