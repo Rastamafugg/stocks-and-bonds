@@ -94,9 +94,17 @@ IF NOT bootLoaded THEN
   GOTO 800
 ENDIF
 
-PRINT "Step 5: traced load request cmd 200"
-PRINT #logFile, "Step 5: traced load request cmd 200"
-RUN h3TraceLoadRequest(200, logFile, state, ok)
+PRINT "Step 5: bootLoadPhase cmd 200"
+PRINT #logFile, "Step 5: bootLoadPhase cmd 200"
+RUN h3ReadState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTCTLH3: h3ReadState before load failed"
+  PRINT #logFile, "TSTCTLH3: h3ReadState before load failed"
+  GOTO 800
+ENDIF
+RUN h3PrintState("before load", state)
+RUN h3LogState(logFile, "before load", state)
+RUN bootLoadPhase(200, ok)
 PRINT "bootLoadPhase ok "; ok
 PRINT #logFile, "bootLoadPhase ok "; ok
 RUN h3UnloadBoot(bootNam, bootHdrAdr, dropOK)
@@ -109,6 +117,14 @@ IF NOT ok THEN
   PRINT #logFile, "TSTCTLH3: bootLoadPhase failed"
   GOTO 800
 ENDIF
+RUN h3ReadState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTCTLH3: h3ReadState after load failed"
+  PRINT #logFile, "TSTCTLH3: h3ReadState after load failed"
+  GOTO 800
+ENDIF
+RUN h3PrintState("after load", state)
+RUN h3LogState(logFile, "after load", state)
 PRINT
 PRINT #logFile, ""
 
@@ -149,7 +165,15 @@ ENDIF
 
 PRINT "Step 9: bootUnloadPhase cmd 213"
 PRINT #logFile, "Step 9: bootUnloadPhase cmd 213"
-RUN h3TraceUnloadRequest(213, logFile, state, ok)
+RUN h3ReadState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTCTLH3: h3ReadState before unload failed"
+  PRINT #logFile, "TSTCTLH3: h3ReadState before unload failed"
+  GOTO 800
+ENDIF
+RUN h3PrintState("before unload", state)
+RUN h3LogState(logFile, "before unload", state)
+RUN bootUnloadPhase(ok)
 PRINT "bootUnloadPhase ok "; ok
 PRINT #logFile, "bootUnloadPhase ok "; ok
 RUN h3UnloadBoot(bootNam, bootHdrAdr, dropOK)
