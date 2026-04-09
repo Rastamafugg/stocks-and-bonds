@@ -844,7 +844,7 @@ FOR tries := 1 TO 40
   ENDIF
   PRINT #logFile, "try "; tries; " child "; state.childPid; " stat "; state.statusCode; " cslp "; state.childSleep
   IF state.childPid <> 0 THEN
-    IF state.statusCode = 10 THEN
+    IF state.statusCode = 10 OR state.statusCode = 11 THEN
       IF logOpen THEN
         PRINT #logFile, "ready"
         CLOSE #logFile
