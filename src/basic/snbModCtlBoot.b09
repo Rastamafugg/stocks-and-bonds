@@ -77,15 +77,11 @@ DIM errVal    : INTEGER
 DIM childPidVal: INTEGER
 DIM exitStat  : INTEGER
 DIM nextSeq   : INTEGER
-DIM logPath   : STRING[20]
-DIM logFile   : BYTE
-DIM logOpen   : BOOLEAN
+DIM mergeState: CtlState
 
 ON ERROR GOTO 900
 
 ok := FALSE
-logPath := "/d1/stopModCtl.log"
-logOpen := FALSE
 
 RUN bootReadState(state, fileOK)
 IF NOT fileOK THEN
@@ -115,26 +111,22 @@ state.reqSeq      := nextSeq
 state.reqCmd      := 214
 state.parentSleep := 1
 state.errCode     := 0
-ON ERROR GOTO 100
-DELETE logPath
-
-100 ON ERROR GOTO 200
-CREATE #logFile, logPath:WRITE
-logOpen := TRUE
-PRINT #logFile, "stopModCtl before write"
-PRINT #logFile, "req "; state.reqSeq; " rsp "; state.rspSeq; " cmd "; state.reqCmd
-PRINT #logFile, "pslp "; state.parentSleep; " cslp "; state.childSleep; " stat "; state.statusCode; " err "; state.errCode
-CLOSE #logFile
-logOpen := FALSE
-
-200 ON ERROR GOTO 900
-RUN bootWriteState(state, fileOK)
+RUN bootReadState(mergeState, fileOK)
+IF NOT fileOK THEN
+  PRINT "stopModCtl: merge bootReadState failed"
+  END
+ENDIF
+mergeState.reqSeq      := state.reqSeq
+mergeState.reqCmd      := state.reqCmd
+mergeState.parentSleep := state.parentSleep
+mergeState.errCode     := state.errCode
+RUN bootWriteState(mergeState, fileOK)
 IF NOT fileOK THEN
   PRINT "stopModCtl: bootWriteState failed"
   END
 ENDIF
 
-childPidVal := state.childPid
+childPidVal := mergeState.childPid
 RUN bootSendSignal(childPidVal, 214, sigOK, errVal)
 IF NOT sigOK THEN
   PRINT "stopModCtl: bootSendSignal failed err "; errVal
@@ -164,11 +156,7 @@ DELETE "MODULELIST"
 ok := TRUE
 END
 
-900 IF logOpen THEN
-      CLOSE #logFile
-      logOpen := FALSE
-    ENDIF
-    PRINT "stopModCtl error ("; ERR; ")"
+900 PRINT "stopModCtl error ("; ERR; ")"
     ok := FALSE
 END
 
@@ -222,6 +210,7 @@ DIM sigOK    : BOOLEAN
 DIM errVal   : INTEGER
 DIM childPidVal: INTEGER
 DIM nextSeq  : INTEGER
+DIM mergeState: CtlState
 
 ON ERROR GOTO 900
 
@@ -250,13 +239,22 @@ state.reqSeq      := nextSeq
 state.reqCmd      := cmdVal
 state.parentSleep := 1
 state.errCode     := 0
-RUN bootWriteState(state, fileOK)
+RUN bootReadState(mergeState, fileOK)
+IF NOT fileOK THEN
+  PRINT "bootRunRequest: merge bootReadState failed"
+  END
+ENDIF
+mergeState.reqSeq      := state.reqSeq
+mergeState.reqCmd      := state.reqCmd
+mergeState.parentSleep := state.parentSleep
+mergeState.errCode     := state.errCode
+RUN bootWriteState(mergeState, fileOK)
 IF NOT fileOK THEN
   PRINT "bootRunRequest: bootWriteState failed"
   END
 ENDIF
 
-childPidVal := state.childPid
+childPidVal := mergeState.childPid
 RUN bootSendSignal(childPidVal, cmdVal, sigOK, errVal)
 IF NOT sigOK THEN
   PRINT "bootRunRequest: bootSendSignal failed err "; errVal
@@ -660,6 +658,7 @@ PARAM ok      : BOOLEAN
 DIM slpOK     : BOOLEAN
 DIM errVal    : INTEGER
 DIM tries     : INTEGER
+DIM mergeState: CtlState
 
 ON ERROR GOTO 900
 
@@ -675,8 +674,13 @@ FOR tries := 1 TO 20
     END
   ENDIF
   IF state.rspSeq = wantSeq THEN
-    state.parentSleep := 0
-    RUN bootWriteState(state, slpOK)
+    RUN bootReadState(mergeState, slpOK)
+    IF NOT slpOK THEN
+      PRINT "bootWaitResponse: merge bootReadState failed"
+      END
+    ENDIF
+    mergeState.parentSleep := 0
+    RUN bootWriteState(mergeState, slpOK)
     IF NOT slpOK THEN
       PRINT "bootWaitResponse: clear parentSleep failed"
       END
