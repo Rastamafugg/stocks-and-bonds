@@ -1,0 +1,12 @@
+=== TSTCTLH2 ===
+Phase 2: cmd 200 plus MODULELIST
+
+Ready child 4 stat 10
+
+Write setup request seq 1 cmd 200
+Setup rsp 1 stat 20
+  err 0
+MODULELIST count 14 first snbSetup
+
+Write unload request seq 2 cmd 213
+TSTCTLH2: wait unload response failed
