@@ -6,7 +6,7 @@ Step 2: startModCtl
 after start
 req 0 rsp 0
 cmd 0
-pslp 0 cslp 0
+pslp 0 cslp 1
 stat 10 err 0
 seen 0 hits 0
 
@@ -39,20 +39,42 @@ seen 0 hits 0
 trace: bootSendSignal pid 4 cmd 200
 trace: bootSendSignal ok True err 0
 trace after bootSend
-req 0 rsp 0
-cmd 0
-pslp 0 cslp 1
+req 1 rsp 0
+cmd 200
+pslp 1 cslp 1
 stat 11 err 0
 seen 0 hits 0
 trace: bootWaitResponse begin want 1
-trace: bootWaitResponse ok False
+trace: bootWaitResponse ok True
 trace after bootWait
-req 0 rsp 0
-cmd 0
+req 1 rsp 1
+cmd 200
 pslp 0 cslp 1
-stat 11 err 0
+stat 20 err 0
 seen 0 hits 0
-bootLoadPhase ok False
-TSTCTLH3: bootLoadPhase failed
+bootLoadPhase ok True
+
+Step 4: probe MODULELIST after load
+MODULELIST count 14 first snbSetup
+
+Step 5: parent unloadPhaseModuleList
+parent unload ok True
+
+Step 6: bootUnloadPhase cmd 213
+bootUnloadPhase ok True
+after unload
+req 2 rsp 2
+cmd 213
+pslp 0 cslp 1
+stat 30 err 0
+seen 0 hits 0
+
+Step 7: probe MODULELIST after child unload
+Post-unload MODULELIST count 14 first snbSetup
+
+Step 8: stopModCtl
+stopModCtl ok False
+TSTCTLH3: stopModCtl failed
+
 boot helper unloaded True
 TSTCTLH3 complete
