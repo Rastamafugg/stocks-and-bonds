@@ -27,11 +27,12 @@ pslp 0 cslp 1
 stat 11 err 0
 seen 0 hits 0
 trace: h2WriteState begin
+trace: merge h2ReadState ok True
 trace: h2WriteState ok True
 trace after h2WriteState
 req 2 rsp 1
 cmd 213
-pslp 1 cslp 1
+pslp 1 cslp 0
 stat 11 err 0
 seen 0 hits 0
 trace: h2SendSignal pid 4 cmd 213
@@ -42,16 +43,16 @@ cmd 213
 pslp 1 cslp 1
 stat 11 err 0
 seen 0 hits 0
-trace: h2WaitRspSeq begin want 2
-trace: h2WaitRspSeq ok True
-trace after h2WaitRspSeq
+trace: h2WaitResponse begin want 2
+trace: h2WaitResponse ok True
+trace after h2WaitRespon
 req 2 rsp 2
 cmd 213
-pslp 1 cslp 1
-stat 253 err 240
+pslp 0 cslp 1
+stat 30 err 0
 seen 0 hits 0
-Unload rsp 2 stat 253
-  err 240
+Unload rsp 2 stat 30
+  err 0
 Post-unload MODULELIST count 14 first snbSetup
 
 Trace stop request cmd 214
@@ -60,8 +61,8 @@ trace: h2ReadState ok True
 trace after h2ReadState
 req 2 rsp 2
 cmd 213
-pslp 1 cslp 1
-stat 253 err 240
+pslp 0 cslp 1
+stat 11 err 0
 seen 0 hits 0
 trace: nextSeq 3
 trace: h2WaitChildSleep begin
@@ -69,31 +70,35 @@ trace: h2WaitChildSleep ok True
 trace after h2WaitChildS
 req 2 rsp 2
 cmd 213
-pslp 1 cslp 1
+pslp 0 cslp 1
 stat 11 err 0
 seen 0 hits 0
 trace: h2WriteState begin
+trace: merge h2ReadState ok True
 trace: h2WriteState ok True
 trace after h2WriteState
-req 2 rsp 2
-cmd 213
-pslp 1 cslp 0
+req 3 rsp 2
+cmd 214
+pslp 1 cslp 1
 stat 11 err 0
 seen 0 hits 0
 trace: h2SendSignal pid 4 cmd 214
 trace: h2SendSignal ok True err 0
 trace after h2SendSignal
-req 2 rsp 2
-cmd 213
-pslp 1 cslp 0
-stat 11 err 0
-seen 0 hits 0
-trace: h2WaitResponse begin want 3
-trace: h2WaitResponse ok False
-trace after h2WaitRespon
-req 2 rsp 2
-cmd 213
+req 3 rsp 2
+cmd 214
 pslp 1 cslp 1
 stat 11 err 0
 seen 0 hits 0
-TSTCTLH2: h2StopModCtl failed
+trace: h2WaitResponse begin want 3
+trace: h2WaitResponse ok True
+trace after h2WaitRespon
+req 3 rsp 3
+cmd 214
+pslp 0 cslp 0
+stat 40 err 0
+seen 214 hits 1
+trace: h2WaitChildExit begin
+trace: h2WaitChildExit ok True stat 0 err 0
+TSTCTLH2 complete
+
