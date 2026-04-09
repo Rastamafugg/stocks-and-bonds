@@ -114,7 +114,7 @@ PRINT #logFile, ""
 
 PRINT "Step 6: bootUnloadPhase cmd 213"
 PRINT #logFile, "Step 6: bootUnloadPhase cmd 213"
-RUN bootUnloadPhase(ok)
+RUN h3TraceUnloadRequest(213, logFile, state, ok)
 PRINT "bootUnloadPhase ok "; ok
 PRINT #logFile, "bootUnloadPhase ok "; ok
 IF NOT ok THEN
@@ -374,6 +374,115 @@ END
 
 900 PRINT "h3TraceLoadRequest error ("; ERR; ")"
     PRINT #pathNo, "h3TraceLoadRequest error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h3TraceUnloadRequest
+(* ============================================================ *)
+(* PROCEDURE : h3TraceUnloadRequest                             *)
+(* PURPOSE   : Reproduce bootUnloadPhase for cmdVal and log     *)
+(*             each sub-step and shared-state transition.       *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
+PARAM cmdVal : INTEGER
+PARAM pathNo : BYTE
+PARAM state  : CtlState
+PARAM ok     : BOOLEAN
+DIM fileOK     : BOOLEAN
+DIM sigOK      : BOOLEAN
+DIM stepOK     : BOOLEAN
+DIM errVal     : INTEGER
+DIM childPidVal: INTEGER
+DIM nextSeq    : INTEGER
+DIM mergeState : CtlState
+
+ON ERROR GOTO 900
+
+ok := FALSE
+PRINT #pathNo, "trace: bootReadState begin"
+RUN bootReadState(state, fileOK)
+PRINT #pathNo, "trace: bootReadState ok "; fileOK
+IF NOT fileOK THEN
+  END
+ENDIF
+RUN h3LogState(pathNo, "trace after bootReadState", state)
+
+nextSeq := state.reqSeq
+IF nextSeq >= 255 THEN
+  nextSeq := 1
+ELSE
+  nextSeq := nextSeq + 1
+ENDIF
+PRINT #pathNo, "trace: nextSeq "; nextSeq
+
+PRINT #pathNo, "trace: bootWaitChildSleep begin"
+RUN bootWaitChildSleep(state, stepOK)
+PRINT #pathNo, "trace: bootWaitChildSleep ok "; stepOK
+IF NOT stepOK THEN
+  RUN h3ReadState(state, fileOK)
+  IF fileOK THEN
+    RUN h3LogState(pathNo, "trace after bootWaitChildSleep fail", state)
+  ENDIF
+  END
+ENDIF
+RUN h3LogState(pathNo, "trace after bootWaitChildSleep", state)
+
+state.reqSeq      := nextSeq
+state.reqCmd      := cmdVal
+state.parentSleep := 1
+state.errCode     := 0
+PRINT #pathNo, "trace: bootWriteState begin"
+RUN bootReadState(mergeState, fileOK)
+PRINT #pathNo, "trace: merge bootReadState ok "; fileOK
+IF NOT fileOK THEN
+  END
+ENDIF
+mergeState.reqSeq      := state.reqSeq
+mergeState.reqCmd      := state.reqCmd
+mergeState.parentSleep := state.parentSleep
+mergeState.errCode     := state.errCode
+RUN bootWriteState(mergeState, fileOK)
+PRINT #pathNo, "trace: bootWriteState ok "; fileOK
+IF NOT fileOK THEN
+  END
+ENDIF
+RUN h3ReadState(state, fileOK)
+IF fileOK THEN
+  RUN h3LogState(pathNo, "trace after bootWriteState", state)
+ENDIF
+
+childPidVal := mergeState.childPid
+PRINT #pathNo, "trace: bootSendSignal pid "; childPidVal; " cmd "; cmdVal
+RUN bootSendSignal(childPidVal, cmdVal, sigOK, errVal)
+PRINT #pathNo, "trace: bootSendSignal ok "; sigOK; " err "; errVal
+IF NOT sigOK THEN
+  RUN h3ReadState(state, fileOK)
+  IF fileOK THEN
+    RUN h3LogState(pathNo, "trace after bootSendSignal fail", state)
+  ENDIF
+  END
+ENDIF
+RUN h3ReadState(state, fileOK)
+IF fileOK THEN
+  RUN h3LogState(pathNo, "trace after bootSendSignal", state)
+ENDIF
+
+PRINT #pathNo, "trace: bootWaitResponse begin want "; nextSeq
+RUN bootWaitResponse(nextSeq, state, stepOK)
+PRINT #pathNo, "trace: bootWaitResponse ok "; stepOK
+RUN h3ReadState(state, fileOK)
+IF fileOK THEN
+  RUN h3LogState(pathNo, "trace after bootWaitResponse", state)
+ENDIF
+IF NOT stepOK THEN
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "h3TraceUnloadRequest error ("; ERR; ")"
+    PRINT #pathNo, "h3TraceUnloadRequest error ("; ERR; ")"
     ok := FALSE
 END
 
