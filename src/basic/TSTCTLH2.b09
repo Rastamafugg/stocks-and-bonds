@@ -230,8 +230,21 @@ ELSE
 ENDIF
 PRINT #pathNo, "trace: nextSeq "; nextSeq
 
+PRINT #pathNo, "trace: h2WaitChildSleep begin"
+RUN h2WaitChildSleep(state, waitOK)
+PRINT #pathNo, "trace: h2WaitChildSleep ok "; waitOK
+IF NOT waitOK THEN
+  RUN h2ReadState(state, fileOK)
+  IF fileOK THEN
+    RUN h2LogState(pathNo, "trace after h2WaitChildSleep fail", state)
+  ENDIF
+  END
+ENDIF
+RUN h2LogState(pathNo, "trace after h2WaitChildSleep", state)
+
 state.reqSeq  := nextSeq
 state.reqCmd  := 214
+state.parentSleep := 1
 state.errCode := 0
 PRINT #pathNo, "trace: h2WriteState begin"
 RUN h2WriteState(state, fileOK)
@@ -309,6 +322,7 @@ DIM sigOK      : BOOLEAN
 DIM errVal     : INTEGER
 DIM childPidVal: INTEGER
 DIM nextSeq    : INTEGER
+DIM waitOK     : BOOLEAN
 
 ON ERROR GOTO 900
 
@@ -329,8 +343,21 @@ ELSE
 ENDIF
 PRINT #pathNo, "trace: nextSeq "; nextSeq
 
+PRINT #pathNo, "trace: h2WaitChildSleep begin"
+RUN h2WaitChildSleep(state, waitOK)
+PRINT #pathNo, "trace: h2WaitChildSleep ok "; waitOK
+IF NOT waitOK THEN
+  RUN h2ReadState(state, fileOK)
+  IF fileOK THEN
+    RUN h2LogState(pathNo, "trace after h2WaitChildSleep fail", state)
+  ENDIF
+  END
+ENDIF
+RUN h2LogState(pathNo, "trace after h2WaitChildSleep", state)
+
 state.reqSeq  := nextSeq
 state.reqCmd  := 213
+state.parentSleep := 1
 state.errCode := 0
 PRINT #pathNo, "trace: h2WriteState begin"
 RUN h2WriteState(state, fileOK)
@@ -414,6 +441,45 @@ PRINT "h2WaitRspSeq: timed out"
 END
 
 900 PRINT "h2WaitRspSeq error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE h2WaitChildSleep
+(* ============================================================ *)
+(* PROCEDURE : h2WaitChildSleep                                 *)
+(* PURPOSE   : Wait until the controller child publishes its    *)
+(*             sleep-ready state.                               *)
+(* ============================================================ *)
+TYPE CtlState = magic,parentPid,childPid,reqSeq,rspSeq,reqCmd,parentSleep,childSleep,statusCode,errCode,seenSig,seenCount:BYTE
+PARAM state : CtlState
+PARAM ok    : BOOLEAN
+DIM slpOK   : BOOLEAN
+DIM errVal  : INTEGER
+DIM tries   : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+FOR tries := 1 TO 20
+  RUN h2ReadState(state, ok)
+  IF NOT ok THEN
+    END
+  ENDIF
+  IF state.childSleep <> 0 THEN
+    ok := TRUE
+    END
+  ENDIF
+  RUN h2Sleep(slpOK, errVal)
+  IF NOT slpOK THEN
+    PRINT "h2WaitChildSleep: h2Sleep failed err "; errVal
+    END
+  ENDIF
+NEXT tries
+
+PRINT "h2WaitChildSleep: timed out"
+END
+
+900 PRINT "h2WaitChildSleep error ("; ERR; ")"
     ok := FALSE
 END
 
