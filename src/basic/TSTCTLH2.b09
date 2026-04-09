@@ -204,6 +204,7 @@ DIM errVal     : INTEGER
 DIM childPidVal: INTEGER
 DIM exitStat   : INTEGER
 DIM nextSeq    : INTEGER
+DIM mergeState : CtlState
 
 ON ERROR GOTO 900
 
@@ -247,7 +248,16 @@ state.reqCmd  := 214
 state.parentSleep := 1
 state.errCode := 0
 PRINT #pathNo, "trace: h2WriteState begin"
-RUN h2WriteState(state, fileOK)
+RUN h2ReadState(mergeState, fileOK)
+PRINT #pathNo, "trace: merge h2ReadState ok "; fileOK
+IF NOT fileOK THEN
+  END
+ENDIF
+mergeState.reqSeq      := state.reqSeq
+mergeState.reqCmd      := state.reqCmd
+mergeState.parentSleep := state.parentSleep
+mergeState.errCode     := state.errCode
+RUN h2WriteState(mergeState, fileOK)
 PRINT #pathNo, "trace: h2WriteState ok "; fileOK
 IF NOT fileOK THEN
   END
@@ -257,7 +267,7 @@ IF fileOK THEN
   RUN h2LogState(pathNo, "trace after h2WriteState", state)
 ENDIF
 
-childPidVal := state.childPid
+childPidVal := mergeState.childPid
 PRINT #pathNo, "trace: h2SendSignal pid "; childPidVal; " cmd 214"
 RUN h2SendSignal(childPidVal, 214, sigOK, errVal)
 PRINT #pathNo, "trace: h2SendSignal ok "; sigOK; " err "; errVal
@@ -323,6 +333,7 @@ DIM errVal     : INTEGER
 DIM childPidVal: INTEGER
 DIM nextSeq    : INTEGER
 DIM waitOK     : BOOLEAN
+DIM mergeState : CtlState
 
 ON ERROR GOTO 900
 
@@ -360,7 +371,16 @@ state.reqCmd  := 213
 state.parentSleep := 1
 state.errCode := 0
 PRINT #pathNo, "trace: h2WriteState begin"
-RUN h2WriteState(state, fileOK)
+RUN h2ReadState(mergeState, fileOK)
+PRINT #pathNo, "trace: merge h2ReadState ok "; fileOK
+IF NOT fileOK THEN
+  END
+ENDIF
+mergeState.reqSeq      := state.reqSeq
+mergeState.reqCmd      := state.reqCmd
+mergeState.parentSleep := state.parentSleep
+mergeState.errCode     := state.errCode
+RUN h2WriteState(mergeState, fileOK)
 PRINT #pathNo, "trace: h2WriteState ok "; fileOK
 IF NOT fileOK THEN
   END
@@ -370,7 +390,7 @@ IF fileOK THEN
   RUN h2LogState(pathNo, "trace after h2WriteState", state)
 ENDIF
 
-childPidVal := state.childPid
+childPidVal := mergeState.childPid
 PRINT #pathNo, "trace: h2SendSignal pid "; childPidVal; " cmd 213"
 RUN h2SendSignal(childPidVal, 213, sigOK, errVal)
 PRINT #pathNo, "trace: h2SendSignal ok "; sigOK; " err "; errVal
@@ -386,12 +406,12 @@ IF fileOK THEN
   RUN h2LogState(pathNo, "trace after h2SendSignal", state)
 ENDIF
 
-PRINT #pathNo, "trace: h2WaitRspSeq begin want "; nextSeq
-RUN h2WaitRspSeq(nextSeq, state, ok)
-PRINT #pathNo, "trace: h2WaitRspSeq ok "; ok
+PRINT #pathNo, "trace: h2WaitResponse begin want "; nextSeq
+RUN h2WaitResponse(nextSeq, state, ok)
+PRINT #pathNo, "trace: h2WaitResponse ok "; ok
 RUN h2ReadState(state, fileOK)
 IF fileOK THEN
-  RUN h2LogState(pathNo, "trace after h2WaitRspSeq", state)
+  RUN h2LogState(pathNo, "trace after h2WaitResponse", state)
 ENDIF
 END
 
@@ -991,26 +1011,38 @@ PARAM ok      : BOOLEAN
 DIM slpOK     : BOOLEAN
 DIM errVal    : INTEGER
 DIM tries     : INTEGER
+DIM mergeState: CtlState
 
 ON ERROR GOTO 900
 
 ok := FALSE
 FOR tries := 1 TO 20
+  RUN h2Sleep(slpOK, errVal)
+  IF NOT slpOK THEN
+    PRINT "h2WaitResponse: sleep failed err "; errVal
+    END
+  ENDIF
   RUN h2ReadState(state, ok)
   IF NOT ok THEN
     END
   ENDIF
   IF state.rspSeq = wantSeq THEN
+    RUN h2ReadState(mergeState, slpOK)
+    IF NOT slpOK THEN
+      PRINT "h2WaitResponse: merge h2ReadState failed"
+      END
+    ENDIF
+    mergeState.parentSleep := 0
+    RUN h2WriteState(mergeState, slpOK)
+    IF NOT slpOK THEN
+      PRINT "h2WaitResponse: clear parentSleep failed"
+      END
+    ENDIF
     IF state.errCode = 0 THEN
       ok := TRUE
       END
     ENDIF
     PRINT "h2WaitResponse: controller err "; state.errCode
-    END
-  ENDIF
-  RUN h2Sleep(slpOK, errVal)
-  IF NOT slpOK THEN
-    PRINT "h2WaitResponse: sleep failed err "; errVal
     END
   ENDIF
 NEXT tries
