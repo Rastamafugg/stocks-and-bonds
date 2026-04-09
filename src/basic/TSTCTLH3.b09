@@ -43,8 +43,15 @@ PRINT #logFile, "=== TSTCTLH3 ==="
 PRINT #logFile, "Reproduce snb releasePhaseLib path"
 PRINT #logFile, ""
 
-PRINT "Step 1: load boot helper"
-PRINT #logFile, "Step 1: load boot helper"
+PRINT "Step 1: prepare transient boot helper"
+PRINT #logFile, "Step 1: prepare transient boot helper"
+PRINT "boot helper loaded per step"
+PRINT #logFile, "boot helper loaded per step"
+PRINT
+PRINT #logFile, ""
+
+PRINT "Step 2: load boot helper for startModCtl"
+PRINT #logFile, "Step 2: load boot helper for startModCtl"
 RUN h3LoadBoot(bootHdrAdr, bootLoaded)
 IF NOT bootLoaded THEN
   PRINT "TSTCTLH3: h3LoadBoot failed"
@@ -52,8 +59,8 @@ IF NOT bootLoaded THEN
   END
 ENDIF
 
-PRINT "Step 2: startModCtl"
-PRINT #logFile, "Step 2: startModCtl"
+PRINT "Step 3: startModCtl"
+PRINT #logFile, "Step 3: startModCtl"
 RUN startModCtl(ok)
 IF NOT ok THEN
   PRINT "TSTCTLH3: startModCtl failed"
@@ -61,6 +68,11 @@ IF NOT ok THEN
   GOTO 800
 ENDIF
 ctlStarted := TRUE
+RUN h3UnloadBoot(bootNam, bootHdrAdr, dropOK)
+PRINT "boot helper unloaded "; dropOK
+PRINT #logFile, "boot helper unloaded "; dropOK
+bootLoaded := FALSE
+bootHdrAdr := 0
 
 RUN h3ReadState(state, fileOK)
 IF NOT fileOK THEN
@@ -73,11 +85,25 @@ RUN h3LogState(logFile, "after start", state)
 PRINT
 PRINT #logFile, ""
 
-PRINT "Step 3: traced load request cmd 200"
-PRINT #logFile, "Step 3: traced load request cmd 200"
+PRINT "Step 4: load boot helper for bootLoadPhase"
+PRINT #logFile, "Step 4: load boot helper for bootLoadPhase"
+RUN h3LoadBoot(bootHdrAdr, bootLoaded)
+IF NOT bootLoaded THEN
+  PRINT "TSTCTLH3: h3LoadBoot failed"
+  PRINT #logFile, "TSTCTLH3: h3LoadBoot failed"
+  GOTO 800
+ENDIF
+
+PRINT "Step 5: traced load request cmd 200"
+PRINT #logFile, "Step 5: traced load request cmd 200"
 RUN h3TraceLoadRequest(200, logFile, state, ok)
 PRINT "bootLoadPhase ok "; ok
 PRINT #logFile, "bootLoadPhase ok "; ok
+RUN h3UnloadBoot(bootNam, bootHdrAdr, dropOK)
+PRINT "boot helper unloaded "; dropOK
+PRINT #logFile, "boot helper unloaded "; dropOK
+bootLoaded := FALSE
+bootHdrAdr := 0
 IF NOT ok THEN
   PRINT "TSTCTLH3: bootLoadPhase failed"
   PRINT #logFile, "TSTCTLH3: bootLoadPhase failed"
@@ -86,8 +112,8 @@ ENDIF
 PRINT
 PRINT #logFile, ""
 
-PRINT "Step 4: probe MODULELIST after load"
-PRINT #logFile, "Step 4: probe MODULELIST after load"
+PRINT "Step 6: probe MODULELIST after load"
+PRINT #logFile, "Step 6: probe MODULELIST after load"
 RUN h3ProbeModuleList(probeOK, modCnt, firstName, probeErr)
 IF probeOK THEN
   PRINT "MODULELIST count "; modCnt; " first "; firstName
@@ -99,8 +125,8 @@ ENDIF
 PRINT
 PRINT #logFile, ""
 
-PRINT "Step 5: parent unloadPhaseModuleList"
-PRINT #logFile, "Step 5: parent unloadPhaseModuleList"
+PRINT "Step 7: parent unloadPhaseModuleList"
+PRINT #logFile, "Step 7: parent unloadPhaseModuleList"
 RUN h3UnloadPhaseModuleList(ok)
 PRINT "parent unload ok "; ok
 PRINT #logFile, "parent unload ok "; ok
@@ -112,11 +138,25 @@ ENDIF
 PRINT
 PRINT #logFile, ""
 
-PRINT "Step 6: bootUnloadPhase cmd 213"
-PRINT #logFile, "Step 6: bootUnloadPhase cmd 213"
+PRINT "Step 8: load boot helper for bootUnloadPhase"
+PRINT #logFile, "Step 8: load boot helper for bootUnloadPhase"
+RUN h3LoadBoot(bootHdrAdr, bootLoaded)
+IF NOT bootLoaded THEN
+  PRINT "TSTCTLH3: h3LoadBoot failed"
+  PRINT #logFile, "TSTCTLH3: h3LoadBoot failed"
+  GOTO 800
+ENDIF
+
+PRINT "Step 9: bootUnloadPhase cmd 213"
+PRINT #logFile, "Step 9: bootUnloadPhase cmd 213"
 RUN h3TraceUnloadRequest(213, logFile, state, ok)
 PRINT "bootUnloadPhase ok "; ok
 PRINT #logFile, "bootUnloadPhase ok "; ok
+RUN h3UnloadBoot(bootNam, bootHdrAdr, dropOK)
+PRINT "boot helper unloaded "; dropOK
+PRINT #logFile, "boot helper unloaded "; dropOK
+bootLoaded := FALSE
+bootHdrAdr := 0
 IF NOT ok THEN
   PRINT "TSTCTLH3: bootUnloadPhase failed"
   PRINT #logFile, "TSTCTLH3: bootUnloadPhase failed"
@@ -134,8 +174,8 @@ RUN h3LogState(logFile, "after unload", state)
 PRINT
 PRINT #logFile, ""
 
-PRINT "Step 7: probe MODULELIST after child unload"
-PRINT #logFile, "Step 7: probe MODULELIST after child unload"
+PRINT "Step 10: probe MODULELIST after child unload"
+PRINT #logFile, "Step 10: probe MODULELIST after child unload"
 RUN h3ProbeModuleList(probeOK, modCnt, firstName, probeErr)
 IF probeOK THEN
   PRINT "Post-unload MODULELIST count "; modCnt; " first "; firstName
@@ -148,11 +188,25 @@ PRINT
 PRINT #logFile, ""
 
 IF state.childPid <> 0 THEN
-  PRINT "Step 8: stopModCtl"
-  PRINT #logFile, "Step 8: stopModCtl"
+  PRINT "Step 11: load boot helper for stopModCtl"
+  PRINT #logFile, "Step 11: load boot helper for stopModCtl"
+  RUN h3LoadBoot(bootHdrAdr, bootLoaded)
+  IF NOT bootLoaded THEN
+    PRINT "TSTCTLH3: h3LoadBoot failed"
+    PRINT #logFile, "TSTCTLH3: h3LoadBoot failed"
+    GOTO 800
+  ENDIF
+
+  PRINT "Step 12: stopModCtl"
+  PRINT #logFile, "Step 12: stopModCtl"
   RUN stopModCtl(ok)
   PRINT "stopModCtl ok "; ok
   PRINT #logFile, "stopModCtl ok "; ok
+  RUN h3UnloadBoot(bootNam, bootHdrAdr, dropOK)
+  PRINT "boot helper unloaded "; dropOK
+  PRINT #logFile, "boot helper unloaded "; dropOK
+  bootLoaded := FALSE
+  bootHdrAdr := 0
   IF NOT ok THEN
     PRINT "TSTCTLH3: stopModCtl failed"
     PRINT #logFile, "TSTCTLH3: stopModCtl failed"
@@ -160,8 +214,8 @@ IF state.childPid <> 0 THEN
     ctlStarted := FALSE
   ENDIF
 ELSE
-  PRINT "Step 8: child already exited"
-  PRINT #logFile, "Step 8: child already exited"
+  PRINT "Step 11: child already exited"
+  PRINT #logFile, "Step 11: child already exited"
 ENDIF
 PRINT
 PRINT #logFile, ""
@@ -186,9 +240,21 @@ PRINT #logFile, ""
       PRINT #logFile, "TSTCTLH3 error ("; ERR; ")"
     ENDIF
     IF ctlStarted THEN
+      RUN h3LoadBoot(bootHdrAdr, bootLoaded)
+      IF logOpen THEN
+        PRINT #logFile, "boot helper loaded in error path "; bootLoaded
+      ENDIF
       RUN stopModCtl(ok)
       IF logOpen THEN
         PRINT #logFile, "stopModCtl in error path "; ok
+      ENDIF
+      IF bootLoaded THEN
+        RUN h3UnloadBoot(bootNam, bootHdrAdr, dropOK)
+        IF logOpen THEN
+          PRINT #logFile, "boot helper unloaded "; dropOK
+        ENDIF
+        bootLoaded := FALSE
+        bootHdrAdr := 0
       ENDIF
     ENDIF
     IF bootLoaded THEN
@@ -710,3 +776,4 @@ END
 900 PRINT "h3UnloadBoot error ("; ERR; ")"
     ok := FALSE
 END
+
