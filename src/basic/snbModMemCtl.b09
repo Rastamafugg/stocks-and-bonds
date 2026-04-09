@@ -29,6 +29,9 @@ DIM iSeenCount : INTEGER
 DIM icptOK     : INTEGER
 DIM icptMem(32): INTEGER
 DIM memIdx     : INTEGER
+DIM logPath    : STRING[24]
+DIM logFile    : BYTE
+DIM logOpen    : BOOLEAN
 
 ON ERROR GOTO 900
 
@@ -36,6 +39,8 @@ lastSeq    := 0
 hdrAddr    := 0
 currCmdVal := 0
 currName   := ""
+logPath    := "/d1/snbModMemCtl.log"
+logOpen    := FALSE
 FOR memIdx := 1 TO 32
   icptMem(memIdx) := 0
 NEXT memIdx
@@ -56,6 +61,8 @@ ENDIF
 ON ERROR GOTO 50
 DELETE "/d1/snbModMemCtl.log"
 50 ON ERROR GOTO 900
+CREATE #logFile, logPath:WRITE
+logOpen := TRUE
 
 RUN mmcReadState(state, fileOK)
 IF NOT fileOK THEN
@@ -133,6 +140,9 @@ LOOP
   ENDIF
   PRINT "snbModMemCtl: before wake write req "; state.reqSeq; " rsp "; state.rspSeq; " cmd "; state.reqCmd
   PRINT "  pslp "; state.parentSleep; " cslp "; state.childSleep; " stat "; state.statusCode; " err "; state.errCode
+  PRINT #logFile, "before wake write"
+  PRINT #logFile, "req "; state.reqSeq; " rsp "; state.rspSeq; " cmd "; state.reqCmd
+  PRINT #logFile, "pslp "; state.parentSleep; " cslp "; state.childSleep; " stat "; state.statusCode; " err "; state.errCode
   RUN mmcWriteState(state, fileOK)
   IF NOT fileOK THEN
     PRINT "snbModMemCtl: wake state write failed"
@@ -192,7 +202,11 @@ LOOP
 ENDLOOP
 END
 
-900 PRINT "snbModMemCtl error ("; ERR; ")"
+900 IF logOpen THEN
+      CLOSE #logFile
+      logOpen := FALSE
+    ENDIF
+    PRINT "snbModMemCtl error ("; ERR; ")"
 END
 
 PROCEDURE mmcReadState
