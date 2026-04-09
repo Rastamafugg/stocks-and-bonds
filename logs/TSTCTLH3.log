@@ -39,9 +39,9 @@ seen 0 hits 0
 trace: bootSendSignal pid 4 cmd 200
 trace: bootSendSignal ok True err 0
 trace after bootSend
-req 1 rsp 0
-cmd 200
-pslp 1 cslp 1
+req 0 rsp 0
+cmd 0
+pslp 0 cslp 1
 stat 11 err 0
 seen 0 hits 0
 trace: bootWaitResponse begin want 1
