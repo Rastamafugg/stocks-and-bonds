@@ -31,6 +31,58 @@ It runs this process sequence:
 
 All inter-process state handoff is done through `SNBSTATE`.
 
+The coordinator also uses a separate controller-session handshake through
+`SNBMODCS` when loading or releasing transient phase libraries via
+`requestPhaseLib`, `releasePhaseLib`, `startCtlSession`, and
+`stopCtlSession`.
+
+---
+
+## 1a. Controller State Record (`SNBMODCS`)
+
+`SNBMODCS` is a single shared request-response record between the parent-side
+bootstrap helper in `src/basic/snbModCtlBoot.b09` and the persistent child
+controller in `src/basic/snbModMemCtl.b09`.
+
+Current authority model:
+
+- `reqSeq` plus `reqCmd` identify the active request.
+- `rspSeq` plus `errCode` are the authoritative completion result observed by
+  the parent.
+- `statusCode` is a child-published phase or diagnostic field. It is useful for
+  debugging and tracing, but it is not the authoritative wrapper-level success
+  signal.
+- `seenSig` and `seenCount` are intercept diagnostics written by the child.
+  They are not the authoritative request identity.
+
+### `CtlState` field purposes
+
+| Field | Purpose |
+|-------|---------|
+| `magic` | Record signature for `SNBMODCS`. Current code expects `$53` before trusting the record contents. |
+| `parentPid` | Process ID of the parent coordinator-side process. The child uses it to wake the parent after startup and after publishing a response. |
+| `childPid` | Process ID of the persistent controller child. The parent uses it as the signal target for controller requests. |
+| `reqSeq` | Parent-owned request generation number. A changed value means a new request is pending. |
+| `rspSeq` | Child-owned response generation number. When it matches `reqSeq`, the parent treats that request as answered. |
+| `reqCmd` | Parent-owned request command code. Current production flow uses values such as `200` for phase-library load, `213` for child-side unload, and `214` for controller stop. |
+| `parentSleep` | Parent-side wait flag. The parent sets it before signaling a request and clears it after the matching response is accepted. The child uses it to decide whether to send a wake signal back to the parent. |
+| `childSleep` | Child-side sleep-ready flag. The child sets it before entering its sleep wait and clears it after wake or response publication. The parent polls it as the child-ready handoff indicator. |
+| `statusCode` | Child-published phase or outcome code. Common observed values include `10` for startup-ready, `11` for awake-idle, `40` for successful stop completion, and failure/diagnostic values such as `252` or `253`. This field may return to idle-state values after a successful response. |
+| `errCode` | Child-published request error result. The parent currently treats `errCode = 0` with matching `rspSeq` as the authoritative success contract for a request. |
+| `seenSig` | Last intercepted signal value observed by the child through `SLPICPT`. This is diagnostic signal-capture information. |
+| `seenCount` | Count of intercepted signals observed by the child in the current wake window. This is diagnostic signal-capture information. |
+
+### Field groups
+
+- Record validity and process identity:
+  `magic`, `parentPid`, `childPid`
+- Parent-owned request publication:
+  `reqSeq`, `reqCmd`, `parentSleep`
+- Child-owned readiness and response publication:
+  `childSleep`, `rspSeq`, `statusCode`, `errCode`
+- Child-owned signal diagnostics:
+  `seenSig`, `seenCount`
+
 ---
 
 ## 2. gameStage Constants
