@@ -636,7 +636,10 @@ ENDLOOP
     ENDIF
     RETURN
 
-900 PRINT "SNB error ("; ERR; ")"
+900 IF ctlStarted THEN
+      RUN stopCtlSession(ctlStarted, ok)
+    ENDIF
+    PRINT "SNB error ("; ERR; ")"
 END
 
 PROCEDURE readTurnPlyrType
