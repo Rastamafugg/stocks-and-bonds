@@ -100,6 +100,8 @@ LOOP
       END
     ENDIF
     RUN probeModuleListOpen
+    RUN probeParentLink("snbSetup", ok, phaseCmd, stateHdrAdr)
+    PRINT "parent link snbSetup ok "; ok; " err "; phaseCmd; " hdr "; stateHdrAdr
     RUN snbSetup
     RUN releasePhaseLib(ctlStarted, ok)
     IF NOT ok THEN
@@ -878,6 +880,46 @@ END
     PRINT "Press any key to continue...";
     GET #0, k
     PRINT
+END
+
+PROCEDURE probeParentLink
+(* ============================================================ *)
+(* PROCEDURE : probeParentLink                                  *)
+(* PURPOSE   : Verify the current process can F$Link a module.  *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM modNam  : STRING[20]
+PARAM ok      : BOOLEAN
+PARAM errVal  : INTEGER
+PARAM hdrAddr : INTEGER
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+errVal := 0
+hdrAddr := 0
+
+callCode := $00
+regs.a := 0
+regs.x := ADDR(modNam)
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+hdrAddr := regs.u
+ok := TRUE
+END
+
+900 PRINT "probeParentLink error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+    hdrAddr := 0
 END
 
 PROCEDURE startCtlSession
