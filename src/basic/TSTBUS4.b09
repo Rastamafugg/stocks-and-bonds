@@ -718,7 +718,7 @@ PROCEDURE busRequestQuit
 (* PURPOSE   : Publish one targeted quit request and wait ack. *)
 (* ============================================================ *)
 TYPE BusState = magic,parentPid,uiPid,mktPid,aiPid,reqSeq,targetMask,cmdCode,busSignal,parentSleep,uiRspSeq,mktRspSeq,aiRspSeq,uiStatus,mktStatus,aiStatus,uiSeenSig,mktSeenSig,aiSeenSig,uiSeenCnt,mktSeenCnt,aiSeenCnt,errCode:BYTE
-PARAM trgtMask : INTEGER
+PARAM trgtMask   : INTEGER
 PARAM sigVal     : INTEGER
 PARAM state      : BusState
 PARAM ok         : BOOLEAN
@@ -726,7 +726,7 @@ DIM fileOK       : BOOLEAN
 DIM sigOK        : BOOLEAN
 DIM waitOK       : BOOLEAN
 DIM errVal       : INTEGER
-DIM reqSeq       : INTEGER
+DIM reqSeqVal    : INTEGER
 
 ON ERROR GOTO 900
 
@@ -736,8 +736,8 @@ IF NOT fileOK THEN
   END
 ENDIF
 
-reqSeq := state.reqSeq + 1
-state.reqSeq      := reqSeq
+reqSeqVal := state.reqSeq + 1
+state.reqSeq      := reqSeqVal
 state.targetMask  := trgtMask
 state.cmdCode     := 9
 state.busSignal   := sigVal
@@ -754,7 +754,7 @@ IF NOT sigOK THEN
   END
 ENDIF
 
-RUN busWaitResponse(trgtMask, reqSeq, state, waitOK)
+RUN busWaitResponse(trgtMask, reqSeqVal, state, waitOK)
 IF NOT waitOK THEN
   END
 ENDIF
