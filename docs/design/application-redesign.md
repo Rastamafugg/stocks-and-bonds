@@ -1,0 +1,11 @@
+I want to do a redesign of the snb program.  The root process should be responsible for loading child processes that execute the different phases of the game.  For child processes that are needed outside of the main year loop (snbSetup, snbEndGame), they should load and exit once complete.  
+
+For the main year loop, I want to create a UI process that handles presenting the UI to the user and responds to user input. If the entire UI code does not all fit into memory, I want a signal/interrupt interface between the root process and this UI process to load and unload libraries responsible for each part of the UI's responsibilities, signalling the market process when it is safe to continue to the next step.
+
+I want a separate market process that manages the dividend calculations, the margin interest collection, the situation card draw, the market securities update, and the stock split mechanics.  If this logic does not all fit into memory, I want a signal/interrupt interface between the root process and this market process to load and unload libraries responsible for each part of the market's responsibilities, signalling the market process when it is safe to continue to the next step.
+
+I also want an AI process that handles the AI player's actions throughout the game, loaded when there are AI player's in the game.  If this logic does not all fit into memory, I want a signal/interrupt interface between the root process and this UI process to load and unload libraries responsible for each part of the AI's responsibilities, signalling the AI process when it is safe to continue to the next step.  When the AI process completes its work, the signal should be sent for the UI process to update the UI to inform the user what the AI player did.
+
+The game state should continue to be managed through the GAMESTATE file. I want to explore whether a unified signal "bus" can be used with interceptors for each process, so that each process can decide to act or not when other processes start or end signal-based work.
+
+We should start with a test harness that can validate this shared signalling bus approach across 4 processes.

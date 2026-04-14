@@ -1,0 +1,802 @@
+PROCEDURE TSTBUS4
+(* ============================================================ *)
+(* PROCEDURE : TSTBUS4                                         *)
+(* PURPOSE   : Root process test harness for a unified signal   *)
+(*             bus with three child workers (UI, Market, AI).   *)
+(*             The parent publishes one shared bus request and   *)
+(*             broadcasts the same signal to all children. Only  *)
+(*             the targeted role acknowledges the request.       *)
+(* ============================================================ *)
+TYPE BusState = magic,parentPid,uiPid,mktPid,aiPid,reqSeq,targetMask,cmdCode,busSignal,parentSleep,uiRspSeq,mktRspSeq,aiRspSeq,uiStatus,mktStatus,aiStatus,uiSeenSig,mktSeenSig,aiSeenSig,uiSeenCnt,mktSeenCnt,aiSeenCnt,errCode:BYTE
+DIM state       : BusState
+DIM ok          : BOOLEAN
+DIM fileOK      : BOOLEAN
+DIM pidOK       : BOOLEAN
+DIM childOK     : BOOLEAN
+DIM waitOK      : BOOLEAN
+DIM sigOK       : BOOLEAN
+DIM exitOK      : BOOLEAN
+DIM iParentPID  : INTEGER
+DIM errVal      : INTEGER
+DIM reqSeq      : INTEGER
+DIM exitStat    : INTEGER
+DIM uiRspBefore : INTEGER
+DIM mktRspBefore: INTEGER
+DIM aiRspBefore : INTEGER
+
+ON ERROR GOTO 900
+
+PRINT "=== TSTBUS4 ==="
+PRINT "4-process shared signal bus harness"
+PRINT
+
+RUN busGetProcID(iParentPID, pidOK)
+IF NOT pidOK THEN
+  PRINT "TSTBUS4: busGetProcID failed"
+  END
+ENDIF
+
+RUN busInitState(iParentPID, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTBUS4: busInitState failed"
+  END
+ENDIF
+
+PRINT "Fork worker 1"
+RUN busForkWorker(childOK, errVal)
+IF NOT childOK THEN
+  PRINT "TSTBUS4: first busForkWorker failed err "; errVal
+  END
+ENDIF
+RUN busWaitReady(1, state, waitOK)
+IF NOT waitOK THEN
+  PRINT "TSTBUS4: worker 1 ready wait failed"
+  END
+ENDIF
+PRINT "  UI PID  = "; state.uiPid
+
+PRINT "Fork worker 2"
+RUN busForkWorker(childOK, errVal)
+IF NOT childOK THEN
+  PRINT "TSTBUS4: second busForkWorker failed err "; errVal
+  END
+ENDIF
+RUN busWaitReady(2, state, waitOK)
+IF NOT waitOK THEN
+  PRINT "TSTBUS4: worker 2 ready wait failed"
+  END
+ENDIF
+PRINT "  MKT PID = "; state.mktPid
+
+PRINT "Fork worker 3"
+RUN busForkWorker(childOK, errVal)
+IF NOT childOK THEN
+  PRINT "TSTBUS4: third busForkWorker failed err "; errVal
+  END
+ENDIF
+RUN busWaitReady(3, state, waitOK)
+IF NOT waitOK THEN
+  PRINT "TSTBUS4: worker 3 ready wait failed"
+  END
+ENDIF
+PRINT "  AI PID  = "; state.aiPid
+PRINT
+
+RUN busReadState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTBUS4: read before UI cycle failed"
+  END
+ENDIF
+reqSeq      := state.reqSeq + 1
+uiRspBefore := state.uiRspSeq
+mktRspBefore:= state.mktRspSeq
+aiRspBefore := state.aiRspSeq
+
+state.reqSeq     := reqSeq
+state.targetMask := 1
+state.cmdCode    := 1
+state.busSignal  := 130
+state.parentSleep:= 1
+state.errCode    := 0
+RUN busWriteState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTBUS4: write UI request failed"
+  END
+ENDIF
+RUN busSignalAll(state, sigOK, errVal)
+IF NOT sigOK THEN
+  PRINT "TSTBUS4: UI broadcast failed err "; errVal
+  END
+ENDIF
+RUN busWaitResponse(1, reqSeq, state, waitOK)
+IF NOT waitOK THEN
+  PRINT "TSTBUS4: UI response wait failed"
+  END
+ENDIF
+PRINT "UI cycle rsp "; state.uiRspSeq; " status "; state.uiStatus; " sig "; state.uiSeenSig; " hits "; state.uiSeenCnt
+IF state.mktRspSeq <> mktRspBefore THEN
+  PRINT "FAIL: Market ack changed during UI-targeted request"
+ENDIF
+IF state.aiRspSeq <> aiRspBefore THEN
+  PRINT "FAIL: AI ack changed during UI-targeted request"
+ENDIF
+PRINT
+
+RUN busReadState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTBUS4: read before Market cycle failed"
+  END
+ENDIF
+reqSeq      := state.reqSeq + 1
+uiRspBefore := state.uiRspSeq
+mktRspBefore:= state.mktRspSeq
+aiRspBefore := state.aiRspSeq
+
+state.reqSeq     := reqSeq
+state.targetMask := 2
+state.cmdCode    := 1
+state.busSignal  := 131
+state.parentSleep:= 1
+state.errCode    := 0
+RUN busWriteState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTBUS4: write Market request failed"
+  END
+ENDIF
+RUN busSignalAll(state, sigOK, errVal)
+IF NOT sigOK THEN
+  PRINT "TSTBUS4: Market broadcast failed err "; errVal
+  END
+ENDIF
+RUN busWaitResponse(2, reqSeq, state, waitOK)
+IF NOT waitOK THEN
+  PRINT "TSTBUS4: Market response wait failed"
+  END
+ENDIF
+PRINT "MKT cycle rsp "; state.mktRspSeq; " status "; state.mktStatus; " sig "; state.mktSeenSig; " hits "; state.mktSeenCnt
+IF state.uiRspSeq <> uiRspBefore THEN
+  PRINT "FAIL: UI ack changed during Market-targeted request"
+ENDIF
+IF state.aiRspSeq <> aiRspBefore THEN
+  PRINT "FAIL: AI ack changed during Market-targeted request"
+ENDIF
+PRINT
+
+RUN busReadState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTBUS4: read before AI cycle failed"
+  END
+ENDIF
+reqSeq      := state.reqSeq + 1
+uiRspBefore := state.uiRspSeq
+mktRspBefore:= state.mktRspSeq
+aiRspBefore := state.aiRspSeq
+
+state.reqSeq     := reqSeq
+state.targetMask := 4
+state.cmdCode    := 1
+state.busSignal  := 132
+state.parentSleep:= 1
+state.errCode    := 0
+RUN busWriteState(state, fileOK)
+IF NOT fileOK THEN
+  PRINT "TSTBUS4: write AI request failed"
+  END
+ENDIF
+RUN busSignalAll(state, sigOK, errVal)
+IF NOT sigOK THEN
+  PRINT "TSTBUS4: AI broadcast failed err "; errVal
+  END
+ENDIF
+RUN busWaitResponse(4, reqSeq, state, waitOK)
+IF NOT waitOK THEN
+  PRINT "TSTBUS4: AI response wait failed"
+  END
+ENDIF
+PRINT "AI cycle rsp "; state.aiRspSeq; " status "; state.aiStatus; " sig "; state.aiSeenSig; " hits "; state.aiSeenCnt
+IF state.uiRspSeq <> uiRspBefore THEN
+  PRINT "FAIL: UI ack changed during AI-targeted request"
+ENDIF
+IF state.mktRspSeq <> mktRspBefore THEN
+  PRINT "FAIL: Market ack changed during AI-targeted request"
+ENDIF
+PRINT
+
+PRINT "Shutdown UI"
+RUN busRequestQuit(1, 140, state, waitOK)
+IF NOT waitOK THEN
+  PRINT "TSTBUS4: UI quit failed"
+  END
+ENDIF
+PRINT "Shutdown MKT"
+RUN busRequestQuit(2, 141, state, waitOK)
+IF NOT waitOK THEN
+  PRINT "TSTBUS4: MKT quit failed"
+  END
+ENDIF
+PRINT "Shutdown AI"
+RUN busRequestQuit(4, 142, state, waitOK)
+IF NOT waitOK THEN
+  PRINT "TSTBUS4: AI quit failed"
+  END
+ENDIF
+
+RUN busWaitChildExit(exitStat, exitOK, errVal)
+IF NOT exitOK THEN
+  PRINT "TSTBUS4: wait child exit #1 failed err "; errVal
+  END
+ENDIF
+PRINT "Child exit #1 status "; exitStat
+
+RUN busWaitChildExit(exitStat, exitOK, errVal)
+IF NOT exitOK THEN
+  PRINT "TSTBUS4: wait child exit #2 failed err "; errVal
+  END
+ENDIF
+PRINT "Child exit #2 status "; exitStat
+
+RUN busWaitChildExit(exitStat, exitOK, errVal)
+IF NOT exitOK THEN
+  PRINT "TSTBUS4: wait child exit #3 failed err "; errVal
+  END
+ENDIF
+PRINT "Child exit #3 status "; exitStat
+
+PRINT
+PRINT "TSTBUS4 complete"
+END
+
+900 PRINT "TSTBUS4 error ("; ERR; ")"
+END
+
+PROCEDURE busInitState
+(* ============================================================ *)
+(* PROCEDURE : busInitState                                    *)
+(* PURPOSE   : Create fresh shared bus state file TSTBUSS.     *)
+(* ============================================================ *)
+TYPE BusState = magic,parentPid,uiPid,mktPid,aiPid,reqSeq,targetMask,cmdCode,busSignal,parentSleep,uiRspSeq,mktRspSeq,aiRspSeq,uiStatus,mktStatus,aiStatus,uiSeenSig,mktSeenSig,aiSeenSig,uiSeenCnt,mktSeenCnt,aiSeenCnt,errCode:BYTE
+PARAM iParentPID : INTEGER
+PARAM ok         : BOOLEAN
+DIM state        : BusState
+DIM path         : BYTE
+DIM pathOpen     : BOOLEAN
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+ok       := FALSE
+
+ON ERROR GOTO 100
+DELETE "TSTBUSS"
+
+100 ON ERROR GOTO 900
+
+state.magic      := $53
+state.parentPid  := iParentPID
+state.uiPid      := 0
+state.mktPid     := 0
+state.aiPid      := 0
+state.reqSeq     := 0
+state.targetMask := 0
+state.cmdCode    := 0
+state.busSignal  := 0
+state.parentSleep:= 0
+state.uiRspSeq   := 0
+state.mktRspSeq  := 0
+state.aiRspSeq   := 0
+state.uiStatus   := 0
+state.mktStatus  := 0
+state.aiStatus   := 0
+state.uiSeenSig  := 0
+state.mktSeenSig := 0
+state.aiSeenSig  := 0
+state.uiSeenCnt  := 0
+state.mktSeenCnt := 0
+state.aiSeenCnt  := 0
+state.errCode    := 0
+
+CREATE #path, "TSTBUSS":UPDATE
+pathOpen := TRUE
+PUT #path, state
+
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "busInitState error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE busReadState
+(* ============================================================ *)
+(* PROCEDURE : busReadState                                    *)
+(* PURPOSE   : Read shared bus state from TSTBUSS.             *)
+(* ============================================================ *)
+TYPE BusState = magic,parentPid,uiPid,mktPid,aiPid,reqSeq,targetMask,cmdCode,busSignal,parentSleep,uiRspSeq,mktRspSeq,aiRspSeq,uiStatus,mktStatus,aiStatus,uiSeenSig,mktSeenSig,aiSeenSig,uiSeenCnt,mktSeenCnt,aiSeenCnt,errCode:BYTE
+PARAM state : BusState
+PARAM ok    : BOOLEAN
+DIM path    : BYTE
+DIM pathOpen: BOOLEAN
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+ok       := FALSE
+
+OPEN #path, "TSTBUSS":READ
+pathOpen := TRUE
+GET #path, state
+IF state.magic <> $53 THEN
+  PRINT "busReadState: invalid magic"
+  END
+ENDIF
+
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "busReadState error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE busWriteState
+(* ============================================================ *)
+(* PROCEDURE : busWriteState                                   *)
+(* PURPOSE   : Rewrite shared bus state in TSTBUSS.            *)
+(* ============================================================ *)
+TYPE BusState = magic,parentPid,uiPid,mktPid,aiPid,reqSeq,targetMask,cmdCode,busSignal,parentSleep,uiRspSeq,mktRspSeq,aiRspSeq,uiStatus,mktStatus,aiStatus,uiSeenSig,mktSeenSig,aiSeenSig,uiSeenCnt,mktSeenCnt,aiSeenCnt,errCode:BYTE
+PARAM state : BusState
+PARAM ok    : BOOLEAN
+DIM path    : BYTE
+DIM pathOpen: BOOLEAN
+
+ON ERROR GOTO 900
+
+pathOpen := FALSE
+ok       := FALSE
+
+OPEN #path, "TSTBUSS":UPDATE
+pathOpen := TRUE
+PUT #path, state
+
+CLOSE #path
+pathOpen := FALSE
+ok := TRUE
+END
+
+900 IF pathOpen THEN
+      CLOSE #path
+    ENDIF
+    PRINT "busWriteState error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE busGetProcID
+(* ============================================================ *)
+(* PROCEDURE : busGetProcID                                    *)
+(* PURPOSE   : Return process ID using F$ID.                   *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM procID : INTEGER
+PARAM ok     : BOOLEAN
+DIM regs     : Register
+DIM callCode : BYTE
+DIM iCC      : INTEGER
+
+ON ERROR GOTO 900
+
+procID   := 0
+ok       := FALSE
+callCode := $0C
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  END
+ENDIF
+
+procID := regs.a
+ok := TRUE
+END
+
+900 PRINT "busGetProcID error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE busForkWorker
+(* ============================================================ *)
+(* PROCEDURE : busForkWorker                                   *)
+(* PURPOSE   : Fork one TSTBUSW worker process.                *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM ok      : BOOLEAN
+PARAM errVal  : INTEGER
+DIM regs       : Register
+DIM callCode   : BYTE
+DIM runbBuf(6) : BYTE
+DIM paramBuf(24): BYTE
+DIM iCC        : INTEGER
+DIM nameLen    : INTEGER
+DIM i          : INTEGER
+DIM childName  : STRING[10]
+
+ON ERROR GOTO 900
+
+ok        := FALSE
+errVal    := 0
+childName := "TSTBUSW"
+
+runbBuf(1) := ASC("R")
+runbBuf(2) := ASC("u")
+runbBuf(3) := ASC("n")
+runbBuf(4) := LOR(ASC("B"), $80)
+
+nameLen := LEN(childName)
+FOR i := 1 TO 24
+  paramBuf(i) := 0
+NEXT i
+FOR i := 1 TO nameLen
+  paramBuf(i) := ASC(MID$(childName, i, 1))
+NEXT i
+paramBuf(nameLen + 1) := $0D
+
+callCode := $03
+regs.a   := 0
+regs.b   := 4
+regs.x   := ADDR(runbBuf)
+regs.y   := nameLen + 1
+regs.u   := ADDR(paramBuf)
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "busForkWorker error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
+
+PROCEDURE busSendSignal
+(* ============================================================ *)
+(* PROCEDURE : busSendSignal                                   *)
+(* PURPOSE   : Send one signal value to one process.           *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM procID  : INTEGER
+PARAM sigVal  : INTEGER
+PARAM ok      : BOOLEAN
+PARAM errVal  : INTEGER
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errVal   := 0
+callCode := $08
+regs.a   := procID
+regs.b   := sigVal
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "busSendSignal error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
+
+PROCEDURE busSignalAll
+(* ============================================================ *)
+(* PROCEDURE : busSignalAll                                    *)
+(* PURPOSE   : Broadcast busSignal to UI, Market, and AI PIDs. *)
+(* ============================================================ *)
+TYPE BusState = magic,parentPid,uiPid,mktPid,aiPid,reqSeq,targetMask,cmdCode,busSignal,parentSleep,uiRspSeq,mktRspSeq,aiRspSeq,uiStatus,mktStatus,aiStatus,uiSeenSig,mktSeenSig,aiSeenSig,uiSeenCnt,mktSeenCnt,aiSeenCnt,errCode:BYTE
+PARAM state : BusState
+PARAM ok    : BOOLEAN
+PARAM errVal: INTEGER
+DIM oneOK   : BOOLEAN
+DIM oneErr  : INTEGER
+
+ON ERROR GOTO 900
+
+ok     := FALSE
+errVal := 0
+
+RUN busSendSignal(state.uiPid, state.busSignal, oneOK, oneErr)
+IF NOT oneOK THEN
+  errVal := oneErr
+  END
+ENDIF
+
+RUN busSendSignal(state.mktPid, state.busSignal, oneOK, oneErr)
+IF NOT oneOK THEN
+  errVal := oneErr
+  END
+ENDIF
+
+RUN busSendSignal(state.aiPid, state.busSignal, oneOK, oneErr)
+IF NOT oneOK THEN
+  errVal := oneErr
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "busSignalAll error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
+
+PROCEDURE busSleep
+(* ============================================================ *)
+(* PROCEDURE : busSleep                                        *)
+(* PURPOSE   : Sleep briefly while polling state.              *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM ok      : BOOLEAN
+PARAM errVal  : INTEGER
+DIM regs      : Register
+DIM callCode  : BYTE
+DIM iCC       : INTEGER
+
+ON ERROR GOTO 900
+
+ok       := FALSE
+errVal   := 0
+callCode := $0A
+regs.x   := 2
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "busSleep error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
+
+PROCEDURE busWaitReady
+(* ============================================================ *)
+(* PROCEDURE : busWaitReady                                    *)
+(* PURPOSE   : Wait until requested number of workers are ready.*)
+(* ============================================================ *)
+TYPE BusState = magic,parentPid,uiPid,mktPid,aiPid,reqSeq,targetMask,cmdCode,busSignal,parentSleep,uiRspSeq,mktRspSeq,aiRspSeq,uiStatus,mktStatus,aiStatus,uiSeenSig,mktSeenSig,aiSeenSig,uiSeenCnt,mktSeenCnt,aiSeenCnt,errCode:BYTE
+PARAM wantCount : INTEGER
+PARAM state     : BusState
+PARAM ok        : BOOLEAN
+DIM slpOK       : BOOLEAN
+DIM errVal      : INTEGER
+DIM tries       : INTEGER
+DIM readyCount  : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+FOR tries := 1 TO 60
+  RUN busReadState(state, ok)
+  IF NOT ok THEN
+    END
+  ENDIF
+  readyCount := 0
+  IF state.uiPid <> 0 THEN
+    IF state.uiStatus = 10 THEN
+      readyCount := readyCount + 1
+    ENDIF
+  ENDIF
+  IF state.mktPid <> 0 THEN
+    IF state.mktStatus = 10 THEN
+      readyCount := readyCount + 1
+    ENDIF
+  ENDIF
+  IF state.aiPid <> 0 THEN
+    IF state.aiStatus = 10 THEN
+      readyCount := readyCount + 1
+    ENDIF
+  ENDIF
+  IF readyCount >= wantCount THEN
+    ok := TRUE
+    END
+  ENDIF
+  RUN busSleep(slpOK, errVal)
+  IF NOT slpOK THEN
+    PRINT "busWaitReady: sleep failed err "; errVal
+    END
+  ENDIF
+NEXT tries
+
+PRINT "busWaitReady: timed out"
+END
+
+900 PRINT "busWaitReady error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE busWaitResponse
+(* ============================================================ *)
+(* PROCEDURE : busWaitResponse                                 *)
+(* PURPOSE   : Wait for the targeted role to ack reqSeq.       *)
+(* ============================================================ *)
+TYPE BusState = magic,parentPid,uiPid,mktPid,aiPid,reqSeq,targetMask,cmdCode,busSignal,parentSleep,uiRspSeq,mktRspSeq,aiRspSeq,uiStatus,mktStatus,aiStatus,uiSeenSig,mktSeenSig,aiSeenSig,uiSeenCnt,mktSeenCnt,aiSeenCnt,errCode:BYTE
+PARAM targetMask : INTEGER
+PARAM wantSeq    : INTEGER
+PARAM state      : BusState
+PARAM ok         : BOOLEAN
+DIM slpOK        : BOOLEAN
+DIM wrOK         : BOOLEAN
+DIM errVal       : INTEGER
+DIM tries        : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+FOR tries := 1 TO 60
+  RUN busSleep(slpOK, errVal)
+  IF NOT slpOK THEN
+    PRINT "busWaitResponse: sleep failed err "; errVal
+    END
+  ENDIF
+  RUN busReadState(state, ok)
+  IF NOT ok THEN
+    END
+  ENDIF
+
+  IF targetMask = 1 THEN
+    IF state.uiRspSeq = wantSeq THEN
+      state.parentSleep := 0
+      RUN busWriteState(state, wrOK)
+      IF NOT wrOK THEN
+        PRINT "busWaitResponse: clear parentSleep failed"
+        END
+      ENDIF
+      ok := TRUE
+      END
+    ENDIF
+  ELSE IF targetMask = 2 THEN
+    IF state.mktRspSeq = wantSeq THEN
+      state.parentSleep := 0
+      RUN busWriteState(state, wrOK)
+      IF NOT wrOK THEN
+        PRINT "busWaitResponse: clear parentSleep failed"
+        END
+      ENDIF
+      ok := TRUE
+      END
+    ENDIF
+  ELSE IF targetMask = 4 THEN
+    IF state.aiRspSeq = wantSeq THEN
+      state.parentSleep := 0
+      RUN busWriteState(state, wrOK)
+      IF NOT wrOK THEN
+        PRINT "busWaitResponse: clear parentSleep failed"
+        END
+      ENDIF
+      ok := TRUE
+      END
+    ENDIF
+  ELSE
+    PRINT "busWaitResponse: unsupported targetMask "; targetMask
+    END
+  ENDIF \ENDIF \ENDIF
+NEXT tries
+
+PRINT "busWaitResponse: timed out for target "; targetMask; " seq "; wantSeq
+ok := FALSE
+END
+
+900 PRINT "busWaitResponse error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE busRequestQuit
+(* ============================================================ *)
+(* PROCEDURE : busRequestQuit                                  *)
+(* PURPOSE   : Publish one targeted quit request and wait ack. *)
+(* ============================================================ *)
+TYPE BusState = magic,parentPid,uiPid,mktPid,aiPid,reqSeq,targetMask,cmdCode,busSignal,parentSleep,uiRspSeq,mktRspSeq,aiRspSeq,uiStatus,mktStatus,aiStatus,uiSeenSig,mktSeenSig,aiSeenSig,uiSeenCnt,mktSeenCnt,aiSeenCnt,errCode:BYTE
+PARAM targetMask : INTEGER
+PARAM sigVal     : INTEGER
+PARAM state      : BusState
+PARAM ok         : BOOLEAN
+DIM fileOK       : BOOLEAN
+DIM sigOK        : BOOLEAN
+DIM waitOK       : BOOLEAN
+DIM errVal       : INTEGER
+DIM reqSeq       : INTEGER
+
+ON ERROR GOTO 900
+
+ok := FALSE
+RUN busReadState(state, fileOK)
+IF NOT fileOK THEN
+  END
+ENDIF
+
+reqSeq := state.reqSeq + 1
+state.reqSeq      := reqSeq
+state.targetMask  := targetMask
+state.cmdCode     := 9
+state.busSignal   := sigVal
+state.parentSleep := 1
+state.errCode     := 0
+RUN busWriteState(state, fileOK)
+IF NOT fileOK THEN
+  END
+ENDIF
+
+RUN busSignalAll(state, sigOK, errVal)
+IF NOT sigOK THEN
+  PRINT "busRequestQuit: signal failed err "; errVal
+  END
+ENDIF
+
+RUN busWaitResponse(targetMask, reqSeq, state, waitOK)
+IF NOT waitOK THEN
+  END
+ENDIF
+
+ok := TRUE
+END
+
+900 PRINT "busRequestQuit error ("; ERR; ")"
+    ok := FALSE
+END
+
+PROCEDURE busWaitChildExit
+(* ============================================================ *)
+(* PROCEDURE : busWaitChildExit                                *)
+(* PURPOSE   : Wait for one child process exit using F$Wait.   *)
+(* ============================================================ *)
+TYPE Register = cc,a,b,dp:BYTE; x,y,u:INTEGER
+PARAM exitStat : INTEGER
+PARAM ok       : BOOLEAN
+PARAM errVal   : INTEGER
+DIM regs       : Register
+DIM callCode   : BYTE
+DIM iCC        : INTEGER
+
+ON ERROR GOTO 900
+
+exitStat := 0
+ok       := FALSE
+errVal   := 0
+callCode := $04
+RUN SysCall(callCode, regs)
+iCC := regs.cc
+IF LAND(iCC, 1) <> 0 THEN
+  errVal := regs.b
+  END
+ENDIF
+
+exitStat := regs.b
+ok := TRUE
+END
+
+900 PRINT "busWaitChildExit error ("; ERR; ")"
+    ok := FALSE
+    errVal := ERR
+END
