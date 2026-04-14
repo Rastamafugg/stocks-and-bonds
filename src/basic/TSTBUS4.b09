@@ -18,7 +18,7 @@ DIM sigOK       : BOOLEAN
 DIM exitOK      : BOOLEAN
 DIM iParentPID  : INTEGER
 DIM errVal      : INTEGER
-DIM reqSeq      : INTEGER
+DIM reqSeqVal   : INTEGER
 DIM exitStat    : INTEGER
 DIM uiRspBefore : INTEGER
 DIM mktRspBefore: INTEGER
@@ -87,12 +87,12 @@ IF NOT fileOK THEN
   PRINT "TSTBUS4: read before UI cycle failed"
   END
 ENDIF
-reqSeq      := state.reqSeq + 1
+reqSeqVal   := state.reqSeq + 1
 uiRspBefore := state.uiRspSeq
 mktRspBefore:= state.mktRspSeq
 aiRspBefore := state.aiRspSeq
 
-state.reqSeq     := reqSeq
+state.reqSeq     := reqSeqVal
 state.targetMask := 1
 state.cmdCode    := 1
 state.busSignal  := 130
@@ -108,7 +108,7 @@ IF NOT sigOK THEN
   PRINT "TSTBUS4: UI broadcast failed err "; errVal
   END
 ENDIF
-RUN busWaitResponse(1, reqSeq, state, waitOK)
+RUN busWaitResponse(1, reqSeqVal, state, waitOK)
 IF NOT waitOK THEN
   PRINT "TSTBUS4: UI response wait failed"
   END
@@ -127,12 +127,12 @@ IF NOT fileOK THEN
   PRINT "TSTBUS4: read before Market cycle failed"
   END
 ENDIF
-reqSeq      := state.reqSeq + 1
+reqSeqVal   := state.reqSeq + 1
 uiRspBefore := state.uiRspSeq
 mktRspBefore:= state.mktRspSeq
 aiRspBefore := state.aiRspSeq
 
-state.reqSeq     := reqSeq
+state.reqSeq     := reqSeqVal
 state.targetMask := 2
 state.cmdCode    := 1
 state.busSignal  := 131
@@ -148,7 +148,7 @@ IF NOT sigOK THEN
   PRINT "TSTBUS4: Market broadcast failed err "; errVal
   END
 ENDIF
-RUN busWaitResponse(2, reqSeq, state, waitOK)
+RUN busWaitResponse(2, reqSeqVal, state, waitOK)
 IF NOT waitOK THEN
   PRINT "TSTBUS4: Market response wait failed"
   END
@@ -167,12 +167,12 @@ IF NOT fileOK THEN
   PRINT "TSTBUS4: read before AI cycle failed"
   END
 ENDIF
-reqSeq      := state.reqSeq + 1
+reqSeqVal   := state.reqSeq + 1
 uiRspBefore := state.uiRspSeq
 mktRspBefore:= state.mktRspSeq
 aiRspBefore := state.aiRspSeq
 
-state.reqSeq     := reqSeq
+state.reqSeq     := reqSeqVal
 state.targetMask := 4
 state.cmdCode    := 1
 state.busSignal  := 132
@@ -188,7 +188,7 @@ IF NOT sigOK THEN
   PRINT "TSTBUS4: AI broadcast failed err "; errVal
   END
 ENDIF
-RUN busWaitResponse(4, reqSeq, state, waitOK)
+RUN busWaitResponse(4, reqSeqVal, state, waitOK)
 IF NOT waitOK THEN
   PRINT "TSTBUS4: AI response wait failed"
   END
